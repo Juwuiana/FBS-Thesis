@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard – FBS Diabetes Risk</title>
+
+  <!-- Bootstrap 5 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <!-- Bootstrap Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+
+  <style>
+    :root {
+      --sidebar-bg: #1a2e1a;
+      --sidebar-hover: #2a4a2a;
+      --sidebar-active: #2d5a2d;
+      --sidebar-text: #c8d8c8;
+      --sidebar-active-text: #ffffff;
+      --accent-green: #3a7d3a;
+      --accent-green-light: #4caf50;
+      --body-bg: #f5f7f5;
+      --card-bg: #ffffff;
+      --text-primary: #1a2e1a;
+      --text-muted: #6b7c6b;
+      --risk-low: #4caf50;
+      --risk-moderate: #ff9800;
+      --risk-high: #f44336;
+      --border-color: #e0e8e0;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--body-bg);
+      color: var(--text-primary);
+      margin: 0;
+      display: flex;
+      min-height: 100vh;
+    }
+
+    /* ── SIDEBAR ── */
+    .sidebar {
+      width: 200px;
+      min-width: 200px;
+      background: var(--sidebar-bg);
+      display: flex;
+      flex-direction: column;
+      position: fixed;
+      top: 0; left: 0; bottom: 0;
+      z-index: 100;
+    }
+
+    .sidebar-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 20px 16px;
+      border-bottom: 1px solid rgba(255,255,255,.08);
+    }
+
+    .sidebar-brand-icon {
+      width: 40px; height: 40px;
+      background: #8b1a1a;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; color: #fff; font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .sidebar-brand-text {
+      font-size: 11px;
+      font-weight: 600;
+      color: #ffffff;
+      line-height: 1.3;
+    }
+
+    .sidebar-nav {
+      flex: 1;
+      padding: 12px 0;
+      overflow-y: auto;
+    }
+
+    .sidebar-nav a {
+      display: block;
+      padding: 10px 18px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--sidebar-text);
+      text-decoration: none;
+      border-radius: 0;
+      transition: background .15s, color .15s;
+    }
+
+    .sidebar-nav a:hover { background: var(--sidebar-hover); color: #fff; }
+    .sidebar-nav a.active {
+      background: var(--sidebar-active);
+      color: var(--sidebar-active-text);
+      border-left: 3px solid var(--accent-green-light);
+    }
+
+    .sidebar-footer {
+      padding: 16px;
+      border-top: 1px solid rgba(255,255,255,.08);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .sidebar-footer img {
+      width: 34px; height: 34px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid var(--accent-green-light);
+    }
+
+    .sidebar-footer-text { font-size: 12px; }
+    .sidebar-footer-name { font-weight: 600; color: #fff; }
+    .sidebar-footer-role { color: var(--sidebar-text); }
+
+    /* ── MAIN ── */
+    .main-wrapper {
+      margin-left: 200px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .topbar {
+      background: #fff;
+      border-bottom: 1px solid var(--border-color);
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky; top: 0; z-index: 50;
+    }
+
+    .topbar-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text-primary);
+      display: flex; align-items: center; gap: 10px;
+    }
+
+    .topbar-title .bi-list { cursor: pointer; font-size: 20px; }
+
+    .page-content {
+      padding: 24px;
+      flex: 1;
+    }
+
+    /* ── STAT CARDS ── */
+    .stat-card {
+      background: var(--card-bg);
+      border-radius: 12px;
+      padding: 18px 20px;
+      border: 1px solid var(--border-color);
+      height: 100%;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .stat-value {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--text-primary);
+      line-height: 1;
+    }
+
+    .stat-change {
+      font-size: 11px;
+      font-weight: 500;
+      margin-top: 5px;
+    }
+
+    .stat-change.up { color: #2e7d32; }
+    .stat-change.neutral { color: var(--text-muted); }
+
+    /* ── CHART CARDS ── */
+    .chart-card {
+      background: var(--card-bg);
+      border-radius: 12px;
+      border: 1px solid var(--border-color);
+      padding: 18px 20px;
+      height: 100%;
+    }
+
+    .chart-card-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 14px;
+    }
+
+    /* ── BARANGAY BARS ── */
+    .barangay-item { margin-bottom: 10px; }
+    .barangay-name { font-size: 12px; font-weight: 500; margin-bottom: 3px; }
+
+    .barangay-bar-track {
+      background: #e8f0e8;
+      border-radius: 6px;
+      height: 8px;
+      position: relative;
+    }
+
+    .barangay-bar-fill {
+      background: var(--accent-green-light);
+      border-radius: 6px;
+      height: 100%;
+    }
+
+    .barangay-count {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 2px;
+      text-align: right;
+    }
+
+    /* ── TABLE ── */
+    .screening-table { font-size: 13px; }
+    .screening-table thead th {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border-color);
+      padding: 8px 10px;
+      background: #f8fbf8;
+    }
+    .screening-table tbody td { padding: 9px 10px; vertical-align: middle; }
+    .screening-table tbody tr { border-bottom: 1px solid #f0f4f0; }
+    .screening-table tbody tr:last-child { border-bottom: none; }
+
+    .badge-category {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: #f0f4f0;
+      color: var(--text-primary);
+    }
+
+    .risk-pill {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .risk-low  { background: #e8f5e9; color: #2e7d32; }
+    .risk-moderate { background: #fff3e0; color: #e65100; }
+    .risk-high { background: #ffebee; color: #c62828; }
+
+    /* ── MODEL PERFORMANCE ── */
+    .perf-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 0;
+      border-bottom: 1px solid #f0f4f0;
+      font-size: 13px;
+    }
+    .perf-row:last-child { border-bottom: none; }
+    .perf-label { color: var(--text-muted); font-weight: 500; }
+    .perf-value { font-weight: 700; color: var(--text-primary); }
+
+    /* ── DONUT LEGEND ── */
+    .donut-legend { font-size: 12px; margin-top: 10px; }
+    .donut-legend-item {
+      display: flex; align-items: center; gap: 6px;
+      margin-bottom: 5px;
+    }
+    .legend-dot {
+      width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+    }
+
+    .view-all-link {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--accent-green);
+      text-decoration: none;
+    }
+    .view-all-link:hover { text-decoration: underline; }
+  </style>
+</head>
+
+<body>
+
+  <!-- ── SIDEBAR ── -->
+  <nav class="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-brand-icon">🏥</div>
+      <div class="sidebar-brand-text">FBS-Based<br>Diabetes Risk<br>Prediction</div>
+    </div>
+
+    <div class="sidebar-nav">
+      <a href="/admin/dashboard" class="active">Dashboard</a>
+      <a href="#">Patients Screening</a>
+      <a href="#">Health Result</a>
+      <a href="#">Model Reliability</a>
+      <a href="#">Green Computing</a>
+      <a href="#">Data Management</a>
+      <a href="#">Privacy &amp; Security</a>
+    </div>
+
+    <div class="sidebar-footer">
+      <img src="https://ui-avatars.com/api/?name=Health+Officer&background=4caf50&color=fff" alt="User avatar" />
+      <div class="sidebar-footer-text">
+        <div class="sidebar-footer-name">Health Officer</div>
+        <div class="sidebar-footer-role">LHU Cabuyao</div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ── MAIN WRAPPER ── -->
+  <div class="main-wrapper">
+
+    <!-- Topbar -->
+    <header class="topbar">
+      <div class="topbar-title">
+        <i class="bi bi-list"></i>
+        Dashboard
+      </div>
+      <button class="btn btn-sm btn-outline-secondary border-0">
+        <i class="bi bi-bell fs-5"></i>
+      </button>
+    </header>
+
+    <!-- Page Content -->
+    <main class="page-content">
+
+      <!-- ── ROW 1: STAT CARDS ── -->
+      <div class="row g-3 mb-3">
+        <div class="col-md col-sm-6">
+          <div class="stat-card">
+            <div class="stat-label">Total Screened</div>
+            <div class="stat-value">{{ metrics.total_screened | default('1,392') }}</div>
+            <div class="stat-change up">
+              <i class="bi bi-arrow-up-short"></i>{{ metrics.total_screened_change | default('+1.2% vs last week') }}
+            </div>
+          </div>
+        </div>
+        <div class="col-md col-sm-6">
+          <div class="stat-card">
+            <div class="stat-label">At Risk (Predicted)</div>
+            <div class="stat-value">
+              {{ metrics.at_risk | default(276) }}
+              <span style="font-size:14px;font-weight:500;color:var(--text-muted)">({{ metrics.at_risk_pct | default(19.8) }}%)</span>
+            </div>
+            <div class="stat-change up">
+              <i class="bi bi-arrow-up-short"></i>{{ metrics.at_risk_change | default('+8% vs last week') }}
+            </div>
+          </div>
+        </div>
+        <div class="col-md col-sm-6">
+          <div class="stat-card">
+            <div class="stat-label">High Risk</div>
+            <div class="stat-value">
+              {{ metrics.high_risk | default(82) }}
+              <span style="font-size:14px;font-weight:500;color:var(--text-muted)">({{ metrics.high_risk_pct | default(5.9) }}%)</span>
+            </div>
+            <div class="stat-change up">
+              <i class="bi bi-arrow-up-short"></i>{{ metrics.high_risk_change | default('+3% vs last week') }}
+            </div>
+          </div>
+        </div>
+        <div class="col-md col-sm-6">
+          <div class="stat-card">
+            <div class="stat-label">Average FBS (mg/dL)</div>
+            <div class="stat-value">{{ metrics.avg_fbs | default(111.4) }}</div>
+            <div class="stat-change up">
+              <i class="bi bi-arrow-up-short"></i>{{ metrics.avg_fbs_change | default('+2.6 vs last week') }}
+            </div>
+          </div>
+        </div>
+        <div class="col-md col-sm-6">
+          <div class="stat-card">
+            <div class="stat-label">Model Accuracy</div>
+            <div class="stat-value">{{ metrics.model_accuracy | default(89.3) }}%</div>
+            <div class="stat-change neutral">Validation Set</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── ROW 2: DONUT / LINE CHART / BARANGAY ── -->
+      <div class="row g-3 mb-3">
+
+        <!-- Donut -->
+        <div class="col-lg-3 col-md-5">
+          <div class="chart-card h-100">
+            <div class="chart-card-title">Risk Distribution</div>
+            <canvas id="donutChart" height="180"></canvas>
+            <div class="donut-legend mt-3">
+              <div class="donut-legend-item">
+                <span class="legend-dot" style="background:var(--risk-low)"></span>
+                <span>Low Risk – <strong>72.1%</strong> (1,073)</span>
+              </div>
+              <div class="donut-legend-item">
+                <span class="legend-dot" style="background:var(--risk-moderate)"></span>
+                <span>Moderate Risk – <strong>17.0%</strong> (237)</span>
+              </div>
+              <div class="donut-legend-item">
+                <span class="legend-dot" style="background:var(--risk-high)"></span>
+                <span>High Risk – <strong>5.9%</strong> (82)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Line Chart -->
+        <div class="col-lg-6 col-md-7">
+          <div class="chart-card h-100">
+            <div class="chart-card-title">Screenings Over Time</div>
+            <canvas id="lineChart" height="200"></canvas>
+          </div>
+        </div>
+
+        <!-- Barangay -->
+        <div class="col-lg-3 col-md-12">
+          <div class="chart-card h-100">
+            <div class="chart-card-title">Barangay List by At-Risk Count</div>
+            {% set barangays = barangay_list if barangay_list is defined else [
+              {"name":"Kanluran","count":58},
+              {"name":"Market Area","count":47},
+              {"name":"Dila","count":41},
+              {"name":"Dita","count":33},
+              {"name":"Malitlit","count":29}
+            ] %}
+            {% for b in barangays %}
+            <div class="barangay-item">
+              <div class="d-flex justify-content-between">
+                <span class="barangay-name">{{ b.name }}</span>
+                <span class="barangay-count">{{ b.count }}</span>
+              </div>
+              <div class="barangay-bar-track">
+                <div class="barangay-bar-fill" style="width:{{ (b.count / 60 * 100)|int }}%"></div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+      <!-- ── ROW 3: RECENT SCREENINGS / MODEL PERFORMANCE ── -->
+      <div class="row g-3">
+
+        <!-- Recent Screenings Table -->
+        <div class="col-lg-8">
+          <div class="chart-card">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <div class="chart-card-title mb-0">Recent Screenings</div>
+              <a href="#" class="view-all-link">View All</a>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-borderless screening-table mb-0">
+                <thead>
+                  <tr>
+                    <th>Patient ID</th>
+                    <th>Name</th>
+                    <th>FBS (mg/dL)</th>
+                    <th>Category</th>
+                    <th>Risk Level</th>
+                    <th>Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% set rows = recent_screenings if recent_screenings is defined else [
+                    {"id":"CAB-2025-0156","name":"Juan Dela Cruz","fbs":142,"category":"Diabetic","risk":"High","date":"May 27, 2025"},
+                    {"id":"CAB-2025-0155","name":"Maria Santos","fbs":118,"category":"Prediabetic","risk":"Low","date":"May 27, 2025"},
+                    {"id":"CAB-2025-0154","name":"Pedro Reyes","fbs":96,"category":"Normal","risk":"Moderate","date":"May 27, 2025"},
+                    {"id":"CAB-2025-0153","name":"Ana Garcia","fbs":134,"category":"Prediabetic","risk":"High","date":"May 27, 2025"},
+                    {"id":"CAB-2025-0152","name":"Lisa Perez","fbs":155,"category":"Diabetic","risk":"High","date":"May 26, 2025"}
+                  ] %}
+                  {% for r in rows %}
+                  <tr>
+                    <td style="font-size:12px;color:var(--text-muted)">{{ r.id }}</td>
+                    <td>{{ r.name }}</td>
+                    <td><strong>{{ r.fbs }}</strong></td>
+                    <td><span class="badge-category">{{ r.category }}</span></td>
+                    <td>
+                      <span class="risk-pill risk-{{ r.risk | lower }}">{{ r.risk }}</span>
+                    </td>
+                    <td style="font-size:12px;color:var(--text-muted)">{{ r.date }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Model Performance -->
+        <div class="col-lg-4">
+          <div class="chart-card h-100">
+            <div class="chart-card-title">Model Performance (Current Model)</div>
+            <canvas id="radarChart" height="200"></canvas>
+            <div class="mt-3">
+              {% set perf = model_performance if model_performance is defined else
+                {"accuracy":89.3,"precision":0.87,"recall":0.88,"f1_score":0.87,"roc_auc":0.93} %}
+              <div class="perf-row">
+                <span class="perf-label">Accuracy</span>
+                <span class="perf-value">{{ perf.accuracy }}%</span>
+              </div>
+              <div class="perf-row">
+                <span class="perf-label">Precision</span>
+                <span class="perf-value">{{ perf.precision }}</span>
+              </div>
+              <div class="perf-row">
+                <span class="perf-label">Recall</span>
+                <span class="perf-value">{{ perf.recall }}</span>
+              </div>
+              <div class="perf-row">
+                <span class="perf-label">F1-Score</span>
+                <span class="perf-value">{{ perf.f1_score }}</span>
+              </div>
+              <div class="perf-row">
+                <span class="perf-label">ROC-AUC</span>
+                <span class="perf-value">{{ perf.roc_auc }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div><!-- /main-wrapper -->
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+    // ── Donut Chart ──
+    new Chart(document.getElementById('donutChart'), {
+      type: 'doughnut',
+      data: {
+        labels: ['Low Risk', 'Moderate Risk', 'High Risk'],
+        datasets: [{
+          data: [72.1, 17.0, 5.9],
+          backgroundColor: ['#4caf50', '#ff9800', '#f44336'],
+          borderWidth: 2,
+          borderColor: '#fff',
+          hoverOffset: 4
+        }]
+      },
+      options: {
+        cutout: '65%',
+        plugins: { legend: { display: false }, tooltip: { callbacks: {
+          label: ctx => ` ${ctx.label}: ${ctx.parsed}%`
+        }}},
+        responsive: true
+      }
+    });
+
+    // ── Line Chart ──
+    const labels = ['May 14','May 16','May 18','May 20','May 22','May 24','May 27'];
+    new Chart(document.getElementById('lineChart'), {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'Total Screened',
+            data: [310, 295, 320, 305, 315, 300, 312],
+            borderColor: '#4caf50',
+            backgroundColor: 'rgba(76,175,80,.08)',
+            fill: true,
+            tension: 0.35,
+            pointRadius: 3,
+            borderWidth: 2
+          },
+          {
+            label: 'At Risk',
+            data: [155, 148, 162, 152, 158, 150, 156],
+            borderColor: '#f44336',
+            backgroundColor: 'rgba(244,67,54,.05)',
+            fill: true,
+            tension: 0.35,
+            pointRadius: 3,
+            borderWidth: 2
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+          y: { grid: { color: '#f0f4f0' }, ticks: { font: { size: 11 } }, beginAtZero: false }
+        },
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: { boxWidth: 10, font: { size: 11 } }
+          }
+        }
+      }
+    });
+
+    // ── Radar Chart ──
+    new Chart(document.getElementById('radarChart'), {
+      type: 'radar',
+      data: {
+        labels: ['Accuracy', 'Precision', 'Recall', 'F1-Score', 'ROC-AUC'],
+        datasets: [{
+          label: 'Current Model',
+          data: [0.893, 0.87, 0.88, 0.87, 0.93],
+          backgroundColor: 'rgba(76,175,80,.15)',
+          borderColor: '#4caf50',
+          borderWidth: 2,
+          pointBackgroundColor: '#4caf50',
+          pointRadius: 3
+        }]
+      },
+      options: {
+        responsive: true,
+        scales: {
+          r: {
+            min: 0.75, max: 1,
+            ticks: { stepSize: 0.05, font: { size: 10 }, backdropColor: 'transparent' },
+            grid: { color: '#e0e8e0' },
+            pointLabels: { font: { size: 11 }, color: '#4a5a4a' }
+          }
+        },
+        plugins: { legend: { display: false } }
+      }
+    });
+  </script>
+</body>
+</html>
