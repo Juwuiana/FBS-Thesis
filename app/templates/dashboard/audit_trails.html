@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+{% set active_page = "audit_trails" %}
+
+{% block title %}Audit Trails – FBS Diabetes Risk{% endblock %}
+{% block page_title %}Audit Log &amp; Trails{% endblock %}
+
+{% block content %}
+<main class="page-content">
+  <div class="audit-card">
+
+    <!-- Filter Row -->
+    <div class="row g-2 mb-3">
+      <div class="col-12 col-md-4">
+        <input type="text" class="audit-search" placeholder="Search events, users, or IP…"
+               id="auditSearch" oninput="filterAudit()" />
+      </div>
+      <div class="col-6 col-md">
+        <select class="audit-filter-select" id="filterType" onchange="filterAudit()">
+          <option value="">All Types</option>
+          <option value="login">Login</option>
+          <option value="export">Export</option>
+          <option value="edit">Edit</option>
+          <option value="delete">Delete</option>
+          <option value="import">Import</option>
+          <option value="role">Role Change</option>
+          <option value="report">Report</option>
+          <option value="failed">Failed</option>
+        </select>
+      </div>
+      <div class="col-6 col-md">
+        <select class="audit-filter-select" id="filterRole" onchange="filterAudit()">
+          <option value="">All Users</option>
+          <option value="admin">Admin</option>
+          <option value="nurse">Nurse</option>
+          <option value="unknown">Unknown</option>
+        </select>
+      </div>
+      <div class="col-6 col-md">
+        <select class="audit-filter-select" id="filterDate">
+          <option>Today</option>
+          <option>Last 7 Days</option>
+          <option>Last 30 Days</option>
+        </select>
+      </div>
+      <div class="col-6 col-md">
+        <select class="audit-filter-select" id="filterSeverity" onchange="filterAudit()">
+          <option value="">All Levels</option>
+          <option value="info">Info</option>
+          <option value="warning">Warning</option>
+          <option value="critical">Critical</option>
+          <option value="success">Success</option>
+        </select>
+      </div>
+      <div class="col-auto">
+        <button class="reset-btn" title="Reset filters" onclick="resetFilters()">
+          <i class="bi bi-arrow-counterclockwise"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Log header + export -->
+    <div class="audit-log-header">
+      <div>
+        <div class="audit-log-title">Full Audit Log</div>
+        <div class="audit-log-subtitle" id="auditCount">
+          Showing {{ logs | length }} events — {{ audit_date }}
+        </div>
+      </div>
+      <div class="d-flex gap-2 flex-wrap">
+        <button class="audit-export-btn"><i class="bi bi-download me-1"></i> Export</button>
+        <button class="audit-print-btn"><i class="bi bi-printer me-1"></i> Print</button>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="audit-table-wrap">
+      <table class="table table-borderless audit-table mb-0">
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>User</th>
+            <th>Action / Event</th>
+            <th class="hide-mobile">IP Address</th>
+            <th class="hide-mobile">Severity</th>
+            <th>Details</th>
+          </tr>
+        </thead>
+        <tbody id="auditTableBody">
+          {% for log in logs %}
+          <tr
+            data-action="{{ log.action | lower }}"
+            data-role="{{ log.role | lower }}"
+            data-severity="{{ log.severity | lower }}"
+            data-search="{{ (log.user ~ ' ' ~ log.action ~ ' ' ~ log.ip) | lower }}"
+          >
+            <td style="white-space:nowrap">
+              <div class="audit-time">{{ log.time }}</div>
+              <div class="audit-date">{{ log.date }}</div>
+            </td>
+            <td>
+              <div class="d-flex align-items-center gap-2">
+                <div class="user-avatar
+                  {{ 'avatar-admin' if log.role == 'Admin' else
+                     ('avatar-unknown' if log.role == 'Unknown' else 'avatar-nurse') }}">
+                  {{ log.user[0] | upper }}
+                </div>
+                <div>
+                  <div class="audit-user-name">{{ log.user }}</div>
+                  <div class="audit-user-role">{{ log.role }}</div>
+                </div>
+              </div>
+            </td>
+            <td><span class="audit-action">{{ log.action }}</span></td>
+            <td class="hide-mobile">
+              <div class="ip-address">{{ log.ip }}</div>
+              <a href="#" class="view-location-link">View location →</a>
+            </td>
+            <td class="hide-mobile">
+              {% if log.severity == 'Critical' %}
+                <span class="sev-critical">Critical</span>
+              {% elif log.severity == 'Warning' %}
+                <span class="sev-warning">Warning</span>
+              {% elif log.severity == 'Success' %}
+                <span class="sev-success">Success</span>
+              {% else %}
+                <span class="sev-info">Info</span>
+              {% endif %}
+            </td>
+            <td><button class="details-btn">Details →</button></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination -->
+    <div class="audit-pagination mt-3">
+      <div class="audit-pagination-info">
+        Showing 1–{{ [logs | length, 12] | min }} of {{ logs | length }} events
+      </div>
+      <div class="page-btns">
+        <button class="page-btn page-btn-arrow">‹</button>
+        <button class="page-btn active">1</button>
+        <button class="page-btn">2</button>
+        <button class="page-btn">3</button>
+        <button class="page-btn" style="width:auto;padding:0 8px">…</button>
+        <button class="page-btn">21</button>
+        <button class="page-btn page-btn-arrow">›</button>
+      </div>
+    </div>
+
+  </div>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function filterAudit() {
+    const q    = document.getElementById('auditSearch').value.toLowerCase();
+    const type = document.getElementById('filterType').value.toLowerCase();
+    const role = document.getElementById('filterRole').value.toLowerCase();
+    const sev  = document.getElementById('filterSeverity').value.toLowerCase();
+    const rows = document.querySelectorAll('#auditTableBody tr');
+    let visible = 0;
+
+    rows.forEach(row => {
+      const matchSearch = !q    || row.dataset.search.includes(q);
+      const matchType   = !type || row.dataset.action.includes(type);
+      const matchRole   = !role || row.dataset.role.includes(role);
+      const matchSev    = !sev  || row.dataset.severity.includes(sev);
+      const show = matchSearch && matchType && matchRole && matchSev;
+      row.style.display = show ? '' : 'none';
+      if (show) visible++;
+    });
+
+    document.getElementById('auditCount').textContent =
+      `Showing ${visible} events — {{ audit_date }}`;
+  }
+
+  function resetFilters() {
+    ['auditSearch', 'filterType', 'filterRole', 'filterDate', 'filterSeverity']
+      .forEach(id => {
+        const el = document.getElementById(id);
+        if (el.tagName === 'INPUT') el.value = '';
+        else el.selectedIndex = 0;
+      });
+    filterAudit();
+  }
+</script>
+{% endblock %}

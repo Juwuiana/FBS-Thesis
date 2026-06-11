@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% set active_page = "data_management" %}
+
+{% block title %}Data Management – FBS Diabetes Risk{% endblock %}
+{% block page_title %}Data Management{% endblock %}
+
+{% block content %}
+<main class="page-content">
+  <div class="dm-card">
+    <div class="dm-card-title">Data Records – filter &amp; manage</div>
+
+    <!-- Filter Bar -->
+    <div class="filter-bar">
+      <select class="filter-select" id="filterEntries">
+        <option value="">All Entries</option>
+        <option value="diabetic">Diabetic</option>
+        <option value="prediabetic">Prediabetic</option>
+        <option value="normal">Normal</option>
+      </select>
+      <select class="filter-select" id="filterCity">
+        <option value="">All City</option>
+        <option value="sta. rosa">Sta. Rosa</option>
+        <option value="cabuyao">Cabuyao</option>
+        <option value="calamba">Calamba</option>
+        <option value="biñan">Biñan</option>
+        <option value="san pedro">San Pedro</option>
+      </select>
+      <select class="filter-select" id="filterRisk">
+        <option value="">All Risk Level</option>
+        <option value="high">High</option>
+        <option value="moderate">Moderate</option>
+        <option value="low">Low</option>
+      </select>
+      <button class="filter-btn" onclick="applyFilters()">Filter</button>
+      <button class="export-btn" onclick="exportTable()">
+        <i class="bi bi-download me-1"></i> Export
+      </button>
+    </div>
+
+    <!-- Table -->
+    <div class="dm-table-wrap">
+      <table class="table table-borderless dm-table mb-0">
+        <thead>
+          <tr>
+            <th>Patient ID</th>
+            <th>Name</th>
+            <th class="hide-mobile">Age</th>
+            <th class="hide-mobile">Sex</th>
+            <th>FBS (mg/dL)</th>
+            <th>Risk Level</th>
+            <th>Date</th>
+            <th class="hide-mobile">City</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="dmTableBody">
+          {% for r in records %}
+          <tr
+            data-category="{{ r.get('category', '') | lower }}"
+            data-city="{{ r.city | lower }}"
+            data-risk="{{ r.risk | lower }}"
+          >
+            <td><span class="patient-id">{{ r.id }}</span></td>
+            <td>{{ r.name }}</td>
+            <td class="hide-mobile">{{ r.age }}</td>
+            <td class="hide-mobile">{{ r.sex }}</td>
+            <td><span class="fbs-value">{{ r.fbs }}</span></td>
+            <td><span class="risk-pill risk-{{ r.risk | lower }}">{{ r.risk }}</span></td>
+            <td style="font-size:12px;color:var(--text-muted);white-space:nowrap">{{ r.date }}</td>
+            <td class="hide-mobile" style="font-size:12px;color:var(--text-muted)">{{ r.city }}</td>
+            <td><button class="view-btn">View</button></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Record count -->
+    <div class="d-flex justify-content-between align-items-center mt-3">
+      <span id="recordCount" style="font-size:12px;color:var(--text-muted)">
+        Showing {{ records | length }} records
+      </span>
+    </div>
+  </div>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function applyFilters() {
+    const category = document.getElementById('filterEntries').value.toLowerCase();
+    const city     = document.getElementById('filterCity').value.toLowerCase();
+    const risk     = document.getElementById('filterRisk').value.toLowerCase();
+    const rows     = document.querySelectorAll('#dmTableBody tr');
+    let visible    = 0;
+
+    rows.forEach(row => {
+      const matchCat  = !category || row.dataset.category.includes(category);
+      const matchCity = !city     || row.dataset.city.includes(city);
+      const matchRisk = !risk     || row.dataset.risk === risk;
+      const show = matchCat && matchCity && matchRisk;
+      row.style.display = show ? '' : 'none';
+      if (show) visible++;
+    });
+
+    document.getElementById('recordCount').textContent =
+      `Showing ${visible} record${visible !== 1 ? 's' : ''}`;
+  }
+
+  function exportTable() {
+    const rows  = document.querySelectorAll('#dmTableBody tr');
+    const lines = ['Patient ID,Name,FBS,Risk,Date,City'];
+    rows.forEach(row => {
+      if (row.style.display === 'none') return;
+      const cells = row.querySelectorAll('td');
+      // id, name, (age hidden), (sex hidden), fbs, risk-text, date, city-text
+      const id   = cells[0].textContent.trim();
+      const name = cells[1].textContent.trim();
+      const fbs  = cells[4].textContent.trim();
+      const risk = cells[5].textContent.trim();
+      const date = cells[6].textContent.trim();
+      // city col is hidden on mobile but still in DOM
+      const cityCell = row.querySelector('td:nth-child(8)');
+      const city = cityCell ? cityCell.textContent.trim() : '';
+      lines.push(`"${id}","${name}",${fbs},"${risk}","${date}","${city}"`);
+    });
+
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = 'fbs_records.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+</script>
+{% endblock %}

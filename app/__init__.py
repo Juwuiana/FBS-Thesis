@@ -3,6 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 
 db = SQLAlchemy()
 
+
 def create_app(config=None):
     app = Flask(__name__)
 
@@ -20,6 +21,13 @@ def create_app(config=None):
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(admin_bp)
+
+    @app.template_filter("number_format")
+    def number_format(value):
+        try:
+            return f"{value:,}"
+        except (ValueError, TypeError):
+            return value
 
     with app.app_context():
         db.create_all()
