@@ -1,0 +1,410 @@
+{% extends "patient/patient_base.html" %}
+{% block title %}Settings{% endblock %}
+
+{% block content %}
+
+<!-- PAGE HEADER -->
+<div class="settings-header">
+    <div>
+        <h1 class="settings-title">Settings</h1>
+        <p class="settings-subtitle">Manage your profile and account preferences</p>
+    </div>
+</div>
+
+<!-- SETTINGS BODY -->
+<div class="settings-body">
+
+    <!-- LEFT: Tab Navigation -->
+    <div class="settings-nav-panel">
+        <button class="settings-tab active" data-tab="profile">
+            <span class="stab-text">
+                <span class="stab-title">My Profile</span>
+                <span class="stab-sub">Personal information</span>
+            </span>
+        </button>
+        <button class="settings-tab" data-tab="contact">
+            <span class="stab-text">
+                <span class="stab-title">Contact Details</span>
+                <span class="stab-sub">Phone, email, address</span>
+            </span>
+        </button>
+        <button class="settings-tab" data-tab="security">
+            <span class="stab-text">
+                <span class="stab-title">Password & Security</span>
+                <span class="stab-sub">Change password</span>
+            </span>
+        </button>
+        <button class="settings-tab" data-tab="notifications">
+            <span class="stab-text">
+                <span class="stab-title">Notifications</span>
+                <span class="stab-sub">Reminders & alerts</span>
+            </span>
+        </button>
+        <button class="settings-tab danger-tab" data-tab="account">
+            <span class="stab-text">
+                <span class="stab-title">Account</span>
+                <span class="stab-sub">Data & privacy</span>
+            </span>
+        </button>
+    </div>
+
+    <!-- RIGHT: Tab Content -->
+    <div class="settings-content-panel">
+
+        <!-- ══ TAB: MY PROFILE ══ -->
+        <div class="settings-pane active" id="pane-profile">
+
+            <!-- Avatar Section -->
+            <div class="settings-section">
+                <div class="section-label">Profile Photo</div>
+                <div class="avatar-row">
+                    <div class="avatar-wrapper">
+                        <div class="settings-avatar" id="settingsAvatarWrap">
+                            <img id="settingsAvatarImg" src="" alt="Avatar" style="display:none; width:100%; height:100%; object-fit:cover; border-radius:50%;">
+                            <span id="settingsAvatarFallback" style="font-size:2rem; color:rgba(255,255,255,0.8);">👤</span>
+                        </div>
+                        <label for="settingsAvatarUpload" class="avatar-upload-btn" title="Change photo"><i class="fas fa-pencil-alt"></i></label>
+                        <input type="file" id="settingsAvatarUpload" accept="image/*" style="display:none;">
+                    </div>
+                    <div class="avatar-info">
+                        <div class="avatar-name">Maria Santos</div>
+                        <div class="avatar-id">Patient ID: CAB-P-00165</div>
+                        <div class="avatar-hint">JPG or PNG, max 2 MB</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Personal Info (read-only from LHU records) -->
+            <div class="settings-section">
+                <div class="section-label">Personal Information
+                    <span class="section-badge">From LHU Records</span>
+                </div>
+                <div class="info-readonly-grid">
+                    <div class="info-field">
+                        <span class="if-label">Full Name</span>
+                        <span class="if-value">Santos, Maria Luisa B.</span>
+                    </div>
+                    <div class="info-field">
+                        <span class="if-label">Date of Birth</span>
+                        <span class="if-value">March 14, 1988</span>
+                    </div>
+                    <div class="info-field">
+                        <span class="if-label">Age</span>
+                        <span class="if-value">37 years old</span>
+                    </div>
+                    <div class="info-field">
+                        <span class="if-label">Sex</span>
+                        <span class="if-value">Female</span>
+                    </div>
+                    <div class="info-field">
+                        <span class="if-label">Civil Status</span>
+                        <span class="if-value">Married</span>
+                    </div>
+                    <div class="info-field">
+                        <span class="if-label">PhilHealth No.</span>
+                        <span class="if-value">04-123456789-0</span>
+                    </div>
+                </div>
+                <p class="readonly-note">
+                    Personal information is sourced from your LHU registration record.
+                    To update, please visit the <strong>Sta. Rosa City Health Office</strong> and request a record amendment.
+                </p>
+            </div>
+
+            <!-- Emergency Contact -->
+            <div class="settings-section">
+                <div class="section-label">Emergency Contact</div>
+                <div class="settings-form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Contact Name</label>
+                        <input class="form-input" type="text" id="ecName" value="Jose Santos" placeholder="Full name">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Relationship</label>
+                        <select class="form-input" id="ecRelation">
+                            <option>Spouse</option>
+                            <option>Parent</option>
+                            <option>Sibling</option>
+                            <option>Child</option>
+                            <option>Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Contact Number</label>
+                        <input class="form-input" type="tel" id="ecPhone" value="+63 917 000 0001" placeholder="+63 9XX XXX XXXX">
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button class="btn-save">Save Changes</button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ══ TAB: CONTACT DETAILS ══ -->
+        <div class="settings-pane" id="pane-contact">
+
+            <div class="settings-section">
+                <div class="section-label">Phone Number</div>
+                <div class="settings-form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Mobile Number</label>
+                        <input class="form-input" type="tel" id="phoneMobile" value="+63 912 345 6789" placeholder="+63 9XX XXX XXXX">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Landline (optional)</label>
+                        <input class="form-input" type="tel" id="phoneLandline" value="" placeholder="(049) XXX-XXXX">
+                    </div>
+                </div>
+            </div>
+
+            <div class="settings-section">
+                <div class="section-label">Email Address</div>
+                <div class="settings-form-grid">
+                    <div class="form-group" style="grid-column: 1 / -1;">
+                        <label class="form-label">Email</label>
+                        <input class="form-input" type="email" id="emailAddr" value="maria.santos@email.com" placeholder="yourname@email.com">
+                        <span class="form-hint">Used for follow-up reminders and notifications</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="settings-section">
+                <div class="section-label">Home Address</div>
+                <div class="settings-form-grid">
+                    <div class="form-group" style="grid-column: 1 / -1;">
+                        <label class="form-label">Street / Purok / Barangay</label>
+                        <input class="form-input" type="text" id="addrStreet" value="45 Sampaguita St., Brgy. Tagapo" placeholder="Street, Purok, Barangay">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">City / Municipality</label>
+                        <input class="form-input" type="text" id="addrCity" value="Sta. Rosa City" placeholder="City / Municipality">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Province</label>
+                        <input class="form-input" type="text" id="addrProvince" value="Laguna" placeholder="Province">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">ZIP Code</label>
+                        <input class="form-input" type="text" id="addrZip" value="4026" placeholder="XXXX" maxlength="4">
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button class="btn-save">Save Changes</button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ══ TAB: PASSWORD & SECURITY ══ -->
+        <div class="settings-pane" id="pane-security">
+
+            <div class="settings-section">
+                <div class="section-label">Change Password</div>
+                <div class="settings-form-grid" style="max-width: 480px;">
+                    <div class="form-group" style="grid-column: 1 / -1;">
+                        <label class="form-label">Current Password</label>
+                        <div class="pw-field-wrap">
+                            <input class="form-input" type="password" id="pwCurrent" placeholder="Enter current password" autocomplete="current-password">
+                            <button class="pw-toggle" data-pw-target="pwCurrent" type="button"><svg class="pw-eye-icon" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M1 10C3.5 5.5 7 3 10 3s6.5 2.5 9 7c-2.5 4.5-6 7-9 7s-6.5-2.5-9-7z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5"/></svg></button>
+                        </div>
+                    </div>
+                    <div class="form-group" style="grid-column: 1 / -1;">
+                        <label class="form-label">New Password</label>
+                        <div class="pw-field-wrap">
+                            <input class="form-input" type="password" id="pwNew" placeholder="At least 8 characters" autocomplete="new-password">
+                            <button class="pw-toggle" data-pw-target="pwNew" type="button"><svg class="pw-eye-icon" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M1 10C3.5 5.5 7 3 10 3s6.5 2.5 9 7c-2.5 4.5-6 7-9 7s-6.5-2.5-9-7z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5"/></svg></button>
+                        </div>
+                        <div class="pw-strength-bar" id="pwStrengthBar">
+                            <div class="pw-strength-fill" id="pwStrengthFill"></div>
+                        </div>
+                        <span class="pw-strength-label" id="pwStrengthLabel"></span>
+                    </div>
+                    <div class="form-group" style="grid-column: 1 / -1;">
+                        <label class="form-label">Confirm New Password</label>
+                        <div class="pw-field-wrap">
+                            <input class="form-input" type="password" id="pwConfirm" placeholder="Re-enter new password" autocomplete="new-password">
+                            <button class="pw-toggle" data-pw-target="pwConfirm" type="button"><svg class="pw-eye-icon" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M1 10C3.5 5.5 7 3 10 3s6.5 2.5 9 7c-2.5 4.5-6 7-9 7s-6.5-2.5-9-7z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5"/></svg></button>
+                        </div>
+                        <span class="form-hint" id="pwMatchHint"></span>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button class="btn-save">Update Password</button>
+                </div>
+            </div>
+
+            <div class="settings-section">
+                <div class="section-label">Login Activity</div>
+                <div class="login-activity-list">
+                    <div class="la-item la-current">
+                        <div class="la-info">
+                            <div class="la-device">Chrome on Windows — <span class="la-badge-current">Current Session</span></div>
+                            <div class="la-meta">Sta. Rosa, Laguna · June 11, 2026, 9:14 AM</div>
+                        </div>
+                    </div>
+                    <div class="la-item">
+                        <div class="la-info">
+                            <div class="la-device">Safari on iPhone</div>
+                            <div class="la-meta">Sta. Rosa, Laguna · June 9, 2026, 3:55 PM</div>
+                        </div>
+                        <button class="btn-revoke">Revoke</button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ══ TAB: NOTIFICATIONS ══ -->
+        <div class="settings-pane" id="pane-notifications">
+
+            <div class="settings-section">
+                <div class="section-label">Follow-up Reminders</div>
+                <div class="toggle-list">
+                    <div class="toggle-item">
+                        <div class="toggle-info">
+                            <div class="toggle-title">Upcoming follow-up appointment</div>
+                            <div class="toggle-sub">Receive a reminder 2 days before your scheduled visit</div>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="notifFollowup" checked>
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div class="toggle-item">
+                        <div class="toggle-info">
+                            <div class="toggle-title">New screening result available</div>
+                            <div class="toggle-sub">Get notified when LHU uploads a new result for you</div>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="notifResult" checked>
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div class="toggle-item">
+                        <div class="toggle-info">
+                            <div class="toggle-title">Annual FBS screening due</div>
+                            <div class="toggle-sub">Yearly reminder to schedule your next FBS check</div>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="notifAnnual">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="settings-section">
+                <div class="section-label">Notification Channels</div>
+                <div class="toggle-list">
+                    <div class="toggle-item">
+                        <div class="toggle-info">
+                            <div class="toggle-title">Email notifications</div>
+                            <div class="toggle-sub">Sent to maria.santos@email.com</div>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="chanEmail" checked>
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div class="toggle-item">
+                        <div class="toggle-info">
+                            <div class="toggle-title">SMS notifications</div>
+                            <div class="toggle-sub">Sent to +63 912 345 6789</div>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="chanSms" checked>
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button class="btn-save">Save Preferences</button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ══ TAB: ACCOUNT ══ -->
+        <div class="settings-pane" id="pane-account">
+
+            <div class="settings-section">
+                <div class="section-label">Data & Privacy</div>
+                <div class="account-action-list">
+                    <div class="account-action-item">
+                        <div class="aai-info">
+                            <div class="aai-title">Download My Data</div>
+                            <div class="aai-sub">Export a copy of your screening history and profile as PDF</div>
+                        </div>
+                        <button class="btn-action-outline"><i class="fas fa-download"></i> Download</button>
+                    </div>
+                    <div class="account-action-item">
+                        <div class="aai-info">
+                            <div class="aai-title">Privacy Policy</div>
+                            <div class="aai-sub">How Sta. Rosa City Health Office uses your health data</div>
+                        </div>
+                        <a href="#" class="btn-action-outline">View →</a>
+                    </div>
+                    <div class="account-action-item">
+                        <div class="aai-info">
+                            <div class="aai-title">Data Sharing Consent</div>
+                            <div class="aai-sub">Manage consent for research and inter-facility data sharing</div>
+                        </div>
+                        <label class="toggle-switch" style="flex-shrink:0;">
+                            <input type="checkbox" id="consentResearch" checked>
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="settings-section">
+                <div class="section-label danger-label">Danger Zone</div>
+                <div class="danger-zone">
+                    <div class="dz-item">
+                        <div class="dz-info">
+                            <div class="dz-title">Sign Out All Devices</div>
+                            <div class="dz-sub">This will end all active sessions except the current one</div>
+                        </div>
+                        <button class="btn-danger-outline">Sign Out All</button>
+                    </div>
+                    <div class="dz-item">
+                        <div class="dz-info">
+                            <div class="dz-title">Deactivate Account</div>
+                            <div class="dz-sub">Your records will remain at the LHU but portal access will be disabled</div>
+                        </div>
+                        <button class="btn-danger">Deactivate</button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </div><!-- end settings-content-panel -->
+</div><!-- end settings-body -->
+
+<!-- TOAST NOTIFICATION -->
+<div id="settingsToast" class="settings-toast" aria-live="polite"></div>
+
+<!-- DEACTIVATE MODAL -->
+<div class="modal-overlay" id="deactivateModal" style="display:none;">
+    <div class="modal-box">
+        <div class="modal-title">Deactivate Account?</div>
+        <div class="modal-body">This will disable your access to the patient portal. Your health records at the LHU will not be deleted. You may re-activate by visiting the Sta. Rosa City Health Office.</div>
+        <div class="modal-actions">
+            <button class="btn-outline">Cancel</button>
+            <button class="btn-danger">Yes, Deactivate</button>
+        </div>
+    </div>
+</div>
+
+<footer class="patient-footer">
+    <span>© 2026 Santa Rosa City Health Office — FBS Diabetes Risk System</span>
+    <div class="footer-links">
+        <a href="#">Privacy Policy</a>
+        <span>·</span>
+        <a href="#">Help</a>
+    </div>
+</footer>
+
+{% endblock %}
