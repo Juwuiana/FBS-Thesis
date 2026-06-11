@@ -1,0 +1,187 @@
+{% extends "nurse/nurse_base.html" %}
+
+{% block content %}
+    <header class="topbar">
+        <h1 class="page-title">Patient Screening Form</h1>
+        <div class="breadcrumbs">Risk Screening / <span style="color:var(--text-primary); font-weight:600;">Patient Screening Form</span></div>
+    </header>
+
+    <div class="patient-info-header">
+        <div>
+            <h2>Patient: Juan Dela Cruz</h2>
+            <p>CAB-2025-0165 • Male, 48 yrs • Barangay Poblacion • BMI: 27.4 (Overweight)</p>
+            <p style="font-size: 0.75rem; color: rgba(255,255,255,0.5); margin-top: 0.25rem;">Intake completed: May 27, 2025</p>
+        </div>
+        <button class="btn btn-secondary" style="background:rgba(255,255,255,0.1); color:white; border:none;">✎ Edit Patient Info</button>
+    </div>
+
+    <div class="screening-layout">
+        <div class="left-col">
+            
+            <div class="form-card">
+                <div class="card-header">FBS Measurement</div>
+                <div class="card-body">
+                    <label class="field-label" style="display:flex; justify-content:space-between;">
+                        <span>Fasting Blood Sugar (FBS)</span>
+                        <span style="color:var(--text-muted); font-weight:normal; font-size:0.75rem;">* Patient must fast for at least 8 hours</span>
+                    </label>
+                    <input type="number" class="field-input fbs-display" placeholder="— mg/dL">
+                    
+                    <div class="grid-3" style="margin-top:1rem;">
+                        <div class="field-group"><label class="field-label">Testing Method</label><select class="field-input"><option>Capillary (Fingerprick)</option></select></div>
+                        <div class="field-group"><label class="field-label">Glucometer ID / Lot No.</label><input type="text" class="field-input" placeholder="e.g. GLC-2025-042"></div>
+                        <div class="field-group"><label class="field-label">Test Date & Time</label><input type="datetime-local" class="field-input"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-card">
+                <div class="card-header">Risk Factor Summary</div>
+                <div class="card-body grid-4">
+                    <div class="risk-badge badge-warning">BMI 27.4<br><span style="font-weight:400">Overweight</span></div>
+                    <div class="risk-badge badge-warning">Waist 92cm<br><span style="font-weight:400">At threshold</span></div>
+                    <div class="risk-badge" style="background:var(--danger-light); color:var(--danger);">Family Hx<br><span style="font-weight:400">Parent diabetic</span></div>
+                    <div class="risk-badge badge-warning">Sedentary<br><span style="font-weight:400">Low activity</span></div>
+                    <div class="risk-badge badge-warning">High Fat Diet<br><span style="font-weight:400">Often</span></div>
+                    <div class="risk-badge badge-success">Non-smoker<br><span style="font-weight:400">No risk</span></div>
+                    <div class="risk-badge badge-success">No Alcohol<br><span style="font-weight:400">No risk</span></div>
+                    <div class="risk-badge badge-warning">Low Fiber<br><span style="font-weight:400">Sometimes</span></div>
+                </div>
+            </div>
+
+            <div class="form-card">
+                <div class="card-header">Clinical Notes & Observations</div>
+                <div class="card-body">
+                    <textarea class="field-input" rows="4" style="resize:vertical;" placeholder="Enter clinical notes, patient complaints, physical observations, or referral notes..."></textarea>
+                </div>
+            </div>
+
+            <div class="form-card">
+                <div class="card-header" style="background:var(--green-light); border-top-color:var(--green-light);">Referral & Follow-up</div>
+                <div class="card-body">
+                    <div class="field-group">
+                        <label class="field-label">Referral Action</label>
+                        <select class="field-input"><option>Select referral action</option></select>
+                    </div>
+                    <div class="grid-2">
+                        <div class="field-group">
+                            <label class="field-label">Follow-up Date</label>
+                            <input type="date" class="field-input">
+                        </div>
+                        <div class="field-group">
+                            <label class="field-label">Referred To</label>
+                            <select class="field-input"><option>Select facility / doctor</option></select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-card">
+                <div class="card-header">Pre-Screening Checklist</div>
+                <div class="card-body">
+                    <div class="grid-2" style="gap: 1rem; font-size: 0.85rem; color: var(--text-secondary);">
+                        <label style="display:flex; align-items:center; gap:0.5rem;"><input type="checkbox" checked> Patient fasted for ≥ 8 hours</label>
+                        <label style="display:flex; align-items:center; gap:0.5rem;"><input type="checkbox"> Patient identity verified against ID</label>
+                        <label style="display:flex; align-items:center; gap:0.5rem;"><input type="checkbox" checked> Glucometer calibrated and lot number recorded</label>
+                        <label style="display:flex; align-items:center; gap:0.5rem;"><input type="checkbox"> Blood sample taken from fingertip (capillary)</label>
+                        <label style="display:flex; align-items:center; gap:0.5rem;"><input type="checkbox" checked> Consent form signed by patient</label>
+                        <label style="display:flex; align-items:center; gap:0.5rem;"><input type="checkbox"> Result recorded within 5 minutes of test</label>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="right-col">
+            
+            <div class="form-card">
+                <div class="card-header">Risk Prediction Result</div>
+                <div class="card-body">
+                    <div class="result-circle-wrapper">
+                        <div class="result-circle">
+                            <span style="font-size:0.8rem; color:var(--text-secondary);">MODERATE</span>
+                            RISK
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom: 1.5rem;">
+                        <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:0.25rem;">
+                            <span style="color:var(--text-muted);">Prediction Score</span>
+                            <span style="font-weight:700; color:var(--warning);">67 / 100</span>
+                        </div>
+                        <div style="width:100%; height:8px; background:var(--bg-light); border-radius:4px; overflow:hidden;">
+                            <div style="width:67%; height:100%; background:var(--warning);"></div>
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom: 1.5rem; border-top: 1px solid var(--border); padding-top: 1rem;">
+                        <div style="display:flex; justify-content:space-between; font-size:0.8rem;">
+                            <span style="color:var(--text-muted);">Model Confidence</span>
+                            <span style="font-weight:700; color:var(--green-accent);">89.3%</span>
+                        </div>
+                        <p style="font-size:0.75rem; color:var(--text-muted); margin-top:0.25rem;">Based on: FBS 124 mg/dL + 5 risk factors</p>
+                    </div>
+
+                    <p style="font-size:0.85rem; font-weight:600;">Recommendation:</p>
+                    <p style="font-size:0.8rem; background:var(--warning-light); padding:1rem; border-radius:6px; color:#b45309; border-left: 4px solid var(--warning);">Refer for confirmatory OGTT test. Schedule follow-up within 2 weeks. Advise lifestyle changes.</p>
+                </div>
+            </div>
+
+            <div class="form-card">
+                <div class="card-header">Final Risk Classification</div>
+                <div class="card-body">
+                    <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.75rem;">Override result (Health Officer decision):</p>
+                    <div class="grid-3" style="gap:0.5rem;">
+                        <button type="button" class="btn btn-secondary" style="padding:0.5rem; font-weight:normal; font-size:0.8rem;">Low</button>
+                        <button type="button" class="btn btn-secondary" style="padding:0.5rem; font-weight:bold; font-size:0.8rem; border-color:var(--warning); color:var(--warning); background:var(--warning-light);">Moderate</button>
+                        <button type="button" class="btn btn-secondary" style="padding:0.5rem; font-weight:normal; font-size:0.8rem;">High</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-card">
+                <div class="card-header" style="background:var(--green-light); border-top-color:var(--green-light);">Screening History</div>
+                <div class="card-body" style="padding: 0;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.8rem;">
+                        <tr style="border-bottom: 1px solid var(--border); color: var(--text-muted);">
+                            <th style="padding: 1rem; text-align: left; font-weight: 500;">Date</th>
+                            <th style="padding: 1rem; text-align: left; font-weight: 500;">FBS</th>
+                            <th style="padding: 1rem; text-align: left; font-weight: 500;">Result</th>
+                            <th></th>
+                        </tr>
+                        <tr style="border-bottom: 1px solid var(--border);">
+                            <td style="padding: 1rem;">Jan 15, 2025</td>
+                            <td style="padding: 1rem;">118 mg/dL</td>
+                            <td style="padding: 1rem;"><span style="background:var(--warning-light); color:#b45309; padding:0.25rem 0.5rem; border-radius:4px; font-size:0.7rem;">Moderate</span></td>
+                            <td style="padding: 1rem; text-align: right;"><a href="#" style="color:var(--green-accent); text-decoration:none;">View →</a></td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid var(--border);">
+                            <td style="padding: 1rem;">Aug 20, 2024</td>
+                            <td style="padding: 1rem;">105 mg/dL</td>
+                            <td style="padding: 1rem;"><span style="background:#ffedd5; color:#c2410c; padding:0.25rem 0.5rem; border-radius:4px; font-size:0.7rem;">Pre-diab.</span></td>
+                            <td style="padding: 1rem; text-align: right;"><a href="#" style="color:var(--green-accent); text-decoration:none;">View →</a></td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 1rem;">Feb 10, 2024</td>
+                            <td style="padding: 1rem;">92 mg/dL</td>
+                            <td style="padding: 1rem;"><span style="background:var(--green-light); color:var(--green-active); padding:0.25rem 0.5rem; border-radius:4px; font-size:0.7rem;">Low</span></td>
+                            <td style="padding: 1rem; text-align: right;"><a href="#" style="color:var(--green-accent); text-decoration:none;">View →</a></td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <div class="action-bar" style="margin-top: 2rem;">
+        <a href="{{ url_for('nurse.nurse_intake') }}" class="btn btn-secondary" style="text-decoration:none; display:inline-block; text-align:center;">← Back</a>
+        
+        <div style="display:flex; gap:1rem;">
+            <button type="button" class="btn btn-secondary">Print Form</button>
+            <button type="button" class="btn btn-secondary">Export PDF</button>
+        </div>
+
+        <button type="button" class="btn btn-primary">✓ Save & Submit Screening</button>
+    </div>
+{% endblock %}
