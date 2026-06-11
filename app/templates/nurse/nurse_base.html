@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FBS Diabetes Risk Prediction</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/nurse_dashboard.css') }}">
+</head>
+<body>
+    <div class="mobile-overlay" id="mobileOverlay"></div>
+
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-brand">FBS-Based<br>Diabetes Risk<br>Prediction</div>
+        </div>
+        
+        <nav class="sidebar-nav">
+            <a href="{{ url_for('nurse.nurse_dashboard') }}" class="nav-item">Dashboard</a>
+            <a href="{{ url_for('nurse.nurse_intake') }}" class="nav-item">Patients Screening</a>
+            <a href="{{ url_for('nurse.nurse_health_results') }}" class="nav-item">Health Result</a>
+            <a href="{{ url_for('nurse.nurse_data_management') }}" class="nav-item">Data Management</a>
+            <a href="{{ url_for('nurse.nurse_privacy_security') }}" class="nav-item">Privacy and Security</a>
+        </nav>
+        
+        <div class="sidebar-user" id="userMenuToggle" role="button" tabindex="0" title="Account options">
+            <div class="user-avatar-wrap">
+                <img id="userAvatarPreview" src="" alt="" style="display:none; width:38px; height:38px; border-radius:50%; object-fit:cover;">
+                <div class="user-avatar" id="userAvatarFallback"></div>
+            </div>
+            <div style="flex:1; min-width:0;">
+                <div style="font-weight:700; font-size:0.85rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Health Officer</div>
+                <div style="font-size:0.75rem; opacity:0.7;">LHU Cabuyao</div>
+            </div>
+            <span class="user-menu-caret" id="userMenuCaret">▲</span>
+        </div>
+
+        <!-- Dropdown anchored just above the user bar -->
+        <div class="user-dropdown" id="userDropdown">
+            <label class="user-dropdown-item" for="avatarFileInput">
+                <span class="udd-icon">🖼</span> Change Profile Photo
+                <input type="file" id="avatarFileInput" accept="image/*" style="display:none;">
+            </label>
+            {# TODO: Uncomment once auth  is connected #}
+            {# <a href="{{ url_for('auth.logout') }}" class="user-dropdown-item user-dropdown-signout">
+                <span class="udd-icon">🚪</span> Sign Out
+            </a> #}
+            <a href="#" class="user-dropdown-item user-dropdown-signout" id="signOutPlaceholder">
+                <span class="udd-icon">🚪</span> Sign Out
+            </a>
+        </div>
+    </aside>
+
+    <button id="backToTop" class="back-to-top">↑</button>
+    <main class="main-wrapper">
+        <div class="mobile-header">
+            <button id="menuToggle" class="menu-toggle">☰</button>
+            <div class="mobile-brand">FBS Diabetes Risk Prediction</div>
+        </div>
+        
+        {% block content %}
+        {% endblock %}
+    </main>
+
+    <!-- 4. The toggle script (Now with Swipe Gestures!) -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const menuToggle = document.getElementById('menuToggle');
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('mobileOverlay');
+            // --- BACK TO TOP BUTTON LOGIC ---
+            const backToTopBtn = document.getElementById('backToTop');
+
+            // 1. Listen for scrolling
+            window.addEventListener('scroll', () => {
+                // If they scroll down more than 300 pixels, show the button
+                if (window.scrollY > 300) {
+                    backToTopBtn.classList.add('show');
+                } else {
+                    // Hide it if they are near the top
+                    backToTopBtn.classList.remove('show');
+                }
+            });
+
+            // 2. Listen for clicks
+            if (backToTopBtn) {
+                backToTopBtn.addEventListener('click', () => {
+                    // Smoothly slide the screen back to the very top
+                    window.scrollTo({
+                        top: 0,
+                        behavior: 'smooth'
+                    });
+                });
+            }
+
+            // Open menu when hamburger is clicked
+            if (menuToggle) {
+                menuToggle.addEventListener('click', () => {
+                    sidebar.classList.add('active');
+                    overlay.classList.add('active');
+                });
+            }
+
+            // Close menu if they tap outside the sidebar
+            if (overlay) {
+                overlay.addEventListener('click', () => {
+                    sidebar.classList.remove('active');
+                    overlay.classList.remove('active');
+                });
+            }
+
+            // --- USER MENU DROPDOWN ---
+            const userMenuToggle  = document.getElementById('userMenuToggle');
+            const userDropdown    = document.getElementById('userDropdown');
+            const userMenuCaret   = document.getElementById('userMenuCaret');
+            const avatarFileInput = document.getElementById('avatarFileInput');
+            const avatarPreview   = document.getElementById('userAvatarPreview');
+            const avatarFallback  = document.getElementById('userAvatarFallback');
+
+            function openUserMenu() {
+                userDropdown.classList.add('open');
+                userMenuCaret.textContent = '▼';
+            }
+            function closeUserMenu() {
+                userDropdown.classList.remove('open');
+                userMenuCaret.textContent = '▲';
+            }
+
+            if (userMenuToggle) {
+                userMenuToggle.addEventListener('click', () => {
+                    userDropdown.classList.contains('open') ? closeUserMenu() : openUserMenu();
+                });
+                userMenuToggle.addEventListener('keydown', e => {
+                    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); userMenuToggle.click(); }
+                });
+            }
+
+            // Close when clicking outside
+            document.addEventListener('click', e => {
+                if (userDropdown && userMenuToggle && !userMenuToggle.contains(e.target) && !userDropdown.contains(e.target)) {
+                    closeUserMenu();
+                }
+            });
+
+            // Profile photo — persisted in localStorage
+            const AVATAR_KEY = 'nurseAvatarDataUrl';
+
+            function applyAvatar(dataUrl) {
+                if (!dataUrl) return;
+                avatarPreview.src = dataUrl;
+                avatarPreview.style.display = 'block';
+                avatarFallback.style.display = 'none';
+            }
+
+            const savedAvatar = localStorage.getItem(AVATAR_KEY);
+            if (savedAvatar) applyAvatar(savedAvatar);
+
+            if (avatarFileInput) {
+                avatarFileInput.addEventListener('change', () => {
+                    const file = avatarFileInput.files[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = e => {
+                        const dataUrl = e.target.result;
+                        localStorage.setItem(AVATAR_KEY, dataUrl);
+                        applyAvatar(dataUrl);
+                        closeUserMenu();
+                    };
+                    reader.readAsDataURL(file);
+                });
+            }
+
+                        // --- SWIPE GESTURE LOGIC ---
+            let touchStartX = 0;
+            let touchEndX = 0;
+
+            // Record where the finger first touches the screen
+            document.addEventListener('touchstart', e => {
+                touchStartX = e.changedTouches[0].screenX;
+            }, { passive: true });
+
+            // Record where the finger leaves the screen and calculate
+            document.addEventListener('touchend', e => {
+                touchEndX = e.changedTouches[0].screenX;
+                handleSwipe();
+            }, { passive: true });
+
+            function handleSwipe() {
+                // If the sidebar is currently open...
+                if (sidebar.classList.contains('active')) {
+                    // And the user swiped left by at least 50 pixels...
+                    if (touchStartX - touchEndX > 50) {
+                        // Close the sidebar!
+                        sidebar.classList.remove('active');
+                        overlay.classList.remove('active');
+                    }
+                }
+            }
+        });
+    </script>
+
+    {% block scripts %}
+    {% endblock %}
+</body>
+</html>

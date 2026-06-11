@@ -1,0 +1,83 @@
+{% extends "nurse/nurse_base.html" %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Health Results Deep Dive</h1>
+        <p class="page-subtitle">Epidemiological feature spaces and predictive impact modeling</p>
+    </div>
+    <button onclick="window.print();" class="btn btn-primary" style="height: 40px; font-size: 0.8rem;">
+        Generate Comprehensive System Report
+    </button>
+</div>
+
+<div class="form-card" style="margin-bottom: 1.5rem;">
+    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <span>Interactive Patient Attribute Profiling Tracker</span>
+        <div>
+            <select id="attributeSelector" class="field-input" style="padding: 0.35rem 0.75rem; font-size: 0.85rem; min-width: 280px; height: 36px; border-color: var(--green-accent); background-color: var(--white);">
+                <option value="fbs">Fasting Blood Sugar Levels</option>
+                <option value="status">Predicted Diabetes Risk Status</option>
+                <option value="age">Age Distribution cohorts</option>
+                <option value="sex">Biological Sex Demographic</option>
+                <option value="bmi">Body Mass Index Classifications</option>
+                <option value="bp">Blood Pressure Segments</option>
+                <option value="hypertension">Hypertension Diagnostic History</option>
+                <option value="waist">Waist Circumference Thresholds</option>
+                <option value="smoking">Smoking Status Metric</option>
+                <option value="family">Family History of Diabetes</option>
+            </select>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="chart-container-large" style="height: 400px; position: relative;">
+            <canvas id="dynamicAttributeChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<div class="form-card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">Barangay Stratified Risk Index Map Matrix (All 18 Sectors)</div>
+    <div class="card-body">
+        <div class="chart-container-large" style="height: 380px;">
+            <canvas id="fullBarangayBarChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<div class="grid-2" style="margin-bottom: 1.5rem;">
+    <div class="form-card">
+        <div class="card-header">Risk Profile Stratified by Sex Attribute</div>
+        <div class="card-body">
+            <div class="chart-container">
+                <canvas id="riskBySexChart"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="form-card">
+        <div class="card-header">Risk Profile Stratified by Age Class Interval Cohorts</div>
+        <div class="card-body">
+            <div class="chart-container">
+                <canvas id="riskByAgeChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="form-card">
+    <div class="card-header">Model Global Feature Importance Vector (SHAP Explanation Framework)</div>
+    <div class="card-body">
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.5rem;">
+            Calculates the mathematical global feature attribution vectors across model sub-routines using SHapley Additive exPlanations. This checks if predictive weighting matches medical clinical guidelines.
+        </p>
+        <div class="chart-container-large" style="height: 320px;">
+            <canvas id="shapImportanceChart"></canvas>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{{ url_for('static', filename='js/nurse_dashboard_charts.js') }}"></script>
+{% endblock %}

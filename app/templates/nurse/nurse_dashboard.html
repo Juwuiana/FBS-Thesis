@@ -1,0 +1,143 @@
+{% extends "nurse/nurse_base.html" %}
+
+{% block content %}
+<header class="topbar">
+    <div>
+        <h1 class="page-title">Dashboard</h1>
+        <p class="page-subtitle">Santa Rosa City Health Office — Diabetes Risk Overview</p>
+    </div>
+</header>
+
+<!-- Stat Cards Row -->
+<div class="dash-grid-top">
+    <div class="stat-card">
+        <div class="stat-title">Total Screened</div>
+        <div class="stat-value">1,392</div>
+        <div class="stat-trend trend-good">▲ 1.2% vs last week</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-title">At Risk (Predicted)</div>
+        <div class="stat-value">276</div>
+        <div class="stat-trend trend-bad">▲ 8% vs last week</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-title">High Risk</div>
+        <div class="stat-value">82</div>
+        <div class="stat-trend trend-bad">▲ 3% vs last week</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-title">Avg. FBS (mg/dL)</div>
+        <div class="stat-value">111.4</div>
+        <div class="stat-trend trend-good">▼ 2.6 vs last week</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-title">Model Accuracy</div>
+        <div class="stat-value">89.3%</div>
+        <div class="stat-trend" style="color:var(--text-muted);">Current active model</div>
+    </div>
+</div>
+
+<!-- Middle Row: Donut | Line | Barangay Bar -->
+<div class="dash-grid-mid">
+    <div class="form-card">
+        <div class="card-header">Risk Profile Distribution</div>
+        <div class="card-body">
+            <div class="chart-container">
+                <canvas id="riskDonutChart"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="form-card">
+        <div class="card-header">Screening Volume Timeline</div>
+        <div class="card-body">
+            <div class="chart-container">
+                <canvas id="screeningsLineChart"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="form-card">
+        <div class="card-header">Regional Burden — Top Barangays</div>
+        <div class="card-body">
+            <div class="chart-container">
+                <canvas id="barangayBarChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bottom Row: Recent Screenings Table | Model Radar -->
+<div class="dash-grid-bot">
+    <div class="form-card">
+        <div class="card-header">Recent Patient Registries</div>
+        <div class="card-body" style="padding:0; overflow-x:auto; -webkit-overflow-scrolling:touch;">
+            <table class="data-table" style="min-width:560px;">
+                <thead>
+                    <tr>
+                        <th>Patient ID</th>
+                        <th>Name</th>
+                        <th>Age / Sex</th>
+                        <th>FBS (mg/dL)</th>
+                        <th>Risk Level</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>CAB-2026-0412</td>
+                        <td>Maria Santos</td>
+                        <td>52 / F</td>
+                        <td>138</td>
+                        <td><span class="risk-badge badge-danger">High</span></td>
+                        <td>Jun 10, 2026</td>
+                    </tr>
+                    <tr>
+                        <td>CAB-2026-0411</td>
+                        <td>Ricardo Cruz</td>
+                        <td>45 / M</td>
+                        <td>118</td>
+                        <td><span class="risk-badge badge-warning">Moderate</span></td>
+                        <td>Jun 10, 2026</td>
+                    </tr>
+                    <tr>
+                        <td>CAB-2026-0410</td>
+                        <td>Luzviminda Reyes</td>
+                        <td>38 / F</td>
+                        <td>95</td>
+                        <td><span class="risk-badge badge-success">Low</span></td>
+                        <td>Jun 10, 2026</td>
+                    </tr>
+                    <tr>
+                        <td>CAB-2026-0409</td>
+                        <td>Eduardo Bautista</td>
+                        <td>61 / M</td>
+                        <td>142</td>
+                        <td><span class="risk-badge badge-danger">High</span></td>
+                        <td>Jun 9, 2026</td>
+                    </tr>
+                    <tr>
+                        <td>CAB-2026-0408</td>
+                        <td>Anabel Torres</td>
+                        <td>29 / F</td>
+                        <td>88</td>
+                        <td><span class="risk-badge badge-success">Low</span></td>
+                        <td>Jun 9, 2026</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="form-card">
+        <div class="card-header">Model Performance</div>
+        <div class="card-body">
+            <div class="chart-container">
+                <canvas id="modelRadarChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='js/nurse_dashboard.js') }}"></script>
+{% endblock %}

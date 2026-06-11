@@ -1,0 +1,170 @@
+{% extends "nurse/nurse_base.html" %}
+
+{% block content %}
+<header class="topbar">
+    <div>
+        <h1 class="page-title">Data Management</h1>
+        <p class="page-subtitle">Import, export, and review patient screening records</p>
+    </div>
+</header>
+
+<!-- Hub Toggle -->
+<div class="hub-toggle-bar">
+    <button type="button" id="toggleDataHubBtn" class="hub-toggle-btn collapsed">
+        <span id="hubToggleLabel">Show Import / Export Tools</span>
+        <span class="hub-toggle-icon" id="hubToggleIcon">▼</span>
+    </button>
+</div>
+
+<div id="dataHubWrapper" class="data-hub-wrapper collapsed">
+    <div class="data-hub-grid">
+
+        <div class="form-card" style="margin-bottom:0;">
+            <div class="card-header">Import Batch Clinical Registry</div>
+            <div class="card-body">
+                <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:1rem;">
+                    Ingest historical patient profiles from paper records converted into comma-separated text files (.csv).
+                </p>
+                <button id="downloadTemplateBtn" type="button" class="btn btn-secondary" style="width:100%; margin-bottom:1.25rem;">
+                    Download Blank CSV Template
+                </button>
+                <form method="POST" action="#" enctype="multipart/form-data" style="margin-bottom:1.25rem;">
+                    <div class="field-group">
+                        <label class="field-label">Select Source File (.csv)</label>
+                        <input type="file" class="field-input" name="csv_import" accept=".csv" required style="height:auto; padding:0.5rem 1rem;">
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="width:100%; margin-top:0.75rem; height:42px;">
+                        Process and Validate File
+                    </button>
+                </form>
+                <div class="accordion-item">
+                    <button type="button" id="toggleSchemaBtn" class="accordion-toggle">
+                        <span>View Required Schema Instructions</span>
+                        <span class="accordion-icon">▼</span>
+                    </button>
+                    <div id="schemaAccordionContent" class="accordion-content">
+                        <div class="schema-guide-box">
+                            <div class="schema-guide-title">Required Column Headers:</div>
+                            <ul class="schema-list">
+                                <li class="schema-item">patient_id <span>(Text)</span></li>
+                                <li class="schema-item">name <span>(Text)</span></li>
+                                <li class="schema-item">age <span>(Number)</span></li>
+                                <li class="schema-item">sex <span>(M/F)</span></li>
+                                <li class="schema-item">fbs <span>(mg/dL)</span></li>
+                                <li class="schema-item">diabetes_status <span>(Risk Class)</span></li>
+                                <li class="schema-item">bmi <span>(Value)</span></li>
+                                <li class="schema-item">blood_pressure <span>(mmHg)</span></li>
+                                <li class="schema-item">hypertension <span>(Yes/No)</span></li>
+                                <li class="schema-item">waist_circumference <span>(cm)</span></li>
+                                <li class="schema-item">smoking_status <span>(Category)</span></li>
+                                <li class="schema-item">family_history <span>(Yes/No)</span></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-card" style="margin-bottom:0;">
+            <div class="card-header">Export Data Archives</div>
+            <div class="card-body">
+                <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:1rem;">
+                    Compile staging data records accumulated on this terminal into an encrypted, standardized file for transfer to the central health office.
+                </p>
+                <p style="font-size:0.8rem; color:var(--text-muted); line-height:1.5; margin-bottom:1.5rem;">
+                    Patient names and row identifiers are hashed before export to protect personal records.
+                </p>
+                <form method="POST" action="#">
+                    <div class="field-group">
+                        <label class="field-label">Export Format</label>
+                        <select class="field-input" name="export_format">
+                            <option value="standard_csv">Standardized Feature Matrix (.csv)</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-secondary" style="width:100%; height:42px; margin-top:1rem; background:var(--green-light); color:var(--green-sidebar); border-color:var(--green-accent);">
+                        Compile and Download Data Ledger
+                    </button>
+                </form>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- Records Table -->
+<div class="form-card" style="margin-top:1.5rem;">
+    <div class="card-header">Patient Records — Filter and Manage</div>
+    <div class="card-body">
+        <form method="GET" action="{{ url_for('nurse.nurse_data_management') }}">
+            <div class="filter-row">
+                <div class="field-group">
+                    <label class="field-label">Show</label>
+                    <select class="field-input" name="entries">
+                        <option value="all">All Entries</option>
+                        <option value="25">25 per page</option>
+                        <option value="50">50 per page</option>
+                    </select>
+                </div>
+                <div class="field-group">
+                    <label class="field-label">Barangay</label>
+                    <select class="field-input" name="barangay">
+                        <option value="">All Barangays</option>
+                        {% for b in barangays %}
+                            <option value="{{ b }}" {% if request.args.get('barangay') == b %}selected{% endif %}>{{ b }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="field-group">
+                    <label class="field-label">Risk Level</label>
+                    <select class="field-input" name="risk">
+                        <option value="">All Levels</option>
+                        <option value="Low">Low</option>
+                        <option value="Moderate">Moderate</option>
+                        <option value="High">High</option>
+                    </select>
+                </div>
+                <div class="field-group">
+                    <label class="field-label">Date</label>
+                    <input type="date" class="field-input" name="date" value="{{ request.args.get('date', '') }}">
+                </div>
+                <button type="submit" class="btn btn-primary filter-btn">Apply Filter</button>
+            </div>
+        </form>
+
+        <div style="overflow-x:auto; -webkit-overflow-scrolling:touch;">
+            <table class="data-table" style="min-width:600px;">
+                <thead>
+                    <tr>
+                        <th>Patient ID</th>
+                        <th>Name</th>
+                        <th>Age</th>
+                        <th>Sex</th>
+                        <th>FBS (mg/dL)</th>
+                        <th>Risk Level</th>
+                        <th>Date</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>CAB-2025-0156</td>
+                        <td>Juan Dela Cruz</td>
+                        <td>30</td>
+                        <td>M</td>
+                        <td>142</td>
+                        <td><span class="risk-badge badge-danger">High</span></td>
+                        <td>May 27, 2025</td>
+                        <td>
+                            <a href="#" class="btn btn-secondary" style="padding:0.35rem 0.75rem; font-size:0.75rem;">View</a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/nurse_dashboard.js') }}"></script>
+{% endblock %}
