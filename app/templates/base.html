@@ -25,21 +25,29 @@
 
     <div class="sidebar-nav">
       <a href="{{ url_for('admin.dashboard') }}"
-         class="{{ 'active' if active_page == 'dashboard' else '' }}">Dashboard</a>
-      <a href="#"
-         class="{{ 'active' if active_page == 'patients' else '' }}">Patients Screening</a>
-      <a href="#"
-         class="{{ 'active' if active_page == 'health_result' else '' }}">Health Result</a>
+         class="{{ 'active' if active_page == 'dashboard' else '' }}">
+        <i class="bi bi-speedometer2 me-2"></i>Dashboard
+      </a>
       <a href="{{ url_for('admin.reliability') }}"
-         class="{{ 'active' if active_page == 'reliability' else '' }}">Model Reliability</a>
+         class="{{ 'active' if active_page == 'reliability' else '' }}">
+        <i class="bi bi-shield-check me-2"></i>Model Reliability
+      </a>
       <a href="{{ url_for('admin.green_computing') }}"
-         class="{{ 'active' if active_page == 'green_computing' else '' }}">Green Computing</a>
+         class="{{ 'active' if active_page == 'green_computing' else '' }}">
+        <i class="bi bi-leaf me-2"></i>Green Computing
+      </a>
       <a href="{{ url_for('admin.data_management') }}"
-         class="{{ 'active' if active_page == 'data_management' else '' }}">Data Management</a>
+         class="{{ 'active' if active_page == 'data_management' else '' }}">
+        <i class="bi bi-table me-2"></i>Data Management
+      </a>
       <a href="{{ url_for('admin.audit_trails') }}"
-         class="{{ 'active' if active_page == 'audit_trails' else '' }}">Audit Trails</a>
-      <a href="#"
-         class="{{ 'active' if active_page == 'privacy' else '' }}">Privacy &amp; Security</a>
+         class="{{ 'active' if active_page == 'audit_trails' else '' }}">
+        <i class="bi bi-journal-text me-2"></i>Audit Trails
+      </a>
+      <a href="{{ url_for('admin.privacy_security') }}"
+         class="{{ 'active' if active_page == 'privacy' else '' }}">
+        <i class="bi bi-lock me-2"></i>Privacy &amp; Security
+      </a>
     </div>
 
     <div class="sidebar-footer">

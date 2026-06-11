@@ -1,0 +1,237 @@
+{% extends "base.html" %}
+{% set active_page = "privacy" %}
+
+{% block title %}Privacy &amp; Security – FBS Diabetes Risk{% endblock %}
+{% block page_title %}Privacy and Security Settings{% endblock %}
+
+{% block content %}
+<main class="page-content">
+
+  <!-- ── ROW 1: DATA PRIVACY CONTROLS + ACCESS ROLES ── -->
+  <div class="row g-3 mb-3">
+
+    <!-- Data Privacy Controls -->
+    <div class="col-lg-5 col-12">
+      <div class="ps-card h-100">
+        <div class="ps-card-title">Data Privacy Controls</div>
+
+        <!-- Active Protocol Banner -->
+        <div class="protocol-banner mb-3">
+          <i class="bi bi-shield-fill-check me-2"></i>
+          Active Protocol: Mandatory Information Anonymization Verified
+        </div>
+
+        <p class="ps-description">
+          Direct identifiers such as patient names and numerical database index sequences
+          are stripped out through local cryptographic hashing before clinical variables
+          undergo feature processing.
+        </p>
+
+        <div class="row g-3 mb-3">
+          <div class="col-md-6 col-12">
+            <label class="ps-field-label">Anonymization Strength</label>
+            <select class="ps-select">
+              <option selected>Strict Pseudonymization (Mask Identifiers)</option>
+              <option>Standard Anonymization</option>
+              <option>Minimal – Research Mode</option>
+            </select>
+          </div>
+          <div class="col-md-6 col-12">
+            <label class="ps-field-label">Demographic Variance Guard</label>
+            <select class="ps-select">
+              <option selected>Balance Local Barangay Class Distribution</option>
+              <option>No Variance Guard</option>
+              <option>Strict Age-Sex Balancing</option>
+            </select>
+          </div>
+        </div>
+
+        <button class="ps-primary-btn">
+          <i class="bi bi-arrow-repeat me-2"></i>Update Processing Rules
+        </button>
+      </div>
+    </div>
+
+    <!-- Access Roles & Permissions -->
+    <div class="col-lg-7 col-12">
+      <div class="ps-card h-100">
+        <div class="ps-card-title">Access roles &amp; permissions</div>
+        <div class="table-responsive">
+          <table class="table table-borderless ps-roles-table mb-0">
+            <thead>
+              <tr>
+                <th>Role</th>
+                <th>Screen Patient</th>
+                <th>View Records</th>
+                <th>Export Data</th>
+                <th>Admin Panel</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for role in roles %}
+              <tr>
+                <td style="font-weight:600;font-size:13px">{{ role.name }}</td>
+                <td>
+                  <span class="{{ 'perm-yes' if role.screen else 'perm-no' }}">
+                    {{ 'Yes' if role.screen else 'No' }}
+                  </span>
+                </td>
+                <td>
+                  <span class="{{ 'perm-yes' if role.view_records == 'Yes' else ('perm-limited' if role.view_records == 'Own records' else ('perm-limited' if role.view_records == 'Limited' else 'perm-no')) }}">
+                    {{ role.view_records }}
+                  </span>
+                </td>
+                <td>
+                  <span class="{{ 'perm-yes' if role.export == 'Yes' else ('perm-limited' if role.export == 'Limited' else 'perm-no') }}">
+                    {{ role.export }}
+                  </span>
+                </td>
+                <td>
+                  <span class="{{ 'perm-yes' if role.admin == 'Yes' else ('perm-limited' if role.admin == 'Read' else 'perm-no') }}">
+                    {{ role.admin }}
+                  </span>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── ROW 2: LHU AGREEMENTS / CONTENT & DATA USE / RETENTION ── -->
+  <div class="row g-3 mb-3">
+
+    <!-- LHU Data Sharing Agreements -->
+    <div class="col-lg-4 col-md-6 col-12">
+      <div class="ps-card h-100">
+        <div class="ps-card-title">LHU Data Sharing Agreements</div>
+        {% for lhu in lhu_agreements %}
+        <div class="agreement-row">
+          <span class="agreement-name">{{ lhu.name }}</span>
+          <span class="{{ 'agreement-signed' if lhu.status == 'Signed' else 'agreement-pending' }}">
+            {{ lhu.status }}
+          </span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Content & Data Use -->
+    <div class="col-lg-4 col-md-6 col-12">
+      <div class="ps-card h-100">
+        <div class="ps-card-title">Content &amp; Data Use</div>
+        <p class="ps-description">
+          Patient records are collected under informed consent protocols per DOH guidelines.
+          Data is used solely for FBS-based diabetes risk screening and public health research
+          as approved by the IRB. No data is shared with third parties or commercial entities.
+        </p>
+        <div class="irb-badge mt-3">
+          <i class="bi bi-patch-check-fill me-2"></i>IRB Approved Protocol
+        </div>
+      </div>
+    </div>
+
+    <!-- Data Retention Policy -->
+    <div class="col-lg-4 col-md-12 col-12">
+      <div class="ps-card h-100">
+        <div class="ps-card-title">Data Retention Policy</div>
+        {% for item in retention_policy %}
+        <div class="detail-row">
+          <span class="detail-label">{{ item.label }}</span>
+          <span class="detail-value">{{ item.value }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- ── ROW 3: LOCAL ENCRYPTION ── -->
+  <div class="row g-3">
+    <div class="col-lg-6 col-12">
+      <div class="ps-card h-100">
+        <div class="ps-section-header">LOCAL ENCRYPTION &amp; STORAGE CONFIGURATION</div>
+        <p class="ps-description mt-2">
+          Manage the cryptographic configurations safeguarding local database records
+          and configure terminal storage constraints.
+        </p>
+        <div class="row g-3 mb-3">
+          <div class="col-md-6 col-12">
+            <label class="ps-field-label">Workstation Salt Cipher</label>
+            <input type="text" class="ps-input" value="AES_256_GCM_OFFLINE_NODE" readonly />
+          </div>
+          <div class="col-md-6 col-12">
+            <label class="ps-field-label">Data Retention Threshold</label>
+            <select class="ps-select">
+              <option selected>Purge Local Staged Cache After 12 Months</option>
+              <option>Purge After 6 Months</option>
+              <option>Purge After 24 Months</option>
+              <option>Never Purge (Manual Only)</option>
+            </select>
+          </div>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+          <button class="ps-secondary-btn">
+            <i class="bi bi-arrow-repeat me-2"></i>Rotate Cryptographic Salts
+          </button>
+          <button class="ps-primary-btn">
+            <i class="bi bi-floppy me-2"></i>Save Key Policies
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Session & Login Security -->
+    <div class="col-lg-6 col-12">
+      <div class="ps-card h-100">
+        <div class="ps-section-header">SESSION &amp; LOGIN SECURITY</div>
+        <p class="ps-description mt-2">
+          Configure authentication policies and session timeout rules for all LHU system users.
+        </p>
+        <div class="row g-3 mb-3">
+          <div class="col-md-6 col-12">
+            <label class="ps-field-label">Session Timeout</label>
+            <select class="ps-select">
+              <option>15 minutes of inactivity</option>
+              <option selected>30 minutes of inactivity</option>
+              <option>60 minutes of inactivity</option>
+            </select>
+          </div>
+          <div class="col-md-6 col-12">
+            <label class="ps-field-label">Max Failed Login Attempts</label>
+            <select class="ps-select">
+              <option>3 attempts</option>
+              <option selected>5 attempts</option>
+              <option>10 attempts</option>
+            </select>
+          </div>
+        </div>
+        <div class="row g-3 mb-3">
+          <div class="col-12">
+            <label class="ps-field-label">Two-Factor Authentication</label>
+            <div class="ps-toggle-row">
+              <span style="font-size:13px;color:var(--text-muted)">Require 2FA for Admin accounts</span>
+              <label class="ps-toggle">
+                <input type="checkbox" checked />
+                <span class="ps-toggle-slider"></span>
+              </label>
+            </div>
+            <div class="ps-toggle-row">
+              <span style="font-size:13px;color:var(--text-muted)">Require 2FA for Health Officer accounts</span>
+              <label class="ps-toggle">
+                <input type="checkbox" />
+                <span class="ps-toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+        <button class="ps-primary-btn">
+          <i class="bi bi-floppy me-2"></i>Save Security Settings
+        </button>
+      </div>
+    </div>
+  </div>
+
+</main>
+{% endblock %}

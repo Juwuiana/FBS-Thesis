@@ -145,42 +145,66 @@ def reliability():
         cv=cv,
         roc_points=roc_points,
     )
-# ── ADD THESE ROUTES TO admin_views.py ──
-
 
 @admin_bp.route("/data-management")
 def data_management():
-    records = [
-        {"id": "CAB-2025-0156", "name": "Juan Dela Cruz", "age": 30, "sex": "M",
-         "fbs": 142, "risk": "High",     "date": "May 27, 2025", "city": "Calamba"},
-        {"id": "CAB-2025-0155", "name": "Maria Santos",   "age": 32, "sex": "F",
-         "fbs": 118, "risk": "Moderate", "date": "May 27, 2025", "city": "Sta. Rosa"},
-        {"id": "CAB-2025-0154", "name": "Pedro Reyes",    "age": 34, "sex": "M",
-         "fbs": 96,  "risk": "Low",      "date": "May 27, 2025", "city": "San Pedro"},
-        {"id": "CAB-2025-0153", "name": "Ana Garcia",     "age": 36, "sex": "F",
-         "fbs": 134, "risk": "Moderate", "date": "May 27, 2025", "city": "Cabuyao"},
-        {"id": "CAB-2025-0152", "name": "Jerome Elano",   "age": 38, "sex": "M",
-         "fbs": 155, "risk": "High",     "date": "May 26, 2025", "city": "Biñan"},
-        {"id": "CAB-2025-0151", "name": "Maria Santos",   "age": 32, "sex": "F",
-         "fbs": 118, "risk": "Moderate", "date": "May 26, 2025", "city": "Calamba"},
-        {"id": "CAB-2025-0150", "name": "Juan Dela Cruz", "age": 30, "sex": "M",
-         "fbs": 142, "risk": "High",     "date": "May 26, 2025", "city": "Sta. Rosa"},
-        {"id": "CAB-2025-0149", "name": "Maria Santos",   "age": 32, "sex": "F",
-         "fbs": 118, "risk": "Moderate", "date": "May 26, 2025", "city": "San Pedro"},
-        {"id": "CAB-2025-0148", "name": "Pedro Reyes",    "age": 34, "sex": "M",
-         "fbs": 96,  "risk": "Low",      "date": "May 26, 2025", "city": "Cabuyao"},
-        {"id": "CAB-2025-0147", "name": "Ana Garcia",     "age": 36, "sex": "F",
-         "fbs": 134, "risk": "Moderate", "date": "May 26, 2025", "city": "Biñan"},
-        {"id": "CAB-2025-0146", "name": "Jerome Elano",   "age": 38, "sex": "M",
-         "fbs": 155, "risk": "High",     "date": "May 26, 2025", "city": "Calamba"},
-        {"id": "CAB-2025-0145", "name": "Maria Santos",   "age": 32, "sex": "F",
-         "fbs": 118, "risk": "Moderate", "date": "May 26, 2025", "city": "Sta. Rosa"},
-        {"id": "CAB-2025-0144", "name": "Pedro Reyes",    "age": 34, "sex": "M",
-         "fbs": 96,  "risk": "Low",      "date": "May 26, 2025", "city": "Cabuyao"},
-        {"id": "CAB-2025-0143", "name": "Jerome Elano",   "age": 38, "sex": "M",
-         "fbs": 155, "risk": "High",     "date": "May 26, 2025", "city": "Biñan"},
+    employees = [
+        {"id": "EMP-2025-001", "name": "Linda Walker",    "email": "l.walker@lhu.gov.ph",
+         "role": "Health Officer", "station": "Sta. Rosa", "contact": "09171234567",
+         "status": "Active",    "date_added": "Jan 10, 2025"},
+        {"id": "EMP-2025-002", "name": "Kurt Pernia",       "email": "k.pernia@lhu.gov.ph",
+         "role": "LHU Nurse",     "station": "Cabuyao",   "contact": "09182345678",
+         "status": "Active",    "date_added": "Jan 10, 2025"},
+        {"id": "EMP-2025-003", "name": "Clarise Espiritu",  "email": "c.espiritu@lhu.gov.ph",
+         "role": "Admin",         "station": "Sta. Rosa", "contact": "09193456789",
+         "status": "Active",    "date_added": "Jan 11, 2025"},
+        {"id": "EMP-2025-004", "name": "Jerome Elano",      "email": "j.elano@lhu.gov.ph",
+         "role": "Encoder",       "station": "Calamba",   "contact": "09204567890",
+         "status": "Active",    "date_added": "Jan 12, 2025"},
+        {"id": "EMP-2025-005", "name": "Maria Santos",      "email": "m.santos@lhu.gov.ph",
+         "role": "LHU Nurse",     "station": "Biñan",     "contact": "09215678901",
+         "status": "On Leave",  "date_added": "Feb 3, 2025"},
+        {"id": "EMP-2025-006", "name": "Pedro Dela Cruz",   "email": "p.delacruz@lhu.gov.ph",
+         "role": "Health Officer","station": "San Pedro", "contact": "09226789012",
+         "status": "Active",    "date_added": "Feb 10, 2025"},
+        {"id": "EMP-2025-007", "name": "Ana Garcia",        "email": "a.garcia@lhu.gov.ph",
+         "role": "Encoder",       "station": "Cabuyao",   "contact": "09237890123",
+         "status": "Inactive",  "date_added": "Mar 1, 2025"},
+        {"id": "EMP-2025-008", "name": "Jose Reyes",        "email": "j.reyes@lhu.gov.ph",
+         "role": "LHU Nurse",     "station": "Calamba",   "contact": "09248901234",
+         "status": "Active",    "date_added": "Mar 15, 2025"},
     ]
-    return render_template("dashboard/records.html", records=records)
+    return render_template("dashboard/records.html", employees=employees)
+
+
+@admin_bp.route("/privacy-security")
+def privacy_security():
+    roles = [
+        {"name": "Patient",        "screen": True,  "view_records": "Own records", "export": "No",      "admin": "No"},
+        {"name": "LHU Nurse",      "screen": True,  "view_records": "Yes",         "export": "Limited", "admin": "No"},
+        {"name": "Health Officer", "screen": True,  "view_records": "Yes",         "export": "Yes",     "admin": "Read"},
+        {"name": "Admin",          "screen": True,  "view_records": "Yes",         "export": "Yes",     "admin": "Yes"},
+    ]
+    lhu_agreements = [
+        {"name": "Calamba",   "status": "Signed"},
+        {"name": "Santa Rosa","status": "Signed"},
+        {"name": "Biñan",     "status": "Signed"},
+        {"name": "San Pedro", "status": "Pending"},
+        {"name": "Cabuyao",   "status": "Pending"},
+    ]
+    retention_policy = [
+        {"label": "Retention period",  "value": "5 years"},
+        {"label": "Anonymization",     "value": "On export"},
+        {"label": "Right to deletion", "value": "Yes"},
+        {"label": "Backup frequency",  "value": "Daily (encrypted)"},
+        {"label": "Storage location",  "value": "LHU local server"},
+    ]
+    return render_template(
+        "dashboard/privacy.html",
+        roles=roles,
+        lhu_agreements=lhu_agreements,
+        retention_policy=retention_policy,
+    )
 
 
 @admin_bp.route("/green-computing")
@@ -273,7 +297,7 @@ def audit_trails():
          "action": "Patient record deleted: CAB-2024-0088 (approved)",   "ip": "192.168.1.12", "severity": "Critical"},
         {"time": "08:48 AM", "date": "May 27", "user": "lhu.admin",      "role": "Admin",
          "action": "Bulk data import: 120 patient records",   "ip": "192.168.1.12", "severity": "Warning"},
-        {"time": "08:40 AM", "date": "May 27", "user": "Nurse Vennisse", "role": "Nurse",
+        {"time": "08:40 AM", "date": "May 27", "user": "Nurse Venisse", "role": "Nurse",
          "action": "Profile updated: contact info changed",    "ip": "192.168.1.22", "severity": "Info"},
     ]
     return render_template("dashboard/audit_trails.html", logs=logs, audit_date="March 27")
