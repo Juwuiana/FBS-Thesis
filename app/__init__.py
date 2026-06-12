@@ -1,13 +1,10 @@
-from flask import Flask
-<<<<<<< HEAD
+﻿from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 
 db = SQLAlchemy()
 
-
 def create_app(config=None):
     app = Flask(__name__)
-
     app.config["SECRET_KEY"] = "change-me-in-production"
     app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///fbs_thesis.db"
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
@@ -19,9 +16,11 @@ def create_app(config=None):
 
     from app.views.auth_views import auth_bp
     from app.views.admin_views import admin_bp
+    from app.views.nurse_views import nurse_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(admin_bp)
+    app.register_blueprint(nurse_bp)
 
     @app.template_filter("number_format")
     def number_format(value):
@@ -32,36 +31,5 @@ def create_app(config=None):
 
     with app.app_context():
         db.create_all()
-=======
-
-def create_app():
-    app = Flask(__name__)
-    app.secret_key = "fbs-thesis-secret-key"
-
- #   from app.views.auth_views import auth_bp
- #   app.register_blueprint(auth_bp)
-
-    from app.views.nurse_views import nurse_bp
-    app.register_blueprint(nurse_bp)
-
-    return app
-
-from flask import Flask, redirect, url_for
-
-def create_app():
-    app = Flask(__name__)
-    app.secret_key = "fbs-thesis-secret-key"
-
-    # from app.views.auth_views import auth_bp
-    # app.register_blueprint(auth_bp)
-
-    from app.views.nurse_views import nurse_bp
-    app.register_blueprint(nurse_bp)
-
-    # Add this right before returning the app!
-    @app.route('/')
-    def default_home():
-        return redirect(url_for('nurse.nurse_dashboard'))
->>>>>>> feature/intake-patient
 
     return app
