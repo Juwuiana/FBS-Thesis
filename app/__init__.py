@@ -1,5 +1,4 @@
-<<<<<<< HEAD
-from flask import Flask
+﻿from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 
 db = SQLAlchemy()
@@ -23,10 +22,10 @@ def create_app(config=None):
     app.register_blueprint(admin_bp)
     app.register_blueprint(nurse_bp)
 
-    @app.template_filter("number_format")
+    @app.template_filter('number_format')
     def number_format(value):
         try:
-            return f"{value:,}"
+            return f'{value:,}'
         except (ValueError, TypeError):
             return value
 
@@ -34,15 +33,3 @@ def create_app(config=None):
         db.create_all()
 
     return app
-=======
-from flask import Flask
-
-def create_app():
-    app = Flask(__name__)
-    app.secret_key = "fbs-thesis-secret-key"
-
-    from app.views.auth_views import auth_bp
-    app.register_blueprint(auth_bp)
-
-    return app
->>>>>>> origin/feature/auth
