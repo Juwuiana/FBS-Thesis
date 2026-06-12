@@ -17,15 +17,17 @@ def create_app(config=None):
     from app.views.auth_views import auth_bp
     from app.views.admin_views import admin_bp
     from app.views.nurse_views import nurse_bp
+    from app.views.patient_views import patient_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(nurse_bp)
+    app.register_blueprint(patient_bp)
 
-    @app.template_filter('number_format')
+    @app.template_filter("number_format")
     def number_format(value):
         try:
-            return f'{value:,}'
+            return f"{value:,}"
         except (ValueError, TypeError):
             return value
 

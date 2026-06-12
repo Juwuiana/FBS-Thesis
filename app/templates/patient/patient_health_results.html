@@ -1,0 +1,588 @@
+{% extends "patient/patient_base.html" %}
+{% block title %}My Results{% endblock %}
+
+{% block content %}
+
+<!-- PAGE HEADER -->
+<div class="results-header">
+    <div>
+        <h1 class="results-title">My Results</h1>
+        <p class="results-subtitle">Your complete FBS screening history</p>
+    </div>
+    <div class="results-header-actions">
+        <button class="btn btn-outline" id="printAllBtn"><i class="fas fa-print"></i> Print All</button>
+        <button class="btn btn-outline" id="downloadAllBtn"><i class="fas fa-file-download"></i> Download PDF</button>
+    </div>
+</div>
+
+<!-- SUMMARY STRIP -->
+<div class="results-summary-strip">
+    <div class="rs-item">
+        <span class="rs-value">3</span>
+        <span class="rs-label">Total Screenings</span>
+    </div>
+    <div class="rs-divider"></div>
+    <div class="rs-item">
+        <span class="rs-value moderate-text">Moderate</span>
+        <span class="rs-label">Latest Risk Level</span>
+    </div>
+    <div class="rs-divider"></div>
+    <div class="rs-item">
+        <span class="rs-value">124 mg/dL</span>
+        <span class="rs-label">Latest FBS</span>
+    </div>
+    <div class="rs-divider"></div>
+    <div class="rs-item">
+        <span class="rs-value">↓ 6</span>
+        <span class="rs-label">Change Since Last</span>
+    </div>
+</div>
+
+<!-- HISTORY LIST + DETAIL PANEL -->
+<div class="results-body">
+
+    <!-- Left: History List -->
+    <div class="history-list-panel">
+        <h2 class="panel-title">Screening History</h2>
+
+        <div class="screening-card active" data-id="sc1">
+            <div class="sc-date">May 27, 2025</div>
+            <div class="sc-row">
+                <div class="sc-fbs">124 <span>mg/dL</span></div>
+                <span class="range-badge pre-diabetic">Pre-Diabetic</span>
+            </div>
+            <div class="sc-meta">BMI: Overweight · Waist: 93.5 cm</div>
+            <div class="sc-risk-bar"><div class="sc-risk-fill moderate-fill" style="width:62%"></div></div>
+            <div class="sc-risk-label moderate-text">Moderate Risk · Score 62/100</div>
+        </div>
+
+        <div class="screening-card" data-id="sc2">
+            <div class="sc-date">January 15, 2025</div>
+            <div class="sc-row">
+                <div class="sc-fbs">118 <span>mg/dL</span></div>
+                <span class="range-badge pre-diabetic">Pre-Diabetic</span>
+            </div>
+            <div class="sc-meta">BMI: Overweight · Waist: 91.0 cm</div>
+            <div class="sc-risk-bar"><div class="sc-risk-fill moderate-fill" style="width:55%"></div></div>
+            <div class="sc-risk-label moderate-text">Moderate Risk · Score 55/100</div>
+        </div>
+
+        <div class="screening-card" data-id="sc3">
+            <div class="sc-date">August 20, 2024</div>
+            <div class="sc-row">
+                <div class="sc-fbs">92 <span>mg/dL</span></div>
+                <span class="range-badge normal">Normal</span>
+            </div>
+            <div class="sc-meta">BMI: Normal · Waist: 88.0 cm</div>
+            <div class="sc-risk-bar"><div class="sc-risk-fill low-fill" style="width:24%"></div></div>
+            <div class="sc-risk-label low-text">Low Risk · Score 24/100</div>
+        </div>
+    </div>
+
+    <!-- Right: Detail Panel -->
+    <div class="detail-panel" id="detailPanel">
+        <!-- Mobile back button (hidden on desktop via CSS) -->
+        <button class="back-btn" id="backToListBtn" style="display:none;"><i class="fas fa-arrow-left"></i> Back to History</button>
+
+
+        <!-- ══════════════════════════════════════
+             DETAIL: sc1 — May 27, 2025
+        ══════════════════════════════════════ -->
+        <div class="detail-view active" id="detail-sc1">
+
+            <!-- Header -->
+            <div class="detail-header">
+                <div>
+                    <div class="detail-date">May 27, 2025</div>
+                    <div class="detail-id">Assessment No. CAB-2025-0165</div>
+                </div>
+                <div class="detail-actions">
+                    <button class="btn btn-outline btn-sm" data-print-id="sc1"><i class="fas fa-print"></i> Print</button>
+                    <button class="btn btn-outline btn-sm" data-download-id="sc1"><i class="fas fa-file-download"></i> PDF</button>
+                </div>
+            </div>
+
+            <!-- FBS + Risk Score -->
+            <div class="detail-cards-row">
+                <div class="detail-metric-card warn-card">
+                    <div class="dm-label">FBS Reading</div>
+                    <div class="dm-value">124 <span>mg/dL</span></div>
+                    <div class="dm-badge"><span class="range-badge pre-diabetic">Pre-Diabetic</span></div>
+                </div>
+                <div class="detail-metric-card warn-card">
+                    <div class="dm-label">Risk Score</div>
+                    <div class="dm-value dm-score">62<span>/100</span></div>
+                    <div class="score-bar"><div class="score-fill moderate-fill" style="width:62%"></div></div>
+                    <div class="dm-badge moderate-text" style="font-size:0.8rem;font-weight:600;margin-top:0.35rem;">Moderate Risk</div>
+                </div>
+            </div>
+
+            <!-- FBS Range -->
+            <div class="detail-section">
+                <div class="ds-label">Position on FBS Range</div>
+                <div class="range-track" style="margin-top:0.5rem;">
+                    <div class="range-normal"></div><div class="range-pre"></div><div class="range-diabetic"></div>
+                    <div class="range-marker" style="left:78%">▲</div>
+                </div>
+                <div class="range-labels" style="margin-top:0.35rem;">
+                    <span class="rl-normal">Normal &lt;100</span>
+                    <span class="rl-pre">Pre-diabetic 100–125</span>
+                    <span class="rl-diabetic">Diabetic ≥126</span>
+                </div>
+            </div>
+
+            <!-- 1. Patient Demographics -->
+            <div class="detail-section">
+                <div class="ds-label">1. Patient Demographics</div>
+                <div class="detail-data-grid">
+                    <div class="dd-item"><span class="dd-key">Full Name</span><span class="dd-val">Santos, Maria Luisa B.</span></div>
+                    <div class="dd-item"><span class="dd-key">Patient ID</span><span class="dd-val">CAB-P-00165</span></div>
+                    <div class="dd-item"><span class="dd-key">Date of Assessment</span><span class="dd-val">May 27, 2025</span></div>
+                    <div class="dd-item"><span class="dd-key">Date of Birth</span><span class="dd-val">March 14, 1988</span></div>
+                    <div class="dd-item"><span class="dd-key">Age</span><span class="dd-val">37 years old</span></div>
+                    <div class="dd-item"><span class="dd-key">Sex</span><span class="dd-val">Female</span></div>
+                    <div class="dd-item"><span class="dd-key">Civil Status</span><span class="dd-val">Married</span></div>
+                    <div class="dd-item"><span class="dd-key">Contact Number</span><span class="dd-val">+63 912 345 6789</span></div>
+                    <div class="dd-item"><span class="dd-key">Occupation</span><span class="dd-val">Office Worker</span></div>
+                    <div class="dd-item"><span class="dd-key">Educational Attainment</span><span class="dd-val">College Graduate</span></div>
+                    <div class="dd-item"><span class="dd-key">Barangay</span><span class="dd-val">Tagapo, Sta. Rosa City</span></div>
+                </div>
+            </div>
+
+            <!-- 2. Family History -->
+            <div class="detail-section">
+                <div class="ds-label">2. Family History (1st Degree Relative)</div>
+                <div class="risk-factors-grid">
+                    <div class="rf-pill danger-pill">⛔ Hypertension</div>
+                    <div class="rf-pill danger-pill">⛔ Diabetes</div>
+                    <div class="rf-pill ok-pill">✓ No Stroke</div>
+                    <div class="rf-pill ok-pill">✓ No Heart Attack</div>
+                    <div class="rf-pill ok-pill">✓ No Asthma</div>
+                    <div class="rf-pill ok-pill">✓ No Cancer</div>
+                    <div class="rf-pill ok-pill">✓ No Kidney Disease</div>
+                </div>
+            </div>
+
+            <!-- 3. CVD Questionnaire -->
+            <div class="detail-section">
+                <div class="ds-label">3. CVD Questionnaire (Probable Angina / Heart Attack / Stroke)</div>
+                <div class="cvd-table">
+                    <div class="cvd-row">
+                        <span class="cvd-q">1. Pain/discomfort/pressure in chest?</span>
+                        <span class="cvd-a cvd-no">No</span>
+                    </div>
+                    <div class="cvd-row">
+                        <span class="cvd-q">2. Pain in center/left chest or left arm?</span>
+                        <span class="cvd-a cvd-no">No</span>
+                    </div>
+                    <div class="cvd-row">
+                        <span class="cvd-q">3. Occurs when walking uphill or hurrying?</span>
+                        <span class="cvd-a cvd-no">No</span>
+                    </div>
+                    <div class="cvd-row">
+                        <span class="cvd-q">4. Do you slow down if you get it while walking?</span>
+                        <span class="cvd-a cvd-no">No</span>
+                    </div>
+                    <div class="cvd-row">
+                        <span class="cvd-q">5. Does pain go away if you stand still or take under-tongue tablet?</span>
+                        <span class="cvd-a cvd-no">No</span>
+                    </div>
+                    <div class="cvd-row">
+                        <span class="cvd-q">6. Does pain go away in less than 10 minutes?</span>
+                        <span class="cvd-a cvd-no">No</span>
+                    </div>
+                    <div class="cvd-row">
+                        <span class="cvd-q">7. Severe chest pain lasting half an hour or more?</span>
+                        <span class="cvd-a cvd-no">No</span>
+                    </div>
+                    <div class="cvd-row cvd-row-alert">
+                        <span class="cvd-q">8. TIA/Stroke: Difficulty talking, weakness or numbness of arm/leg?</span>
+                        <span class="cvd-a cvd-no">No</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. Lifestyle Factors -->
+            <div class="detail-section">
+                <div class="ds-label">4. Lifestyle Factors</div>
+                <div class="detail-data-grid" style="margin-bottom:0.75rem;">
+                    <div class="dd-item"><span class="dd-key">Smoking Status</span><span class="dd-val">Never smoked</span></div>
+                    <div class="dd-item"><span class="dd-key">Alcohol Intake</span><span class="dd-val">Never Consumed</span></div>
+                    <div class="dd-item"><span class="dd-key">Physical Activity</span><span class="dd-val">Does NOT meet 2.5 hrs/week</span></div>
+                </div>
+                <div class="dd-key" style="margin-bottom:0.4rem;">Dietary Factors</div>
+                <div class="risk-factors-grid">
+                    <div class="rf-pill warn-pill">⚠ High Fat/Salt Diet</div>
+                    <div class="rf-pill ok-pill">✓ Eats 3 servings vegetables daily</div>
+                    <div class="rf-pill warn-pill">⚠ Insufficient fruit intake</div>
+                </div>
+            </div>
+
+            <!-- 5. Diabetes History -->
+            <div class="detail-section">
+                <div class="ds-label">5. Diabetes History</div>
+                <div class="detail-data-grid" style="margin-bottom:0.75rem;">
+                    <div class="dd-item" style="grid-column:1/-1;">
+                        <span class="dd-key">Previously Diagnosed with Diabetes</span>
+                        <span class="dd-val">No / Do not know</span>
+                    </div>
+                </div>
+                <div class="dd-key" style="margin-bottom:0.4rem;">Symptoms Present</div>
+                <div class="risk-factors-grid">
+                    <div class="rf-pill warn-pill">⚠ Polyphagia (Excessive eating)</div>
+                    <div class="rf-pill ok-pill">✓ No Polydipsia</div>
+                    <div class="rf-pill ok-pill">✓ No Polyuria</div>
+                </div>
+            </div>
+
+            <!-- 6. Anthropometric Measurements & Vitals -->
+            <div class="detail-section">
+                <div class="ds-label">6. Anthropometric Measurements &amp; Vitals</div>
+                <div class="detail-data-grid">
+                    <div class="dd-item"><span class="dd-key">Blood Pressure</span><span class="dd-val">128/84 mmHg</span></div>
+                    <div class="dd-item"><span class="dd-key">Height</span><span class="dd-val">158 cm</span></div>
+                    <div class="dd-item"><span class="dd-key">Weight</span><span class="dd-val">68.5 kg</span></div>
+                    <div class="dd-item"><span class="dd-key">BMI</span><span class="dd-val">27.4 kg/m²</span></div>
+                    <div class="dd-item"><span class="dd-key">Waist Circumference</span><span class="dd-val">93.5 cm (At threshold)</span></div>
+                    <div class="dd-item"><span class="dd-key">Obesity Classification</span><span class="dd-val">Overweight (23–24.9)</span></div>
+                </div>
+            </div>
+
+            <!-- Clinical Recommendation -->
+            <div class="detail-section">
+                <div class="ds-label">Clinical Recommendation</div>
+                <div class="recommendation-box warn-rec">
+                    <p>Refer for confirmatory OGTT test. Schedule follow-up within 2 weeks. Advised to begin structured dietary changes and increase physical activity to at least 150 minutes per week.</p>
+                </div>
+            </div>
+
+            <!-- Follow-up & Referral -->
+            <div class="detail-section">
+                <div class="ds-label">Follow-up &amp; Referral</div>
+                <div class="detail-data-grid">
+                    <div class="dd-item"><span class="dd-key">Next Follow-up</span><span class="dd-val followup-date">June 10, 2025</span></div>
+                    <div class="dd-item"><span class="dd-key">Referred To</span><span class="dd-val">Dr. Velandres</span></div>
+                    <div class="dd-item"><span class="dd-key">Facility</span><span class="dd-val">LHU, Sta. Rosa</span></div>
+                    <div class="dd-item"><span class="dd-key">Attending Nurse</span><span class="dd-val">RN Kim Santos</span></div>
+                </div>
+            </div>
+
+            <div class="detail-footer">
+                <button class="btn btn-outline" data-print-id="sc1"><i class="fas fa-print"></i> Print This Result</button>
+                <button class="btn btn-outline" data-download-id="sc1"><i class="fas fa-file-download"></i> Save as PDF</button>
+            </div>
+        </div>
+
+        <!-- ══════════════════════════════════════
+             DETAIL: sc2 — January 15, 2025
+        ══════════════════════════════════════ -->
+        <div class="detail-view" id="detail-sc2">
+
+            <div class="detail-header">
+                <div>
+                    <div class="detail-date">January 15, 2025</div>
+                    <div class="detail-id">Assessment No. CAB-2025-0032</div>
+                </div>
+                <div class="detail-actions">
+                    <button class="btn btn-outline btn-sm" data-print-id="sc2"><i class="fas fa-print"></i> Print</button>
+                    <button class="btn btn-outline btn-sm" data-download-id="sc2"><i class="fas fa-file-download"></i> PDF</button>
+                </div>
+            </div>
+
+            <div class="detail-cards-row">
+                <div class="detail-metric-card warn-card">
+                    <div class="dm-label">FBS Reading</div>
+                    <div class="dm-value">118 <span>mg/dL</span></div>
+                    <div class="dm-badge"><span class="range-badge pre-diabetic">Pre-Diabetic</span></div>
+                </div>
+                <div class="detail-metric-card warn-card">
+                    <div class="dm-label">Risk Score</div>
+                    <div class="dm-value dm-score">55<span>/100</span></div>
+                    <div class="score-bar"><div class="score-fill moderate-fill" style="width:55%"></div></div>
+                    <div class="dm-badge moderate-text" style="font-size:0.8rem;font-weight:600;margin-top:0.35rem;">Moderate Risk</div>
+                </div>
+            </div>
+
+            <div class="detail-section">
+                <div class="ds-label">Position on FBS Range</div>
+                <div class="range-track" style="margin-top:0.5rem;">
+                    <div class="range-normal"></div><div class="range-pre"></div><div class="range-diabetic"></div>
+                    <div class="range-marker" style="left:69%">▲</div>
+                </div>
+                <div class="range-labels" style="margin-top:0.35rem;">
+                    <span class="rl-normal">Normal &lt;100</span>
+                    <span class="rl-pre">Pre-diabetic 100–125</span>
+                    <span class="rl-diabetic">Diabetic ≥126</span>
+                </div>
+            </div>
+
+            <div class="detail-section">
+                <div class="ds-label">1. Patient Demographics</div>
+                <div class="detail-data-grid">
+                    <div class="dd-item"><span class="dd-key">Full Name</span><span class="dd-val">Santos, Maria Luisa B.</span></div>
+                    <div class="dd-item"><span class="dd-key">Patient ID</span><span class="dd-val">CAB-P-00165</span></div>
+                    <div class="dd-item"><span class="dd-key">Date of Assessment</span><span class="dd-val">January 15, 2025</span></div>
+                    <div class="dd-item"><span class="dd-key">Age at Assessment</span><span class="dd-val">36 years old</span></div>
+                    <div class="dd-item"><span class="dd-key">Sex</span><span class="dd-val">Female</span></div>
+                    <div class="dd-item"><span class="dd-key">Civil Status</span><span class="dd-val">Married</span></div>
+                    <div class="dd-item"><span class="dd-key">Occupation</span><span class="dd-val">Office Worker</span></div>
+                    <div class="dd-item"><span class="dd-key">Barangay</span><span class="dd-val">Tagapo, Sta. Rosa City</span></div>
+                </div>
+            </div>
+
+            <div class="detail-section">
+                <div class="ds-label">2. Family History (1st Degree Relative)</div>
+                <div class="risk-factors-grid">
+                    <div class="rf-pill danger-pill">⛔ Hypertension</div>
+                    <div class="rf-pill danger-pill">⛔ Diabetes</div>
+                    <div class="rf-pill ok-pill">✓ No Stroke</div>
+                    <div class="rf-pill ok-pill">✓ No Heart Attack</div>
+                    <div class="rf-pill ok-pill">✓ No Asthma</div>
+                    <div class="rf-pill ok-pill">✓ No Cancer</div>
+                    <div class="rf-pill ok-pill">✓ No Kidney Disease</div>
+                </div>
+            </div>
+
+            <div class="detail-section">
+                <div class="ds-label">3. CVD Questionnaire</div>
+                <div class="cvd-table">
+                    <div class="cvd-row"><span class="cvd-q">1. Pain/discomfort/pressure in chest?</span><span class="cvd-a cvd-no">No</span></div>
+                    <div class="cvd-row"><span class="cvd-q">2. Pain in center/left chest or left arm?</span><span class="cvd-a cvd-no">No</span></div>
+                    <div class="cvd-row"><span class="cvd-q">3. Occurs when walking uphill or hurrying?</span><span class="cvd-a cvd-no">No</span></div>
+                    <div class="cvd-row"><span class="cvd-q">4. Do you slow down if you get it while walking?</span><span class="cvd-a cvd-no">No</span></div>
+                    <div class="cvd-row"><span class="cvd-q">5. Does pain go away standing still or under-tongue tablet?</span><span class="cvd-a cvd-no">No</span></div>
+                    <div class="cvd-row"><span class="cvd-q">6. Does pain go away in less than 10 minutes?</span><span class="cvd-a cvd-no">No</span></div>
+                    <div class="cvd-row"><span class="cvd-q">7. Severe chest pain lasting half an hour or more?</span><span class="cvd-a cvd-no">No</span></div>
+                    <div class="cvd-row cvd-row-alert"><span class="cvd-q">8. TIA/Stroke: Difficulty talking, weakness or numbness?</span><span class="cvd-a cvd-no">No</span></div>
+                </div>
+            </div>
+
+            <div class="detail-section">
+                <div class="ds-label">4. Lifestyle Factors</div>
+                <div class="detail-data-grid" style="margin-bottom:0.75rem;">
+                    <div class="dd-item"><span class="dd-key">Smoking Status</span><span class="dd-val">Never smoked</span></div>
+                    <div class="dd-item"><span class="dd-key">Alcohol Intake</span><span class="dd-val">Never Consumed</span></div>
+                    <div class="dd-item"><span class="dd-key">Physical Activity</span><span class="dd-val">Does NOT meet 2.5 hrs/week</span></div>
+                </div>
+                <div class="dd-key" style="margin-bottom:0.4rem;">Dietary Factors</div>
+                <div class="risk-factors-grid">
+                    <div class="rf-pill warn-pill">⚠ High Fat/Salt Diet</div>
+                    <div class="rf-pill ok-pill">✓ Eats vegetables daily</div>
+                    <div class="rf-pill ok-pill">✓ Eats fruit daily</div>
+                </div>
+            </div>
+
+            <div class="detail-section">
+                <div class="ds-label">5. Diabetes History</div>
+                <div class="detail-data-grid" style="margin-bottom:0.75rem;">
+                    <div class="dd-item" style="grid-column:1/-1;">
+                        <span class="dd-key">Previously Diagnosed with Diabetes</span>
+                        <span class="dd-val">No / Do not know</span>
+                    </div>
+                </div>
+                <div class="dd-key" style="margin-bottom:0.4rem;">Symptoms Present</div>
+                <div class="risk-factors-grid">
+                    <div class="rf-pill ok-pill">✓ No Polyphagia</div>
+                    <div class="rf-pill ok-pill">✓ No Polydipsia</div>
+                    <div class="rf-pill ok-pill">✓ No Polyuria</div>
+                </div>
+            </div>
+
+            <div class="detail-section">
+                <div class="ds-label">6. Anthropometric Measurements &amp; Vitals</div>
+                <div class="detail-data-grid">
+                    <div class="dd-item"><span class="dd-key">Blood Pressure</span><span class="dd-val">124/82 mmHg</span></div>
+                    <div class="dd-item"><span class="dd-key">Height</span><span class="dd-val">158 cm</span></div>
+                    <div class="dd-item"><span class="dd-key">Weight</span><span class="dd-val">66.9 kg</span></div>
+                    <div class="dd-item"><span class="dd-key">BMI</span><span class="dd-val">26.8 kg/m²</span></div>
+                    <div class="dd-item"><span class="dd-key">Waist Circumference</span><span class="dd-val">91.0 cm</span></div>
+                    <div class="dd-item"><span class="dd-key">Obesity Classification</span><span class="dd-val">Overweight (23–24.9)</span></div>
+                </div>
+            </div>
+
+            <div class="detail-section">
+                <div class="ds-label">Clinical Recommendation</div>
+                <div class="recommendation-box warn-rec">
+                    <p>Advised dietary modification and increased physical activity. Schedule repeat FBS after 3 months.</p>
+                </div>
+            </div>
+
+            <div class="detail-section">
+                <div class="ds-label">Follow-up &amp; Referral</div>
+                <div class="detail-data-grid">
+                    <div class="dd-item"><span class="dd-key">Next Follow-up</span><span class="dd-val followup-date">April 15, 2025</span></div>
+                    <div class="dd-item"><span class="dd-key">Attending Nurse</span><span class="dd-val">RN Kim Santos</span></div>
+                    <div class="dd-item"><span class="dd-key">Facility</span><span class="dd-val">LHU, Sta. Rosa</span></div>
+                </div>
+            </div>
+
+            <div class="detail-footer">
+                <button class="btn btn-outline" data-print-id="sc2"><i class="fas fa-print"></i> Print This Result</button>
+                <button class="btn btn-outline" data-download-id="sc2"><i class="fas fa-file-download"></i> Save as PDF</button>
+            </div>
+        </div>
+
+        <!-- ══════════════════════════════════════
+             DETAIL: sc3 — August 20, 2024
+        ══════════════════════════════════════ -->
+        <div class="detail-view" id="detail-sc3">
+
+            <div class="detail-header">
+                <div>
+                    <div class="detail-date">August 20, 2024</div>
+                    <div class="detail-id">Assessment No. CAB-2024-0289</div>
+                </div>
+                <div class="detail-actions">
+                    <button class="btn btn-outline btn-sm" data-print-id="sc3"><i class="fas fa-print"></i> Print</button>
+                    <button class="btn btn-outline btn-sm" data-download-id="sc3"><i class="fas fa-file-download"></i> PDF</button>
+                </div>
+            </div>
+
+            <div class="detail-cards-row">
+                <div class="detail-metric-card low-card">
+                    <div class="dm-label">FBS Reading</div>
+                    <div class="dm-value">92 <span>mg/dL</span></div>
+                    <div class="dm-badge"><span class="range-badge normal">Normal</span></div>
+                </div>
+                <div class="detail-metric-card low-card">
+                    <div class="dm-label">Risk Score</div>
+                    <div class="dm-value dm-score">24<span>/100</span></div>
+                    <div class="score-bar"><div class="score-fill low-fill" style="width:24%"></div></div>
+                    <div class="dm-badge low-text" style="font-size:0.8rem;font-weight:600;margin-top:0.35rem;">Low Risk</div>
+                </div>
+            </div>
+
+            <div class="detail-section">
+                <div class="ds-label">Position on FBS Range</div>
+                <div class="range-track" style="margin-top:0.5rem;">
+                    <div class="range-normal"></div><div class="range-pre"></div><div class="range-diabetic"></div>
+                    <div class="range-marker" style="left:20%">▲</div>
+                </div>
+                <div class="range-labels" style="margin-top:0.35rem;">
+                    <span class="rl-normal">Normal &lt;100</span>
+                    <span class="rl-pre">Pre-diabetic 100–125</span>
+                    <span class="rl-diabetic">Diabetic ≥126</span>
+                </div>
+            </div>
+
+            <div class="detail-section">
+                <div class="ds-label">1. Patient Demographics</div>
+                <div class="detail-data-grid">
+                    <div class="dd-item"><span class="dd-key">Full Name</span><span class="dd-val">Santos, Maria Luisa B.</span></div>
+                    <div class="dd-item"><span class="dd-key">Patient ID</span><span class="dd-val">CAB-P-00165</span></div>
+                    <div class="dd-item"><span class="dd-key">Date of Assessment</span><span class="dd-val">August 20, 2024</span></div>
+                    <div class="dd-item"><span class="dd-key">Age at Assessment</span><span class="dd-val">36 years old</span></div>
+                    <div class="dd-item"><span class="dd-key">Sex</span><span class="dd-val">Female</span></div>
+                    <div class="dd-item"><span class="dd-key">Civil Status</span><span class="dd-val">Married</span></div>
+                    <div class="dd-item"><span class="dd-key">Occupation</span><span class="dd-val">Office Worker</span></div>
+                    <div class="dd-item"><span class="dd-key">Barangay</span><span class="dd-val">Tagapo, Sta. Rosa City</span></div>
+                </div>
+            </div>
+
+            <div class="detail-section">
+                <div class="ds-label">2. Family History (1st Degree Relative)</div>
+                <div class="risk-factors-grid">
+                    <div class="rf-pill danger-pill">⛔ Hypertension</div>
+                    <div class="rf-pill ok-pill">✓ No Diabetes</div>
+                    <div class="rf-pill ok-pill">✓ No Stroke</div>
+                    <div class="rf-pill ok-pill">✓ No Heart Attack</div>
+                    <div class="rf-pill ok-pill">✓ No Asthma</div>
+                    <div class="rf-pill ok-pill">✓ No Cancer</div>
+                    <div class="rf-pill ok-pill">✓ No Kidney Disease</div>
+                </div>
+            </div>
+
+            <div class="detail-section">
+                <div class="ds-label">3. CVD Questionnaire</div>
+                <div class="cvd-table">
+                    <div class="cvd-row"><span class="cvd-q">1. Pain/discomfort/pressure in chest?</span><span class="cvd-a cvd-no">No</span></div>
+                    <div class="cvd-row"><span class="cvd-q">2. Pain in center/left chest or left arm?</span><span class="cvd-a cvd-no">No</span></div>
+                    <div class="cvd-row"><span class="cvd-q">3. Occurs when walking uphill or hurrying?</span><span class="cvd-a cvd-no">No</span></div>
+                    <div class="cvd-row"><span class="cvd-q">4. Do you slow down if you get it while walking?</span><span class="cvd-a cvd-no">No</span></div>
+                    <div class="cvd-row"><span class="cvd-q">5. Does pain go away standing still or under-tongue tablet?</span><span class="cvd-a cvd-no">No</span></div>
+                    <div class="cvd-row"><span class="cvd-q">6. Does pain go away in less than 10 minutes?</span><span class="cvd-a cvd-no">No</span></div>
+                    <div class="cvd-row"><span class="cvd-q">7. Severe chest pain lasting half an hour or more?</span><span class="cvd-a cvd-no">No</span></div>
+                    <div class="cvd-row cvd-row-alert"><span class="cvd-q">8. TIA/Stroke: Difficulty talking, weakness or numbness?</span><span class="cvd-a cvd-no">No</span></div>
+                </div>
+            </div>
+
+            <div class="detail-section">
+                <div class="ds-label">4. Lifestyle Factors</div>
+                <div class="detail-data-grid" style="margin-bottom:0.75rem;">
+                    <div class="dd-item"><span class="dd-key">Smoking Status</span><span class="dd-val">Never smoked</span></div>
+                    <div class="dd-item"><span class="dd-key">Alcohol Intake</span><span class="dd-val">Never Consumed</span></div>
+                    <div class="dd-item"><span class="dd-key">Physical Activity</span><span class="dd-val">Meets at least 2.5 hrs/week</span></div>
+                </div>
+                <div class="dd-key" style="margin-bottom:0.4rem;">Dietary Factors</div>
+                <div class="risk-factors-grid">
+                    <div class="rf-pill ok-pill">✓ No High Fat/Salt Diet</div>
+                    <div class="rf-pill ok-pill">✓ Eats 3 servings vegetables daily</div>
+                    <div class="rf-pill ok-pill">✓ Eats 2–3 servings fruit daily</div>
+                </div>
+            </div>
+
+            <div class="detail-section">
+                <div class="ds-label">5. Diabetes History</div>
+                <div class="detail-data-grid" style="margin-bottom:0.75rem;">
+                    <div class="dd-item" style="grid-column:1/-1;">
+                        <span class="dd-key">Previously Diagnosed with Diabetes</span>
+                        <span class="dd-val">No / Do not know</span>
+                    </div>
+                </div>
+                <div class="dd-key" style="margin-bottom:0.4rem;">Symptoms Present</div>
+                <div class="risk-factors-grid">
+                    <div class="rf-pill ok-pill">✓ No Polyphagia</div>
+                    <div class="rf-pill ok-pill">✓ No Polydipsia</div>
+                    <div class="rf-pill ok-pill">✓ No Polyuria</div>
+                </div>
+            </div>
+
+            <div class="detail-section">
+                <div class="ds-label">6. Anthropometric Measurements &amp; Vitals</div>
+                <div class="detail-data-grid">
+                    <div class="dd-item"><span class="dd-key">Blood Pressure</span><span class="dd-val">118/76 mmHg</span></div>
+                    <div class="dd-item"><span class="dd-key">Height</span><span class="dd-val">158 cm</span></div>
+                    <div class="dd-item"><span class="dd-key">Weight</span><span class="dd-val">57.7 kg</span></div>
+                    <div class="dd-item"><span class="dd-key">BMI</span><span class="dd-val">23.1 kg/m²</span></div>
+                    <div class="dd-item"><span class="dd-key">Waist Circumference</span><span class="dd-val">88.0 cm</span></div>
+                    <div class="dd-item"><span class="dd-key">Obesity Classification</span><span class="dd-val">Normal (18.5–22.9)</span></div>
+                </div>
+            </div>
+
+            <div class="detail-section">
+                <div class="ds-label">Clinical Recommendation</div>
+                <div class="recommendation-box low-rec">
+                    <p>Results within normal range. Continue healthy lifestyle. Return for annual FBS screening.</p>
+                </div>
+            </div>
+
+            <div class="detail-section">
+                <div class="ds-label">Follow-up &amp; Referral</div>
+                <div class="detail-data-grid">
+                    <div class="dd-item"><span class="dd-key">Next Follow-up</span><span class="dd-val followup-date">August 2025 (Annual)</span></div>
+                    <div class="dd-item"><span class="dd-key">Attending Nurse</span><span class="dd-val">RN Kim Santos</span></div>
+                    <div class="dd-item"><span class="dd-key">Facility</span><span class="dd-val">LHU, Sta. Rosa</span></div>
+                </div>
+            </div>
+
+            <div class="detail-footer">
+                <button class="btn btn-outline" data-print-id="sc3"><i class="fas fa-print"></i> Print This Result</button>
+                <button class="btn btn-outline" data-download-id="sc3"><i class="fas fa-file-download"></i> Save as PDF</button>
+            </div>
+        </div>
+
+    </div><!-- end detail-panel -->
+</div><!-- end results-body -->
+
+<div id="printArea" style="display:none;"></div>
+
+<footer class="patient-footer">
+    <span>© 2026 Santa Rosa City Health Office — FBS Diabetes Risk System</span>
+    <div class="footer-links">
+        <a href="#">Privacy Policy</a>
+        <span>·</span>
+        <a href="#">Help</a>
+    </div>
+</footer>
+
+{% endblock %}
