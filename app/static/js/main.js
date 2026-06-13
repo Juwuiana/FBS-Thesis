@@ -4,7 +4,7 @@
 
 // Chart.js global defaults for mobile responsiveness
 Chart.defaults.responsive = true;
-Chart.defaults.maintainAspectRatio = true;
+Chart.defaults.maintainAspectRatio = false;
 
 // ── Dashboard: Donut Chart ──
 function initDonutChart() {

@@ -100,11 +100,11 @@ canvas {
    ========================================================== */
 
 .stat-card {
-  background: var(--card-bg);
+  background: #ffffff;
   border-radius: 12px;
+  border: 1px solid #e8ede8;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
   padding: 18px 20px;
-  border: 1px solid var(--border-color);
-  height: 100%;
 }
 .stat-label {
   font-size: 11px; font-weight: 600;
@@ -118,13 +118,23 @@ canvas {
 .stat-change.neutral { color: var(--text-muted); }
 
 .chart-card {
-  background: var(--card-bg);
+  background: #ffffff;
   border-radius: 12px;
-  border: 1px solid var(--border-color);
-  padding: 18px 20px;
-  height: 100%;
+  border: 1px solid #e8ede8;
+  border-top: 3px solid #27ae60;
+  padding: 20px 22px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
 }
-.chart-card-title { font-size: 13px; font-weight: 700; color: var(--text-primary); margin-bottom: 14px; }
+.chart-card-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #4a7c59;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e8ede8;
+}
 
 .risk-pill {
   display: inline-block; padding: 3px 10px;
@@ -180,10 +190,24 @@ canvas {
    ========================================================== */
 
 .rel-card {
-  background: var(--card-bg); border-radius: 12px;
-  border: 1px solid var(--border-color); padding: 20px 22px;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e8ede8;
+  border-top: 3px solid #27ae60;
+  padding: 20px 22px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  height: 100%;
 }
-.rel-card-title { font-size: 13px; font-weight: 700; color: var(--text-primary); margin-bottom: 14px; }
+.rel-card-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #4a7c59;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e8ede8;
+}
 .rel-divider { border: none; border-top: 1px solid var(--border-color); margin: 12px 0 0; }
 
 .bench-table { font-size: 13px; }
@@ -258,8 +282,24 @@ canvas {
    DATA MANAGEMENT PAGE
    ========================================================== */
 
-.dm-card { background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border-color); padding: 20px 22px; }
-.dm-card-title { font-size: 16px; font-weight: 700; color: var(--text-primary); margin-bottom: 16px; }
+.dm-card {
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e8ede8;
+  border-top: 3px solid #27ae60;
+  padding: 20px 22px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+.dm-card-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #4a7c59;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e8ede8;
+}
 
 .filter-bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 18px; }
 .filter-select {
@@ -333,9 +373,25 @@ canvas {
 .gc-stat-change.positive { color: #2e7d32; }
 .gc-stat-change.neutral { color: var(--text-muted); }
 
-.gc-card { background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border-color); padding: 20px 22px; height: 100%; }
-.gc-card-title { font-size: 14px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px; }
-.gc-card-subtitle { font-size: 11px; color: var(--text-muted); margin-bottom: 16px; }
+.gc-card {
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e8ede8;
+  border-top: 3px solid #27ae60;
+  padding: 20px 22px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+.gc-card-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #4a7c59;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 4px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e8ede8;
+}
+.gc-card-subtitle { font-size: 11px; color: #94a3b8; margin-bottom: 16px; }
 
 .live-badge {
   display: inline-block; padding: 3px 10px; background: #e8f5e9;
@@ -442,7 +498,14 @@ canvas {
    AUDIT TRAILS PAGE
    ========================================================== */
 
-.audit-card { background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border-color); padding: 20px 22px; }
+.audit-card {
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e8ede8;
+  border-top: 3px solid #27ae60;
+  padding: 20px 22px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
 
 .audit-search {
   width: 100%; padding: 9px 14px;
@@ -627,17 +690,23 @@ canvas {
    ========================================================== */
 
 .ps-card {
-  background: var(--card-bg);
+  background: #ffffff;
   border-radius: 12px;
-  border: 1px solid var(--border-color);
+  border: 1px solid #e8ede8;
+  border-top: 3px solid #27ae60;
   padding: 20px 22px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
 }
 
 .ps-card-title {
-  font-size: 14px;
+  font-size: 11px;
   font-weight: 700;
-  color: var(--text-primary);
+  color: #4a7c59;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
   margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e8ede8;
 }
 
 .ps-section-header {
@@ -828,7 +897,14 @@ canvas {
 .ps-toggle input:checked + .ps-toggle-slider:before { transform: translateX(16px); }
 
 @media (max-width: 575px) {
-  .ps-card { padding: 14px; }
+  .ps-card {
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e8ede8;
+  border-top: 3px solid #27ae60;
+  padding: 20px 22px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
   .ps-primary-btn, .ps-secondary-btn { width: 100%; justify-content: center; }
 }
 =======
@@ -1470,3 +1546,99 @@ canvas {
         
         
 >>>>>>> origin/feature/auth
+
+/* -- ADMIN DASHBOARD CHART SIZE FIX -- */
+.chart-card canvas {
+    max-height: 220px !important;
+}
+#donutChart {
+    max-height: 180px !important;
+}
+#lineChart {
+    max-height: 200px !important;
+}
+#radarChart {
+    max-height: 180px !important;
+}
+
+/* -- CHART CARD HEIGHT CONSTRAINTS -- */
+.chart-card {
+    overflow: hidden;
+}
+.chart-card canvas {
+    max-height: 200px !important;
+    width: 100% !important;
+}
+#donutChart { max-height: 160px !important; }
+#lineChart  { max-height: 190px !important; }
+#radarChart { max-height: 160px !important; }
+
+/* -- STAT CARD OVERRIDES to match target design -- */
+.stat-label {
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  color: #6b8f71 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.04em !important;
+  margin-bottom: 6px !important;
+}
+.stat-value {
+  font-size: 2rem !important;
+  font-weight: 700 !important;
+  color: #1e293b !important;
+  line-height: 1.1 !important;
+  margin-bottom: 6px !important;
+}
+.stat-change.up    { color: #27ae60 !important; font-size: 12px !important; }
+.stat-change.down  { color: #e53e3e !important; font-size: 12px !important; }
+.stat-change.neutral { color: #6b8f71 !important; font-size: 12px !important; }
+
+/* Page subtitle under Dashboard title */
+.page-subtitle-text {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+/* ── BUTTON VISIBILITY FIXES ── */
+.view-btn {
+  padding: 5px 14px;
+  background: #ffffff;
+  color: #27ae60;
+  border: 1.5px solid #27ae60;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.view-btn:hover {
+  background: #27ae60;
+  color: #ffffff;
+}
+.ps-primary-btn {
+  padding: 9px 20px;
+  background: #27ae60 !important;
+  color: #fff !important;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+}
+.ps-secondary-btn {
+  padding: 9px 20px;
+  background: #ffffff !important;
+  color: #27ae60 !important;
+  border: 1.5px solid #27ae60 !important;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+}
+.ps-primary-btn:hover { background: #219a52 !important; }
+.ps-secondary-btn:hover { background: #27ae60 !important; color: #fff !important; }
