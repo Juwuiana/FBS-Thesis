@@ -241,3 +241,8 @@ textarea.field-input   { height: auto; padding: 0.625rem 0.875rem; resize: verti
 .user-dropdown-signout:hover { background: rgba(239,68,68,0.15); color: #fca5a5; }
 
 .udd-icon { font-size: 1rem; }
+/* Risk badges */
+.risk-badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:0.75rem; font-weight:700; }
+.badge-danger  { background:#fee2e2; color:#dc2626; }
+.badge-warning { background:#fef3c7; color:#d97706; }
+.badge-success { background:#dcfce7; color:#16a34a; }

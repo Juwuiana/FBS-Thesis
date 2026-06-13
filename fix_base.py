@@ -1,4 +1,6 @@
-<!DOCTYPE html>
+﻿import re
+
+html = r"""<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -141,4 +143,7 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 {% block scripts %}{% endblock %}
 </body>
-</html>
+</html>"""
+
+open('app/templates/base.html', 'w', encoding='utf-8').write(html)
+print('base.html written successfully')

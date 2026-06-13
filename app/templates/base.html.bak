@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+  
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}FBS Diabetes Risk{% endblock %}</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/nurse_dashboard.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+      body {
+        background: #f0f4f0 !important;
+        display: flex;
+      }
+      .main-wrapper {
+        background: #f0f4f0 !important;
+        flex: 1;
+      }
+    </style>
+
+<body>
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <div class="mobile-overlay" id="mobileOverlay"></div>
+
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-brand">FBS-Based<br>Diabetes Risk<br>Prediction</div>
+        </div>
+
+        <nav class="sidebar-nav">
+            <a href="{{ url_for('admin.dashboard') }}" class="nav-item {{ 'active' if active_page == 'dashboard' else '' }}">Dashboard</a>
+            <a href="{{ url_for('admin.reliability') }}" class="nav-item {{ 'active' if active_page == 'reliability' else '' }}">Model Reliability</a>
+            <a href="{{ url_for('admin.green_computing') }}" class="nav-item {{ 'active' if active_page == 'green_computing' else '' }}">Green Computing</a>
+            <a href="{{ url_for('admin.data_management') }}" class="nav-item {{ 'active' if active_page == 'data_management' else '' }}">Data Management</a>
+            <a href="{{ url_for('admin.audit_trails') }}" class="nav-item {{ 'active' if active_page == 'audit_trails' else '' }}">Audit Trails</a>
+            <a href="{{ url_for('admin.privacy_security') }}" class="nav-item {{ 'active' if active_page == 'privacy' else '' }}">Privacy &amp; Security</a>
+        </nav>
+
+        <div class="sidebar-user" id="userMenuToggle" role="button" tabindex="0">
+            <div class="user-avatar-wrap">
+                <img id="userAvatarPreview" src="" alt="" style="display:none; width:38px; height:38px; border-radius:50%; object-fit:cover;">
+                <div class="user-avatar" id="userAvatarFallback"></div>
+            </div>
+            <div style="flex:1; min-width:0;">
+                <div style="font-weight:700; font-size:0.85rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Health Officer</div>
+                <div style="font-size:0.75rem; opacity:0.7;">LHU Cabuyao</div>
+            </div>
+            <span class="user-menu-caret" id="userMenuCaret">▲</span>
+        </div>
+
+        <div class="user-dropdown" id="userDropdown">
+            <label class="user-dropdown-item" for="avatarFileInput">
+                <span class="udd-icon">🖼</span> Change Profile Photo
+                <input type="file" id="avatarFileInput" accept="image/*" style="display:none;">
+            </label>
+            <a href="{{ url_for('auth.logout') }}" class="user-dropdown-item user-dropdown-signout">
+                <span class="udd-icon">🚪</span> Sign Out
+            </a>
+        </div>
+    </aside>
+
+    <button id="backToTop" class="back-to-top">↑</button>
+
+    <main class="main-wrapper">
+        <div class="mobile-header">
+            <button id="menuToggle" class="menu-toggle">☰</button>
+            <div class="mobile-brand">FBS Diabetes Risk Prediction</div>
+        </div>
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const menuToggle = document.getElementById('menuToggle');
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('mobileOverlay');
+            const backToTopBtn = document.getElementById('backToTop');
+
+            window.addEventListener('scroll', () => {
+                backToTopBtn.classList.toggle('show', window.scrollY > 300);
+            });
+            if (backToTopBtn) backToTopBtn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+            if (menuToggle) menuToggle.addEventListener('click', () => { sidebar.classList.add('active'); overlay.classList.add('active'); });
+            if (overlay) overlay.addEventListener('click', () => { sidebar.classList.remove('active'); overlay.classList.remove('active'); });
+
+            const userMenuToggle = document.getElementById('userMenuToggle');
+            const userDropdown = document.getElementById('userDropdown');
+            const userMenuCaret = document.getElementById('userMenuCaret');
+            const avatarFileInput = document.getElementById('avatarFileInput');
+            const avatarPreview = document.getElementById('userAvatarPreview');
+            const avatarFallback = document.getElementById('userAvatarFallback');
+
+            if (userMenuToggle) {
+                userMenuToggle.addEventListener('click', () => {
+                    const open = userDropdown.classList.toggle('open');
+                    userMenuCaret.textContent = open ? '▼' : '▲';
+                });
+            }
+            document.addEventListener('click', e => {
+                if (userDropdown && userMenuToggle && !userMenuToggle.contains(e.target) && !userDropdown.contains(e.target)) {
+                    userDropdown.classList.remove('open');
+                    userMenuCaret.textContent = '▲';
+                }
+            });
+
+            const AVATAR_KEY = 'adminAvatarDataUrl';
+            const savedAvatar = localStorage.getItem(AVATAR_KEY);
+            if (savedAvatar) { avatarPreview.src = savedAvatar; avatarPreview.style.display = 'block'; avatarFallback.style.display = 'none'; }
+            if (avatarFileInput) {
+                avatarFileInput.addEventListener('change', () => {
+                    const file = avatarFileInput.files[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = e => {
+                        localStorage.setItem(AVATAR_KEY, e.target.result);
+                        avatarPreview.src = e.target.result;
+                        avatarPreview.style.display = 'block';
+                        avatarFallback.style.display = 'none';
+                        userDropdown.classList.remove('open');
+                    };
+                    reader.readAsDataURL(file);
+                });
+            }
+
+            let touchStartX = 0;
+            document.addEventListener('touchstart', e => { touchStartX = e.changedTouches[0].screenX; }, { passive: true });
+            document.addEventListener('touchend', e => {
+                if (sidebar.classList.contains('active') && touchStartX - e.changedTouches[0].screenX > 50) {
+                    sidebar.classList.remove('active');
+                    overlay.classList.remove('active');
+                }
+            }, { passive: true });
+        });
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

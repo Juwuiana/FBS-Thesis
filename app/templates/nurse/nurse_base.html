@@ -16,11 +16,11 @@
         </div>
         
         <nav class="sidebar-nav">
-            <a href="{{ url_for('nurse.nurse_dashboard') }}" class="nav-item">Dashboard</a>
-            <a href="{{ url_for('nurse.nurse_intake') }}" class="nav-item">Patients Screening</a>
-            <a href="{{ url_for('nurse.nurse_health_results') }}" class="nav-item">Health Result</a>
-            <a href="{{ url_for('nurse.nurse_data_management') }}" class="nav-item">Data Management</a>
-            <a href="{{ url_for('nurse.nurse_privacy_security') }}" class="nav-item">Privacy and Security</a>
+            <a href="{{ url_for('nurse.nurse_dashboard') }}" class="nav-item {{ 'active' if active_page == 'dashboard' else '' }}">Dashboard</a>
+            <a href="{{ url_for('nurse.nurse_intake') }}" class="nav-item {{ 'active' if active_page == 'intake' else '' }}">Patients Screening</a>
+            <a href="{{ url_for('nurse.nurse_health_results') }}" class="nav-item {{ 'active' if active_page == 'health_results' else '' }}">Health Result</a>
+            <a href="{{ url_for('nurse.nurse_data_management') }}" class="nav-item {{ 'active' if active_page == 'data_management' else '' }}">Data Management</a>
+            <a href="{{ url_for('nurse.nurse_privacy_security') }}" class="nav-item {{ 'active' if active_page == 'privacy' else '' }}">Privacy and Security</a>
         </nav>
         
         <div class="sidebar-user" id="userMenuToggle" role="button" tabindex="0" title="Account options">
@@ -45,7 +45,7 @@
             {# <a href="{{ url_for('auth.logout') }}" class="user-dropdown-item user-dropdown-signout">
                 <span class="udd-icon">🚪</span> Sign Out
             </a> #}
-            <a href="#" class="user-dropdown-item user-dropdown-signout" id="signOutPlaceholder">
+            <a href="{{ url_for('auth.logout') }}" class="user-dropdown-item user-dropdown-signout" id="signOutPlaceholder">
                 <span class="udd-icon">🚪</span> Sign Out
             </a>
         </div>
@@ -203,3 +203,8 @@
     {% endblock %}
 </body>
 </html>
+
+
+
+
+

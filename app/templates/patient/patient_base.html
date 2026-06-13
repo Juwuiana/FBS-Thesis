@@ -42,7 +42,7 @@
 
         <div class="sidebar-footer">
             {# TODO: Replace href once auth blueprint is connected #}
-            <a href="#" class="nav-link sign-out">
+            <a href="{{ url_for('auth.logout') }}" class="nav-link sign-out">
                 <i class="fas fa-sign-out-alt"></i> Sign Out
             </a>
         </div>
