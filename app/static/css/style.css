@@ -4,6 +4,7 @@
    ========================================================== */
 
 :root {
+    --accent-green: #27ae60;
   --sidebar-bg: #1a2e1a;
   --sidebar-hover: #2a4a2a;
   --sidebar-active: #2d5a2d;
@@ -324,7 +325,7 @@ canvas {
 .date-range-btn:hover { border-color: var(--accent-green-light); }
 
 .filter-btn {
-  padding: 7px 20px; background: var(--accent-green); color: #fff;
+  padding: 7px 20px; background: #27ae60; color: #fff;
   border: none; border-radius: 8px; font-size: 13px; font-weight: 600;
   cursor: pointer; transition: background .15s;
 }
@@ -344,15 +345,15 @@ canvas {
 .fbs-value { font-weight: 700; font-size: 14px; }
 
 .view-btn {
-  padding: 5px 14px; background: var(--accent-green); color: #fff;
+  padding: 5px 14px; background: #27ae60; color: #fff;
   border: none; border-radius: 6px; font-size: 12px; font-weight: 600;
   cursor: pointer; transition: background .15s; white-space: nowrap;
 }
 .view-btn:hover { background: #2d5a2d; }
 
 .export-btn {
-  padding: 6px 16px; background: transparent; color: var(--accent-green);
-  border: 1.5px solid var(--accent-green); border-radius: 8px;
+  padding: 6px 16px; background: #ffffff; color: #27ae60;
+  border: 1.5px solid #27ae60; border-radius: 8px;
   font-size: 13px; font-weight: 600; cursor: pointer; transition: all .15s;
 }
 .export-btn:hover { background: var(--accent-green); color: #fff; }
