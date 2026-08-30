@@ -1,0 +1,73 @@
+{% extends "admin/admin_base.html" %}
+{% set active_page = "data_management" %}
+
+{% block title %}{{ employee.name }} – Staff Record{% endblock %}
+{% block page_title %}Staff Record{% endblock %}
+
+{% block content %}
+<main class="page-content">
+  <div class="dm-card">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <div class="dm-card-title mb-0">{{ employee.name }}</div>
+      <a href="{{ url_for('admin.data_management') }}" class="filter-btn" style="text-decoration:none;">
+        <i class="bi bi-arrow-left me-1"></i> Back to Data Management
+      </a>
+    </div>
+
+    <!--
+        TEMPORARY DEMO DATA — EMPLOYEES lives in-memory in admin_views.py,
+        there is no Staff/User model or DB table yet. Saving the role below
+        only updates that in-memory list; it resets on app restart.
+    -->
+
+    <div class="row g-3 mb-4">
+      <div class="col-md-6 col-12">
+        <label class="ps-field-label">Employee ID</label>
+        <input type="text" class="ps-input" value="{{ employee.id }}" readonly>
+      </div>
+      <div class="col-md-6 col-12">
+        <label class="ps-field-label">Full Name</label>
+        <input type="text" class="ps-input" value="{{ employee.name }}" readonly>
+      </div>
+      <div class="col-md-6 col-12">
+        <label class="ps-field-label">Email</label>
+        <input type="text" class="ps-input" value="{{ employee.email }}" readonly>
+      </div>
+      <div class="col-md-6 col-12">
+        <label class="ps-field-label">Contact Number</label>
+        <input type="text" class="ps-input" value="{{ employee.contact }}" readonly>
+      </div>
+      <div class="col-md-6 col-12">
+        <label class="ps-field-label">Station / LHU</label>
+        <input type="text" class="ps-input" value="{{ employee.station }}" readonly>
+      </div>
+      <div class="col-md-6 col-12">
+        <label class="ps-field-label">Status</label>
+        <input type="text" class="ps-input" value="{{ employee.status }}" readonly>
+      </div>
+      <div class="col-md-6 col-12">
+        <label class="ps-field-label">Date Added</label>
+        <input type="text" class="ps-input" value="{{ employee.date_added }}" readonly>
+      </div>
+    </div>
+
+    <hr>
+
+    <form method="POST" action="{{ url_for('admin.staff_update_role', employee_id=employee.id) }}" class="row g-3 align-items-end mt-1">
+      <div class="col-md-6 col-12">
+        <label class="ps-field-label">Role <span style="font-weight:400;color:var(--text-muted);">(the only editable field)</span></label>
+        <select class="ps-select" name="role">
+          {% for r in roles %}
+            <option value="{{ r }}" {{ 'selected' if r == employee.role }}>{{ r }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-6 col-12">
+        <button type="submit" class="filter-btn" style="padding:8px 20px;">
+          Save Role
+        </button>
+      </div>
+    </form>
+  </div>
+</main>
+{% endblock %}

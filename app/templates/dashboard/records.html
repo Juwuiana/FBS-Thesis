@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "admin/admin_base.html" %}
 {% set active_page = "data_management" %}
 
 {% block title %}Data Management – FBS Diabetes Risk{% endblock %}
@@ -82,8 +82,8 @@
             <td class="hide-mobile" style="font-size:12px;color:var(--text-muted);white-space:nowrap">{{ e.date_added }}</td>
             <td>
               <div class="d-flex gap-1">
-                <button class="view-btn">View</button>
-                <button class="view-btn" style="background:transparent;color:var(--accent-green);border:1.5px solid var(--accent-green)">Edit</button>
+                <a href="{{ url_for('admin.staff_detail', employee_id=e.id) }}" class="view-btn" style="text-decoration:none;">View</a>
+                <a href="{{ url_for('admin.staff_detail', employee_id=e.id) }}" class="view-btn" style="text-decoration:none;background:transparent;color:var(--accent-green);border:1.5px solid var(--accent-green)">Edit</a>
               </div>
             </td>
           </tr>
@@ -97,9 +97,9 @@
       <span id="recordCount" style="font-size:12px;color:var(--text-muted)">
         Showing {{ employees | length }} employees
       </span>
-      <button class="filter-btn" style="padding:6px 16px;font-size:12px">
+      <a href="{{ url_for('admin.add_staff') }}" class="filter-btn" style="padding:6px 16px;font-size:12px;text-decoration:none;">
         <i class="bi bi-person-plus me-1"></i> Add Employee
-      </button>
+      </a>
     </div>
   </div>
 </main>
