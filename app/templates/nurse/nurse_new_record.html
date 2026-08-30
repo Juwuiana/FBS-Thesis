@@ -3,11 +3,20 @@
 {% block content %}
     <header class="topbar">
         <div>
-            <h1 class="page-title">Patient Assessment Form</h1>
-            <p class="page-subtitle">Individual Health Profile &amp; CVD/NCD Risk Assessment (Annex A1 — Santa Rosa City Health Office I)</p>
+            <h1 class="page-title">New Screening Record</h1>
+            <p class="page-subtitle">New visit for an existing patient — demographic info is pre-filled and can be corrected if needed</p>
         </div>
-        <div class="breadcrumbs">Risk Screening / <span style="color:var(--text-primary); font-weight:600;">Patient Intake Form</span></div>
+        <div class="breadcrumbs">Data Management / <span style="color:var(--text-primary); font-weight:600;">New Record — {{ patient.first_name }} {{ patient.last_name }}</span></div>
     </header>
+
+    <!--
+        TEMPORARY DEMO DATA — pre-filled from MOCK_PATIENT (see
+        nurse_views.py) regardless of `patient_id`. There is no Patient
+        model / DB lookup on this branch. When the real Patient model
+        lands, pass the actual looked-up record as `patient` instead, and
+        point the submit button at an endpoint that creates a new
+        screening record tied to this patient_id rather than a new patient.
+    -->
 
     <form id="intakeForm">
         <!-- 1. PATIENT DEMOGRAPHICS -->
@@ -15,67 +24,69 @@
             <div class="card-header">1. Patient Demographics <span id="patientIdBadge" style="font-weight:600; text-transform:none;"></span></div>
             <div class="card-body">
                 <div class="grid-4">
-                    <div class="field-group"><label class="field-label">Patient ID No.</label><input type="text" id="patientId" class="field-input" placeholder="Auto-generated" disabled></div>
-                    <div class="field-group"><label class="field-label">Last Name</label><input type="text" id="lastName" class="field-input" required></div>
-                    <div class="field-group"><label class="field-label">First Name</label><input type="text" id="firstName" class="field-input" required></div>
-                    <div class="field-group"><label class="field-label">Middle Name</label><input type="text" id="middleName" class="field-input"></div>
+                    <div class="field-group"><label class="field-label">Patient ID No.</label><input type="text" id="patientId" class="field-input" value="{{ patient.patient_id }}" disabled></div>
+                    <div class="field-group"><label class="field-label">Last Name</label><input type="text" id="lastName" class="field-input" value="{{ patient.last_name }}" required></div>
+                    <div class="field-group"><label class="field-label">First Name</label><input type="text" id="firstName" class="field-input" value="{{ patient.first_name }}" required></div>
+                    <div class="field-group"><label class="field-label">Middle Name</label><input type="text" id="middleName" class="field-input" value="{{ patient.middle_name }}"></div>
                 </div>
-
-                <!-- Father's Name — split for clean CSV columns -->
-                <div class="grid-4">
-                    <div class="field-group"><label class="field-label">Father's First Name</label><input type="text" id="fatherFirstName" class="field-input"></div>
-                    <div class="field-group"><label class="field-label">Father's Last Name</label><input type="text" id="fatherLastName" class="field-input"></div>
-                    <div class="field-group"><label class="field-label">Mother's First Name</label><input type="text" id="motherFirstName" class="field-input"></div>
-                    <div class="field-group"><label class="field-label">Mother's Last Name</label><input type="text" id="motherLastName" class="field-input"></div>
-                </div>
-
-                <!-- Spouse's Name — split -->
-                <div class="grid-4">
-                    <div class="field-group"><label class="field-label">Spouse's First Name</label><input type="text" id="spouseFirstName" class="field-input"></div>
-                    <div class="field-group"><label class="field-label">Spouse's Last Name</label><input type="text" id="spouseLastName" class="field-input"></div>
-                    <div class="field-group"><label class="field-label">Contact Number</label><input type="text" id="contactNumber" class="field-input"></div>
-                    <div class="field-group"><label class="field-label">Date of Assessment</label><input type="date" id="dateAssessment" class="field-input"></div>
-                </div>
-
                 <div class="grid-5">
-                    <div class="field-group"><label class="field-label">Date of Birth</label><input type="date" id="birthdate" class="field-input" required></div>
-                    <div class="field-group"><label class="field-label">Age</label><input type="text" id="age" class="field-input" placeholder="yrs" readonly></div>
+                    <div class="field-group"><label class="field-label">Father's Last Name</label><input type="text" id="fatherLastName" class="field-input" value="{{ patient.father_last_name }}"></div>
+                    <div class="field-group"><label class="field-label">Father's First Name</label><input type="text" id="fatherFirstName" class="field-input" value="{{ patient.father_first_name }}"></div>
+                    <div class="field-group"><label class="field-label">Mother's Last Name</label><input type="text" id="motherLastName" class="field-input" value="{{ patient.mother_last_name }}"></div>
+                    <div class="field-group"><label class="field-label">Mother's First Name</label><input type="text" id="motherFirstName" class="field-input" value="{{ patient.mother_first_name }}"></div>
+                    <div class="field-group"><label class="field-label">Contact Number</label><input type="text" id="contactNumber" class="field-input" value="{{ patient.contact_number }}"></div>
+                </div>
+                <div class="grid-2">
+                    <div class="field-group"><label class="field-label">Spouse's Last Name</label><input type="text" id="spouseLastName" class="field-input" value="{{ patient.spouse_last_name }}"></div>
+                    <div class="field-group"><label class="field-label">Spouse's First Name</label><input type="text" id="spouseFirstName" class="field-input" value="{{ patient.spouse_first_name }}"></div>
+                </div>
+                <div class="grid-5">
+                    <div class="field-group"><label class="field-label">Date of Assessment</label><input type="date" id="dateAssessment" class="field-input"></div>
+                    <div class="field-group"><label class="field-label">Date of Birth</label><input type="date" id="birthdate" class="field-input" value="{{ patient.birthdate }}" required></div>
+                    <div class="field-group"><label class="field-label">Age</label><input type="text" id="age" class="field-input" placeholder="yrs" value="{{ patient.age }}" readonly></div>
                     <div class="field-group">
                         <label class="field-label">Sex</label>
                         <select id="sex" class="field-input" required>
-                            <option value="">Select</option><option>Male</option><option>Female</option>
+                            <option value="">Select</option>
+                            <option {{ 'selected' if patient.sex == 'Male' }}>Male</option>
+                            <option {{ 'selected' if patient.sex == 'Female' }}>Female</option>
                         </select>
                     </div>
                     <div class="field-group">
                         <label class="field-label">Civil Status</label>
                         <select id="civilStatus" class="field-input">
-                            <option value="">Select</option><option>Single</option><option>Married</option>
-                            <option>Annulled</option><option>Widow/Widower</option><option>Separated</option>
+                            <option value="">Select</option>
+                            <option {{ 'selected' if patient.civil_status == 'Single' }}>Single</option>
+                            <option {{ 'selected' if patient.civil_status == 'Married' }}>Married</option>
+                            <option {{ 'selected' if patient.civil_status == 'Annulled' }}>Annulled</option>
+                            <option {{ 'selected' if patient.civil_status == 'Widow/Widower' }}>Widow/Widower</option>
+                            <option {{ 'selected' if patient.civil_status == 'Separated' }}>Separated</option>
                         </select>
                     </div>
-                    <div class="field-group"><label class="field-label">Religion</label><input type="text" id="religion" class="field-input"></div>
                 </div>
-
                 <div class="grid-4">
-                    <div class="field-group"><label class="field-label">Occupation</label><input type="text" id="occupation" class="field-input"></div>
+                    <div class="field-group"><label class="field-label">Religion</label><input type="text" id="religion" class="field-input" value="{{ patient.religion }}"></div>
+                    <div class="field-group"><label class="field-label">Occupation</label><input type="text" id="occupation" class="field-input" value="{{ patient.occupation }}"></div>
                     <div class="field-group">
                         <label class="field-label">Educational Attainment</label>
                         <select id="education" class="field-input">
                             <option value="">Select Education</option>
-                            <option>No Schooling</option><option>Elementary</option>
-                            <option>High School</option><option>Vocational</option>
-                            <option>College degree, post graduate</option>
+                            <option {{ 'selected' if patient.education == 'No Schooling' }}>No Schooling</option>
+                            <option {{ 'selected' if patient.education == 'Elementary' }}>Elementary</option>
+                            <option {{ 'selected' if patient.education == 'High School' }}>High School</option>
+                            <option {{ 'selected' if patient.education == 'Vocational' }}>Vocational</option>
+                            <option {{ 'selected' if patient.education == 'College degree, post graduate' }}>College degree, post graduate</option>
                         </select>
                     </div>
                     <div class="field-group">
                         <label class="field-label">Barangay</label>
                         <select id="barangay" class="field-input">
                             <option value="">Select Barangay</option>
-                            {% for b in barangays %}<option>{{ b }}</option>{% endfor %}
+                            {% for b in barangays %}<option {{ 'selected' if b == patient.barangay }}>{{ b }}</option>{% endfor %}
                         </select>
                     </div>
-                    <div class="field-group"><label class="field-label">Complete Address</label><input type="text" id="address" class="field-input"></div>
                 </div>
+                <div class="field-group"><label class="field-label">Complete Address</label><input type="text" id="address" class="field-input" value="{{ patient.address }}"></div>
             </div>
         </div>
 
@@ -87,25 +98,34 @@
                     <div class="field-group">
                         <label class="field-label">Membership Type</label>
                         <select id="phicMembership" class="field-input">
-                            <option value="">Select</option><option>Member</option><option>Dependent</option><option>Non-Member</option>
+                            <option value="">Select</option>
+                            <option {{ 'selected' if patient.phic_membership == 'Member' }}>Member</option>
+                            <option {{ 'selected' if patient.phic_membership == 'Dependent' }}>Dependent</option>
+                            <option {{ 'selected' if patient.phic_membership == 'Non-Member' }}>Non-Member</option>
                         </select>
                     </div>
                     <div class="field-group">
                         <label class="field-label">Category</label>
                         <select id="phicType" class="field-input">
                             <option value="">Select</option>
-                            <option>Sponsored - NHTS</option><option>Sponsored - LGU</option><option>Sponsored - NGA</option>
-                            <option>IPP - Organized Group</option><option>IPP - OFW</option><option>IPP - Private</option>
-                            <option>Employed - Government</option><option>Employed - Private</option><option>Lifetime</option>
+                            <option {{ 'selected' if patient.phic_type == 'Sponsored - NHTS' }}>Sponsored - NHTS</option>
+                            <option {{ 'selected' if patient.phic_type == 'Sponsored - LGU' }}>Sponsored - LGU</option>
+                            <option {{ 'selected' if patient.phic_type == 'Sponsored - NGA' }}>Sponsored - NGA</option>
+                            <option {{ 'selected' if patient.phic_type == 'IPP - Organized Group' }}>IPP - Organized Group</option>
+                            <option {{ 'selected' if patient.phic_type == 'IPP - OFW' }}>IPP - OFW</option>
+                            <option {{ 'selected' if patient.phic_type == 'IPP - Private' }}>IPP - Private</option>
+                            <option {{ 'selected' if patient.phic_type == 'Employed - Government' }}>Employed - Government</option>
+                            <option {{ 'selected' if patient.phic_type == 'Employed - Private' }}>Employed - Private</option>
+                            <option {{ 'selected' if patient.phic_type == 'Lifetime' }}>Lifetime</option>
                         </select>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- 3. PAST MEDICAL / SURGICAL HISTORY -->
+        <!-- 3. PAST MEDICAL / SURGICAL HISTORY (reassessed each visit) -->
         <div class="form-card">
-            <div class="card-header">3. Past Medical History</div>
+            <div class="card-header">3. Past Medical History <span style="font-weight:400; text-transform:none; font-size:0.75rem; color:var(--text-muted);">(confirm still accurate)</span></div>
             <div class="card-body">
                 <div class="radio-card-wrapper">
                     <div class="radio-card"><input type="checkbox" class="pmh" id="pmh1" value="Allergy"><label for="pmh1">Allergy</label></div>
@@ -145,7 +165,7 @@
             </div>
         </div>
 
-        <!-- 5. CVD QUESTIONNAIRE -->
+        <!-- 5. CVD QUESTIONNAIRE (reassessed each visit) -->
         <div class="form-card">
             <div class="card-header">5. CVD Questionnaire (Probable Angina, Heart Attack, Stroke)</div>
             <div class="card-body">
@@ -165,7 +185,7 @@
             </div>
         </div>
 
-        <!-- 6. LIFESTYLE FACTORS -->
+        <!-- 6. LIFESTYLE FACTORS (reassessed each visit) -->
         <div class="form-card">
             <div class="card-header">6. Personal / Social History &amp; Lifestyle Factors</div>
             <div class="card-body">
@@ -206,7 +226,7 @@
             </div>
         </div>
 
-        <!-- 7. DIABETES HISTORY -->
+        <!-- 7. DIABETES HISTORY (reassessed each visit) -->
         <div class="form-card">
             <div class="card-header">7. Diabetes History</div>
             <div class="card-body">
@@ -231,7 +251,7 @@
 
         <!-- 8. IMMUNIZATIONS -->
         <div class="form-card">
-            <div class="card-header">8. Immunizations</div>
+            <div class="card-header">8. Immunizations <span style="font-weight:400; text-transform:none; font-size:0.75rem; color:var(--text-muted);">(update if new since last visit)</span></div>
             <div class="card-body">
                 <div class="radio-card-wrapper">
                     <div class="radio-card"><input type="checkbox" class="immu" id="im1" value="BCG"><label for="im1">BCG</label></div>
@@ -261,23 +281,25 @@
             </div>
         </div>
 
-        <!-- 10. VITALS & PHYSICAL EXAM -->
+        <!-- 10. VITALS & PHYSICAL EXAM (new measurements for this visit) -->
         <div class="form-card">
-            <div class="card-header">10. Anthropometric Measurements, Vitals &amp; Physical Exam</div>
+            <div class="card-header">10. Anthropometric Measurements, Vitals &amp; Physical Exam <span style="font-weight:400; text-transform:none; font-size:0.75rem; color:var(--text-muted);">(new measurements for this visit)</span></div>
             <div class="card-body">
-                <div class="grid-5">
-                    <div class="field-group"><label class="field-label">Systolic BP (mmHg)</label><input type="number" id="bpSystolic" class="field-input" placeholder="e.g. 120"></div>
-                    <div class="field-group"><label class="field-label">Diastolic BP (mmHg)</label><input type="number" id="bpDiastolic" class="field-input" placeholder="e.g. 80"></div>
+                <div class="grid-3">
+                    <div class="field-group"><label class="field-label">Systolic BP</label><input type="number" id="bpSystolic" class="field-input" placeholder="e.g. 120 mmHg"></div>
+                    <div class="field-group"><label class="field-label">Diastolic BP</label><input type="number" id="bpDiastolic" class="field-input" placeholder="e.g. 80 mmHg"></div>
                     <div class="field-group"><label class="field-label">Heart Rate</label><input type="text" id="hr" class="field-input" placeholder="bpm"></div>
-                    <div class="field-group"><label class="field-label">Respiratory Rate</label><input type="text" id="rr" class="field-input" placeholder="cpm"></div>
-                    <div class="field-group"><label class="field-label">Height (cm)</label><input type="number" id="height" class="field-input"></div>
                 </div>
                 <div class="grid-3">
+                    <div class="field-group"><label class="field-label">Respiratory Rate</label><input type="text" id="rr" class="field-input" placeholder="cpm"></div>
+                    <div class="field-group"><label class="field-label">Height (cm)</label><input type="number" id="height" class="field-input"></div>
                     <div class="field-group"><label class="field-label">Weight (kg)</label><input type="number" id="weight" class="field-input"></div>
+                </div>
+                <div class="grid-3">
                     <div class="field-group"><label class="field-label">Waist Circ. (cm)</label><input type="number" id="waist" class="field-input" placeholder="Central Adiposity"></div>
                     <div class="field-group"><label class="field-label">BMI (Auto-calculated)</label><input type="text" id="bmi" class="field-input" readonly placeholder="— kg/m²"></div>
+                    <div class="field-group"><label class="field-label">Obesity Classification</label><input type="text" id="obesityClass" class="field-input" readonly></div>
                 </div>
-                <div class="field-group"><label class="field-label">Obesity Classification</label><input type="text" id="obesityClass" class="field-input" readonly></div>
 
                 <label class="field-label" style="margin-top:1rem;">Pertinent PE Findings</label>
                 <div class="grid-3">
@@ -292,8 +314,9 @@
         </div>
 
         <div class="action-bar">
-            <button type="button" id="saveDraftBtn" class="btn btn-secondary">← Save as Draft</button>
-            <button type="button" id="submitIntakeBtn" class="btn btn-primary">Save Intake &amp; Proceed to Lab Screening →</button>
+            <a href="{{ url_for('nurse.nurse_patient_file_view', patient_id=patient_id) }}" class="btn btn-secondary" style="text-decoration:none; display:inline-block; text-align:center;">← Cancel</a>
+            <button type="button" id="saveDraftBtn" class="btn btn-secondary">Save as Draft</button>
+            <button type="button" id="submitIntakeBtn" class="btn btn-primary">Save New Record &amp; Proceed to Lab Screening →</button>
         </div>
     </form>
 {% endblock %}

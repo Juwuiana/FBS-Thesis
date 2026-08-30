@@ -155,7 +155,8 @@
                         <td><span class="risk-badge badge-danger">High</span></td>
                         <td>May 27, 2025</td>
                         <td>
-                            <a href="#" class="btn btn-secondary" style="padding:0.35rem 0.75rem; font-size:0.75rem;">View</a>
+                            <a href="{{ url_for('nurse.nurse_patient_file_view', patient_id='CAB-2025-0156') }}" class="btn btn-secondary" style="padding:0.35rem 0.75rem; font-size:0.75rem;">View</a>
+                            <a href="{{ url_for('nurse.nurse_new_record', patient_id='CAB-2025-0156') }}" class="btn btn-secondary" style="padding:0.35rem 0.75rem; font-size:0.75rem;">+ Add Record</a>
                         </td>
                     </tr>
                 </tbody>

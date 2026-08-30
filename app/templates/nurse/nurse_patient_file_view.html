@@ -1,0 +1,210 @@
+{% extends "nurse/nurse_base.html" %}
+
+{% block content %}
+    <header class="topbar">
+        <div>
+            <h1 class="page-title">Patient Record</h1>
+            <p class="page-subtitle">Read-only view of the patient's assessment record</p>
+        </div>
+        <div class="breadcrumbs">Data Management / <span style="color:var(--text-primary); font-weight:600;">Patient Record — {{ patient_id }}</span></div>
+    </header>
+
+    <!--
+        TEMPORARY DEMO DATA — this template renders MOCK_PATIENT (see
+        nurse_views.py) regardless of `patient_id`. There is no Patient
+        model / DB lookup on this branch. When the real Patient model
+        lands, pass the actual looked-up record as `patient` instead.
+    -->
+
+    <div class="patient-info-header">
+        <div>
+            <h2>Patient: {{ patient.first_name }} {{ patient.last_name }}</h2>
+            <p>{{ patient_id }} • {{ patient.sex }}, {{ patient.age }} yrs • Barangay {{ patient.barangay }} • FBS: 142 mg/dL • Risk: High</p>
+            <p style="font-size: 0.75rem; color: rgba(255,255,255,0.5); margin-top: 0.25rem;">Intake completed: May 27, 2025</p>
+        </div>
+    </div>
+
+    <!-- 1. PATIENT DEMOGRAPHICS -->
+    <div class="form-card">
+        <div class="card-header">1. Patient Demographics</div>
+        <div class="card-body">
+            <div class="grid-4">
+                <div class="field-group"><label class="field-label">Patient ID No.</label><input type="text" class="field-input" value="{{ patient.patient_id }}" disabled></div>
+                <div class="field-group"><label class="field-label">Last Name</label><input type="text" class="field-input" value="{{ patient.last_name }}" disabled></div>
+                <div class="field-group"><label class="field-label">First Name</label><input type="text" class="field-input" value="{{ patient.first_name }}" disabled></div>
+                <div class="field-group"><label class="field-label">Middle Name</label><input type="text" class="field-input" value="{{ patient.middle_name }}" disabled></div>
+            </div>
+            <div class="grid-5">
+                <div class="field-group"><label class="field-label">Father's Last Name</label><input type="text" class="field-input" value="{{ patient.father_last_name }}" disabled></div>
+                <div class="field-group"><label class="field-label">Father's First Name</label><input type="text" class="field-input" value="{{ patient.father_first_name }}" disabled></div>
+                <div class="field-group"><label class="field-label">Mother's Last Name</label><input type="text" class="field-input" value="{{ patient.mother_last_name }}" disabled></div>
+                <div class="field-group"><label class="field-label">Mother's First Name</label><input type="text" class="field-input" value="{{ patient.mother_first_name }}" disabled></div>
+                <div class="field-group"><label class="field-label">Contact Number</label><input type="text" class="field-input" value="{{ patient.contact_number }}" disabled></div>
+            </div>
+            <div class="grid-2">
+                <div class="field-group"><label class="field-label">Spouse's Last Name</label><input type="text" class="field-input" value="{{ patient.spouse_last_name }}" disabled></div>
+                <div class="field-group"><label class="field-label">Spouse's First Name</label><input type="text" class="field-input" value="{{ patient.spouse_first_name }}" disabled></div>
+            </div>
+            <div class="grid-5">
+                <div class="field-group"><label class="field-label">Date of Assessment</label><input type="text" class="field-input" value="May 27, 2025" disabled></div>
+                <div class="field-group"><label class="field-label">Date of Birth</label><input type="text" class="field-input" value="{{ patient.birthdate_display }}" disabled></div>
+                <div class="field-group"><label class="field-label">Age</label><input type="text" class="field-input" value="{{ patient.age }} yrs" disabled></div>
+                <div class="field-group"><label class="field-label">Sex</label><input type="text" class="field-input" value="{{ patient.sex }}" disabled></div>
+                <div class="field-group"><label class="field-label">Civil Status</label><input type="text" class="field-input" value="{{ patient.civil_status }}" disabled></div>
+            </div>
+            <div class="grid-4">
+                <div class="field-group"><label class="field-label">Religion</label><input type="text" class="field-input" value="{{ patient.religion }}" disabled></div>
+                <div class="field-group"><label class="field-label">Occupation</label><input type="text" class="field-input" value="{{ patient.occupation }}" disabled></div>
+                <div class="field-group"><label class="field-label">Educational Attainment</label><input type="text" class="field-input" value="{{ patient.education }}" disabled></div>
+                <div class="field-group"><label class="field-label">Barangay</label><input type="text" class="field-input" value="{{ patient.barangay }}" disabled></div>
+            </div>
+            <div class="field-group"><label class="field-label">Complete Address</label><input type="text" class="field-input" value="{{ patient.address }}" disabled></div>
+        </div>
+    </div>
+
+    <!-- 2. PHIC MEMBERSHIP -->
+    <div class="form-card">
+        <div class="card-header">2. PHIC Membership</div>
+        <div class="card-body">
+            <div class="grid-2">
+                <div class="field-group"><label class="field-label">Membership Type</label><input type="text" class="field-input" value="{{ patient.phic_membership }}" disabled></div>
+                <div class="field-group"><label class="field-label">Category</label><input type="text" class="field-input" value="{{ patient.phic_type }}" disabled></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. PAST MEDICAL HISTORY -->
+    <div class="form-card">
+        <div class="card-header">3. Past Medical History</div>
+        <div class="card-body">
+            <div class="radio-card-wrapper">
+                <div class="radio-card"><input type="checkbox" checked disabled><label>Hypertension</label></div>
+                <div class="radio-card"><input type="checkbox" checked disabled><label>Hyperlipidemia</label></div>
+            </div>
+            <div class="field-group" style="margin-top:1rem;"><label class="field-label">Past Surgical History</label><input type="text" class="field-input" value="None" disabled></div>
+        </div>
+    </div>
+
+    <!-- 4. FAMILY HISTORY -->
+    <div class="form-card">
+        <div class="card-header">4. Family History (1st Degree Relative)</div>
+        <div class="card-body">
+            <div class="radio-card-wrapper">
+                <div class="radio-card"><input type="checkbox" checked disabled><label>Diabetes (Parent)</label></div>
+                <div class="radio-card"><input type="checkbox" checked disabled><label>Hypertension</label></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 5. CVD QUESTIONNAIRE -->
+    <div class="form-card">
+        <div class="card-header">5. CVD Questionnaire</div>
+        <div class="card-body">
+            <div class="grid-2">
+                <div class="field-group"><label class="field-label">Pain/discomfort/pressure in chest?</label><input type="text" class="field-input" value="No" disabled></div>
+                <div class="field-group"><label class="field-label">Severe chest pain lasting half an hour or more?</label><input type="text" class="field-input" value="No" disabled></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 6. LIFESTYLE FACTORS -->
+    <div class="form-card">
+        <div class="card-header">6. Personal / Social History &amp; Lifestyle Factors</div>
+        <div class="card-body">
+            <div class="grid-3">
+                <div class="field-group"><label class="field-label">Smoking</label><input type="text" class="field-input" value="Never smoked" disabled></div>
+                <div class="field-group"><label class="field-label">Alcohol Intake</label><input type="text" class="field-input" value="Never Consumed" disabled></div>
+                <div class="field-group"><label class="field-label">Physical Activity</label><input type="text" class="field-input" value="Does NOT meet 2.5 hours/week" disabled></div>
+            </div>
+            <label class="field-label" style="margin-top:1rem;">Dietary Factors</label>
+            <div class="radio-card-wrapper">
+                <div class="radio-card"><input type="checkbox" checked disabled><label>High Fat/Salt (weekly)</label></div>
+                <div class="radio-card"><input type="checkbox" disabled><label>3+ servings vegetables daily</label></div>
+                <div class="radio-card"><input type="checkbox" disabled><label>2-3 servings fruits daily</label></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 7. DIABETES HISTORY -->
+    <div class="form-card">
+        <div class="card-header">7. Diabetes History</div>
+        <div class="card-body">
+            <div class="field-group"><label class="field-label">Was patient diagnosed as having diabetes?</label><input type="text" class="field-input" value="No / Do not know" disabled></div>
+        </div>
+    </div>
+
+    <!-- 8. IMMUNIZATIONS -->
+    <div class="form-card">
+        <div class="card-header">8. Immunizations</div>
+        <div class="card-body">
+            <div class="radio-card-wrapper">
+                <div class="radio-card"><input type="checkbox" checked disabled><label>Tetanus Toxoid</label></div>
+                <div class="radio-card"><input type="checkbox" checked disabled><label>Flu Vaccine</label></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 10. VITALS & PHYSICAL EXAM -->
+    <div class="form-card">
+        <div class="card-header">10. Anthropometric Measurements, Vitals &amp; Physical Exam</div>
+        <div class="card-body">
+            <div class="grid-3">
+                <div class="field-group"><label class="field-label">Systolic BP</label><input type="text" class="field-input" value="138 mmHg" disabled></div>
+                <div class="field-group"><label class="field-label">Diastolic BP</label><input type="text" class="field-input" value="88 mmHg" disabled></div>
+                <div class="field-group"><label class="field-label">Heart Rate</label><input type="text" class="field-input" value="78 bpm" disabled></div>
+            </div>
+            <div class="grid-3">
+                <div class="field-group"><label class="field-label">Respiratory Rate</label><input type="text" class="field-input" value="18 cpm" disabled></div>
+                <div class="field-group"><label class="field-label">Height (cm)</label><input type="text" class="field-input" value="170 cm" disabled></div>
+                <div class="field-group"><label class="field-label">Weight (kg)</label><input type="text" class="field-input" value="79 kg" disabled></div>
+            </div>
+            <div class="grid-3">
+                <div class="field-group"><label class="field-label">Waist Circ. (cm)</label><input type="text" class="field-input" value="92 cm" disabled></div>
+                <div class="field-group"><label class="field-label">BMI</label><input type="text" class="field-input" value="27.4 kg/m² (Overweight)" disabled></div>
+                <div class="field-group"><label class="field-label">Obesity Classification</label><input type="text" class="field-input" value="Overweight" disabled></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PAST RECORDS -->
+    <div class="form-card">
+        <div class="card-header" style="background:var(--green-light); border-top-color:var(--green-light);">Past Records — Screening History</div>
+        <div class="card-body" style="padding: 0;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 0.8rem;">
+                <tr style="border-bottom: 1px solid var(--border); color: var(--text-muted);">
+                    <th style="padding: 1rem; text-align: left; font-weight: 500;">Date</th>
+                    <th style="padding: 1rem; text-align: left; font-weight: 500;">FBS</th>
+                    <th style="padding: 1rem; text-align: left; font-weight: 500;">Risk Level</th>
+                    <th></th>
+                </tr>
+                {% for r in records %}
+                <tr style="border-bottom: 1px solid var(--border);">
+                    <td style="padding: 1rem;">{{ r.date }}</td>
+                    <td style="padding: 1rem;">{{ r.fbs }}</td>
+                    <td style="padding: 1rem;">
+                        {% if r.risk == 'High' %}
+                            <span style="background:var(--danger-light); color:var(--danger); padding:0.25rem 0.5rem; border-radius:4px; font-size:0.7rem;">{{ r.risk }}</span>
+                        {% elif r.risk == 'Moderate' %}
+                            <span style="background:var(--warning-light); color:#b45309; padding:0.25rem 0.5rem; border-radius:4px; font-size:0.7rem;">{{ r.risk }}</span>
+                        {% elif r.risk == 'Pre-diab.' %}
+                            <span style="background:#ffedd5; color:#c2410c; padding:0.25rem 0.5rem; border-radius:4px; font-size:0.7rem;">{{ r.risk }}</span>
+                        {% else %}
+                            <span style="background:var(--green-light); color:var(--green-active); padding:0.25rem 0.5rem; border-radius:4px; font-size:0.7rem;">{{ r.risk }}</span>
+                        {% endif %}
+                    </td>
+                    <td style="padding: 1rem; text-align: right;"><a href="{{ url_for('nurse.nurse_screening') }}" style="color:var(--green-accent); text-decoration:none;">View →</a></td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+    </div>
+
+    <div class="action-bar">
+        <a href="{{ url_for('nurse.nurse_data_management') }}" class="btn btn-secondary" style="text-decoration:none; display:inline-block; text-align:center;">← Back to Data Management</a>
+        <div style="display:flex; gap:1rem;">
+            <button type="button" class="btn btn-secondary">Print Record</button>
+            <a href="{{ url_for('nurse.nurse_new_record', patient_id=patient_id) }}" class="btn btn-secondary" style="text-decoration:none; display:inline-block; text-align:center;">+ Add New Record</a>
+            <a href="{{ url_for('nurse.nurse_screening') }}" class="btn btn-primary" style="text-decoration:none; display:inline-block; text-align:center;">View Screening Result →</a>
+        </div>
+    </div>
+{% endblock %}
