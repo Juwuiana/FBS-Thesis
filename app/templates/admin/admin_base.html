@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}FBS Diabetes Risk{% endblock %}</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  {% block head %}{% endblock %}
+</head>
+<body>
+
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-footer" id="userMenuToggle" role="button" tabindex="0" title="Account options">
+      <div class="user-avatar-wrap">
+        <img id="userAvatarPreview" src="https://ui-avatars.com/api/?name=Health+Officer&background=4caf50&color=fff" alt="User avatar" />
+      </div>
+      <div class="sidebar-footer-text">
+        <div class="sidebar-footer-name">Health Officer</div>
+        <div class="sidebar-footer-role">LHU Cabuyao</div>
+      </div>
+      <span class="user-menu-caret" id="userMenuCaret">▲</span>
+    </div>
+
+    <div class="user-dropdown" id="userDropdown">
+      <label class="user-dropdown-item" for="avatarFileInput">
+        Change Profile Photo
+        <input type="file" id="avatarFileInput" accept="image/*" style="display:none;">
+      </label>
+      <a href="#" class="user-dropdown-item">
+        Change Password
+      </a>
+    </div>
+
+    <div class="sidebar-nav">
+      <a href="{{ url_for('admin.dashboard') }}"
+         class="{{ 'active' if active_page == 'dashboard' else '' }}">
+        Dashboard
+      </a>
+      <a href="{{ url_for('admin.reliability') }}"
+         class="{{ 'active' if active_page == 'reliability' else '' }}">
+        Model Reliability
+      </a>
+      <a href="{{ url_for('admin.green_computing') }}"
+         class="{{ 'active' if active_page == 'green_computing' else '' }}">
+        Green Computing
+      </a>
+      <a href="{{ url_for('admin.data_management') }}"
+         class="{{ 'active' if active_page == 'data_management' else '' }}">
+        Data Management
+      </a>
+      <a href="{{ url_for('admin.audit_trails') }}"
+         class="{{ 'active' if active_page == 'audit_trails' else '' }}">
+        Audit Trails
+      </a>
+      <a href="{{ url_for('admin.privacy_security') }}"
+         class="{{ 'active' if active_page == 'privacy' else '' }}">
+        Privacy &amp; Security
+      </a>
+    </div>
+
+    <!-- TODO: point at the real auth.logout route once auth is wired on this branch -->
+    <div class="sidebar-bottom-signout">
+      <a href="#" class="sidebar-signout-link">
+        <i class="bi bi-box-arrow-right me-2"></i> Sign Out
+      </a>
+    </div>
+  </nav>
+
+  <div class="main-wrapper">
+    <header class="topbar">
+      <div class="topbar-title">
+        <i class="bi bi-list" id="sidebarToggle"></i>
+        {% block page_title %}Dashboard{% endblock %}
+      </div>
+      <button class="btn btn-sm btn-outline-secondary border-0">
+        <i class="bi bi-bell fs-5"></i>
+      </button>
+    </header>
+
+    {% block content %}{% endblock %}
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const userMenuToggle  = document.getElementById('userMenuToggle');
+      const userDropdown    = document.getElementById('userDropdown');
+      const userMenuCaret   = document.getElementById('userMenuCaret');
+      const avatarFileInput = document.getElementById('avatarFileInput');
+      const avatarPreview   = document.getElementById('userAvatarPreview');
+
+      function openUserMenu() {
+        userDropdown.classList.add('open');
+        userMenuCaret.textContent = '▼';
+      }
+      function closeUserMenu() {
+        userDropdown.classList.remove('open');
+        userMenuCaret.textContent = '▲';
+      }
+
+      if (userMenuToggle) {
+        userMenuToggle.addEventListener('click', () => {
+          userDropdown.classList.contains('open') ? closeUserMenu() : openUserMenu();
+        });
+        userMenuToggle.addEventListener('keydown', e => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); userMenuToggle.click(); }
+        });
+      }
+
+      document.addEventListener('click', e => {
+        if (userDropdown && userMenuToggle && !userMenuToggle.contains(e.target) && !userDropdown.contains(e.target)) {
+          closeUserMenu();
+        }
+      });
+
+      const AVATAR_KEY = 'adminAvatarDataUrl';
+
+      const savedAvatar = localStorage.getItem(AVATAR_KEY);
+      if (savedAvatar) avatarPreview.src = savedAvatar;
+
+      if (avatarFileInput) {
+        avatarFileInput.addEventListener('change', () => {
+          const file = avatarFileInput.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = e => {
+            const dataUrl = e.target.result;
+            localStorage.setItem(AVATAR_KEY, dataUrl);
+            avatarPreview.src = dataUrl;
+            closeUserMenu();
+          };
+          reader.readAsDataURL(file);
+        });
+      }
+    });
+  </script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

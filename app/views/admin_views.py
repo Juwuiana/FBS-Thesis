@@ -1,6 +1,45 @@
-from flask import Blueprint, render_template
+from flask import Blueprint, render_template, request, redirect, url_for, abort
+from datetime import datetime
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
+
+STAFF_ROLES = ["Admin", "Health Officer", "LHU Nurse", "Encoder"]
+STATIONS = ["Sta. Rosa", "Cabuyao", "Calamba", "Biñan", "San Pedro"]
+STAFF_STATUSES = ["Active", "Inactive", "On Leave"]
+
+# ── TEMPORARY STUB ────────────────────────────────────────────────────────
+# In-memory only — resets whenever the app restarts. There is no Staff/User
+# model or DB table for this yet. Moved to module scope (out of
+# data_management()) so the new staff detail/edit route below can look up
+# and update the same records the list page shows. When a real model
+# lands, replace EMPLOYEES with an actual query and delete this comment.
+EMPLOYEES = [
+    {"id": "EMP-2025-001", "name": "Linda Walker",    "email": "l.walker@lhu.gov.ph",
+     "role": "Health Officer", "station": "Sta. Rosa", "contact": "09171234567",
+     "status": "Active",    "date_added": "Jan 10, 2025"},
+    {"id": "EMP-2025-002", "name": "Kurt Pernia",       "email": "k.pernia@lhu.gov.ph",
+     "role": "LHU Nurse",     "station": "Cabuyao",   "contact": "09182345678",
+     "status": "Active",    "date_added": "Jan 10, 2025"},
+    {"id": "EMP-2025-003", "name": "Clarise Espiritu",  "email": "c.espiritu@lhu.gov.ph",
+     "role": "Admin",         "station": "Sta. Rosa", "contact": "09193456789",
+     "status": "Active",    "date_added": "Jan 11, 2025"},
+    {"id": "EMP-2025-004", "name": "Jerome Elano",      "email": "j.elano@lhu.gov.ph",
+     "role": "Encoder",       "station": "Calamba",   "contact": "09204567890",
+     "status": "Active",    "date_added": "Jan 12, 2025"},
+    {"id": "EMP-2025-005", "name": "Maria Santos",      "email": "m.santos@lhu.gov.ph",
+     "role": "LHU Nurse",     "station": "Biñan",     "contact": "09215678901",
+     "status": "On Leave",  "date_added": "Feb 3, 2025"},
+    {"id": "EMP-2025-006", "name": "Pedro Dela Cruz",   "email": "p.delacruz@lhu.gov.ph",
+     "role": "Health Officer","station": "San Pedro", "contact": "09226789012",
+     "status": "Active",    "date_added": "Feb 10, 2025"},
+    {"id": "EMP-2025-007", "name": "Ana Garcia",        "email": "a.garcia@lhu.gov.ph",
+     "role": "Encoder",       "station": "Cabuyao",   "contact": "09237890123",
+     "status": "Inactive",  "date_added": "Mar 1, 2025"},
+    {"id": "EMP-2025-008", "name": "Jose Reyes",        "email": "j.reyes@lhu.gov.ph",
+     "role": "LHU Nurse",     "station": "Calamba",   "contact": "09248901234",
+     "status": "Active",    "date_added": "Mar 15, 2025"},
+]
+# ── END TEMPORARY STUB ───────────────────────────────────────────────────
 
 
 @admin_bp.route("/dashboard")
@@ -148,33 +187,94 @@ def reliability():
 
 @admin_bp.route("/data-management")
 def data_management():
-    employees = [
-        {"id": "EMP-2025-001", "name": "Linda Walker",    "email": "l.walker@lhu.gov.ph",
-         "role": "Health Officer", "station": "Sta. Rosa", "contact": "09171234567",
-         "status": "Active",    "date_added": "Jan 10, 2025"},
-        {"id": "EMP-2025-002", "name": "Kurt Pernia",       "email": "k.pernia@lhu.gov.ph",
-         "role": "LHU Nurse",     "station": "Cabuyao",   "contact": "09182345678",
-         "status": "Active",    "date_added": "Jan 10, 2025"},
-        {"id": "EMP-2025-003", "name": "Clarise Espiritu",  "email": "c.espiritu@lhu.gov.ph",
-         "role": "Admin",         "station": "Sta. Rosa", "contact": "09193456789",
-         "status": "Active",    "date_added": "Jan 11, 2025"},
-        {"id": "EMP-2025-004", "name": "Jerome Elano",      "email": "j.elano@lhu.gov.ph",
-         "role": "Encoder",       "station": "Calamba",   "contact": "09204567890",
-         "status": "Active",    "date_added": "Jan 12, 2025"},
-        {"id": "EMP-2025-005", "name": "Maria Santos",      "email": "m.santos@lhu.gov.ph",
-         "role": "LHU Nurse",     "station": "Biñan",     "contact": "09215678901",
-         "status": "On Leave",  "date_added": "Feb 3, 2025"},
-        {"id": "EMP-2025-006", "name": "Pedro Dela Cruz",   "email": "p.delacruz@lhu.gov.ph",
-         "role": "Health Officer","station": "San Pedro", "contact": "09226789012",
-         "status": "Active",    "date_added": "Feb 10, 2025"},
-        {"id": "EMP-2025-007", "name": "Ana Garcia",        "email": "a.garcia@lhu.gov.ph",
-         "role": "Encoder",       "station": "Cabuyao",   "contact": "09237890123",
-         "status": "Inactive",  "date_added": "Mar 1, 2025"},
-        {"id": "EMP-2025-008", "name": "Jose Reyes",        "email": "j.reyes@lhu.gov.ph",
-         "role": "LHU Nurse",     "station": "Calamba",   "contact": "09248901234",
-         "status": "Active",    "date_added": "Mar 15, 2025"},
-    ]
-    return render_template("dashboard/records.html", employees=employees)
+    return render_template("dashboard/records.html", employees=EMPLOYEES)
+
+
+# ── TEMPORARY STUB ────────────────────────────────────────────────────────
+# Appends to the in-memory EMPLOYEES list above — does NOT persist to a
+# database (there isn't one yet) and resets on app restart. The ID scheme
+# below (EMP-2025-{count+1}) is only safe because nothing ever removes an
+# employee; a real implementation should let the DB assign the ID instead.
+@admin_bp.route("/data-management/add", methods=["GET", "POST"])
+def add_staff():
+    if request.method == "POST":
+        name = request.form.get("name", "").strip()
+        email = request.form.get("email", "").strip()
+        role = request.form.get("role", "").strip()
+        station = request.form.get("station", "").strip()
+        contact = request.form.get("contact", "").strip()
+        status = request.form.get("status", "").strip()
+
+        errors = []
+        if not name:
+            errors.append("Full name is required.")
+        if not email:
+            errors.append("Email is required.")
+        if role not in STAFF_ROLES:
+            errors.append("Please select a valid role.")
+        if station not in STATIONS:
+            errors.append("Please select a valid station.")
+        if status not in STAFF_STATUSES:
+            errors.append("Please select a valid status.")
+
+        if errors:
+            return render_template(
+                "admin/add_staff.html",
+                roles=STAFF_ROLES, stations=STATIONS, statuses=STAFF_STATUSES,
+                errors=errors,
+                form_data={"name": name, "email": email, "role": role,
+                           "station": station, "contact": contact, "status": status},
+            )
+
+        now = datetime.now()
+        new_employee = {
+            "id": f"EMP-2025-{len(EMPLOYEES) + 1:03d}",
+            "name": name,
+            "email": email,
+            "role": role,
+            "station": station,
+            "contact": contact,
+            "status": status,
+            "date_added": f"{now.strftime('%b')} {now.day}, {now.year}",
+        }
+        EMPLOYEES.append(new_employee)
+        return redirect(url_for("admin.staff_detail", employee_id=new_employee["id"]))
+
+    return render_template(
+        "admin/add_staff.html",
+        roles=STAFF_ROLES, stations=STATIONS, statuses=STAFF_STATUSES,
+        errors=[], form_data={},
+    )
+# ── END TEMPORARY STUB ───────────────────────────────────────────────────
+
+
+# ── TEMPORARY STUB ────────────────────────────────────────────────────────
+# Shows full staff info (read-only) with Role as the one editable field, per
+# spec: "view and edit the staffs... edit only the roles given." Updating
+# only mutates the in-memory EMPLOYEES list above — it does NOT persist to
+# a database (there isn't one yet) and resets on app restart. When a real
+# Staff/User model lands, replace the lookup/update below with actual
+# queries and delete this comment.
+@admin_bp.route("/data-management/<employee_id>")
+def staff_detail(employee_id):
+    employee = next((e for e in EMPLOYEES if e["id"] == employee_id), None)
+    if employee is None:
+        abort(404)
+    return render_template("admin/staff_detail.html", employee=employee, roles=STAFF_ROLES)
+
+
+@admin_bp.route("/data-management/<employee_id>/update-role", methods=["POST"])
+def staff_update_role(employee_id):
+    employee = next((e for e in EMPLOYEES if e["id"] == employee_id), None)
+    if employee is None:
+        abort(404)
+
+    new_role = request.form.get("role", "").strip()
+    if new_role in STAFF_ROLES:
+        employee["role"] = new_role
+
+    return redirect(url_for("admin.staff_detail", employee_id=employee_id))
+# ── END TEMPORARY STUB ───────────────────────────────────────────────────
 
 
 @admin_bp.route("/privacy-security")
@@ -255,9 +355,9 @@ def green_computing():
             {"online": True,  "weight": 5},
         ],
         "offline_events": [
-            {"time_range": "08:42–09:00", "duration": "18 min", "records": 7},
-            {"time_range": "10:00–10:24", "duration": "24 min", "records": 12},
-            {"time_range": "11:24–11:40", "duration": "16 min", "records": 4},
+            {"time_range": "08:42\u201309:00", "duration": "18 min", "records": 7},
+            {"time_range": "10:00\u201310:24", "duration": "24 min", "records": 12},
+            {"time_range": "11:24\u201311:40", "duration": "16 min", "records": 4},
         ],
     }
     embedded_records = [
@@ -288,7 +388,7 @@ def audit_trails():
         {"time": "09:21 AM", "date": "May 27", "user": "Nurse Kurt",     "role": "Nurse",
          "action": "Patient profile edited: CAB-2025-0148",    "ip": "192.168.1.45", "severity": "Info"},
         {"time": "09:14 AM", "date": "May 27", "user": "lhu.admin",      "role": "Admin",
-         "action": "Role changed: Viewer → Health Officer (user: garcia_m)", "ip": "192.168.1.12", "severity": "Warning"},
+         "action": "Role changed: Viewer \u2192 Health Officer (user: garcia_m)", "ip": "192.168.1.12", "severity": "Warning"},
         {"time": "09:08 AM", "date": "May 27", "user": "lhu.admin",      "role": "Admin",
          "action": "Monthly report generated (PDF)",           "ip": "192.168.1.12", "severity": "Info"},
         {"time": "09:00 AM", "date": "May 27", "user": "Nurse Kurt",     "role": "Nurse",

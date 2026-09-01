@@ -1,0 +1,80 @@
+{% extends "admin/admin_base.html" %}
+{% set active_page = "data_management" %}
+
+{% block title %}Add Employee – FBS Diabetes Risk{% endblock %}
+{% block page_title %}Add Employee{% endblock %}
+
+{% block content %}
+<main class="page-content">
+  <div class="dm-card">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <div class="dm-card-title mb-0">Add New Employee</div>
+      <a href="{{ url_for('admin.data_management') }}" class="filter-btn" style="text-decoration:none;">
+        <i class="bi bi-arrow-left me-1"></i> Back to Data Management
+      </a>
+    </div>
+
+    <!--
+        TEMPORARY DEMO DATA — this appends to the in-memory EMPLOYEES list
+        in admin_views.py. There is no Staff/User model or DB table yet;
+        new employees are lost on app restart.
+    -->
+
+    {% if errors %}
+    <div class="alert alert-danger" role="alert">
+      <ul class="mb-0" style="padding-left:1.2rem;">
+        {% for err in errors %}<li>{{ err }}</li>{% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    <form method="POST" action="{{ url_for('admin.add_staff') }}" class="row g-3">
+      <div class="col-md-6 col-12">
+        <label class="ps-field-label">Full Name</label>
+        <input type="text" class="ps-input" name="name" value="{{ form_data.name or '' }}" required>
+      </div>
+      <div class="col-md-6 col-12">
+        <label class="ps-field-label">Email</label>
+        <input type="email" class="ps-input" name="email" value="{{ form_data.email or '' }}" required>
+      </div>
+      <div class="col-md-6 col-12">
+        <label class="ps-field-label">Role</label>
+        <select class="ps-select" name="role" required>
+          <option value="">Select Role</option>
+          {% for r in roles %}
+            <option value="{{ r }}" {{ 'selected' if r == form_data.role }}>{{ r }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-6 col-12">
+        <label class="ps-field-label">Station / LHU</label>
+        <select class="ps-select" name="station" required>
+          <option value="">Select Station</option>
+          {% for s in stations %}
+            <option value="{{ s }}" {{ 'selected' if s == form_data.station }}>{{ s }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-6 col-12">
+        <label class="ps-field-label">Contact Number</label>
+        <input type="text" class="ps-input" name="contact" value="{{ form_data.contact or '' }}" placeholder="09171234567">
+      </div>
+      <div class="col-md-6 col-12">
+        <label class="ps-field-label">Status</label>
+        <select class="ps-select" name="status" required>
+          <option value="">Select Status</option>
+          {% for s in statuses %}
+            <option value="{{ s }}" {{ 'selected' if s == form_data.status }}>{{ s }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-12 mt-4">
+        <button type="submit" class="filter-btn" style="padding:8px 20px;">
+          <i class="bi bi-person-plus me-1"></i> Add Employee
+        </button>
+      </div>
+    </form>
+  </div>
+</main>
+{% endblock %}
