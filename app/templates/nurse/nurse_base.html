@@ -57,30 +57,23 @@
         {% endblock %}
     </main>
 
-    <!-- 4. The toggle script (Now with Swipe Gestures!) -->
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const menuToggle = document.getElementById('menuToggle');
             const sidebar = document.getElementById('sidebar');
             const overlay = document.getElementById('mobileOverlay');
-            // --- BACK TO TOP BUTTON LOGIC ---
             const backToTopBtn = document.getElementById('backToTop');
 
-            // 1. Listen for scrolling
             window.addEventListener('scroll', () => {
-                // If they scroll down more than 300 pixels, show the button
                 if (window.scrollY > 300) {
                     backToTopBtn.classList.add('show');
                 } else {
-                    // Hide it if they are near the top
                     backToTopBtn.classList.remove('show');
                 }
             });
 
-            // 2. Listen for clicks
             if (backToTopBtn) {
                 backToTopBtn.addEventListener('click', () => {
-                    // Smoothly slide the screen back to the very top
                     window.scrollTo({
                         top: 0,
                         behavior: 'smooth'
@@ -88,7 +81,6 @@
                 });
             }
 
-            // Open menu when hamburger is clicked
             if (menuToggle) {
                 menuToggle.addEventListener('click', () => {
                     sidebar.classList.add('active');
@@ -96,7 +88,6 @@
                 });
             }
 
-            // Close menu if they tap outside the sidebar
             if (overlay) {
                 overlay.addEventListener('click', () => {
                     sidebar.classList.remove('active');
@@ -104,7 +95,6 @@
                 });
             }
 
-            // --- USER MENU DROPDOWN ---
             const userMenuToggle  = document.getElementById('userMenuToggle');
             const userDropdown    = document.getElementById('userDropdown');
             const userMenuCaret   = document.getElementById('userMenuCaret');
@@ -130,14 +120,13 @@
                 });
             }
 
-            // Close when clicking outside
             document.addEventListener('click', e => {
                 if (userDropdown && userMenuToggle && !userMenuToggle.contains(e.target) && !userDropdown.contains(e.target)) {
                     closeUserMenu();
                 }
             });
 
-            // Profile photo — persisted in localStorage
+            // Profile photo 
             const AVATAR_KEY = 'nurseAvatarDataUrl';
 
             function applyAvatar(dataUrl) {
@@ -165,7 +154,6 @@
                 });
             }
 
-                        // --- SWIPE GESTURE LOGIC ---
             let touchStartX = 0;
             let touchEndX = 0;
 
@@ -181,9 +169,7 @@
             }, { passive: true });
 
             function handleSwipe() {
-                // If the sidebar is currently open...
                 if (sidebar.classList.contains('active')) {
-                    // And the user swiped left by at least 50 pixels...
                     if (touchStartX - touchEndX > 50) {
                         // Close the sidebar!
                         sidebar.classList.remove('active');
