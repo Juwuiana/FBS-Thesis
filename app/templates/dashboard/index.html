@@ -138,25 +138,25 @@
                 <th>Patient ID</th>
                 <th>Name</th>
                 <th>FBS (mg/dL)</th>
-                <th>Category</th>
+                <th>Age / Sex</th>
                 <th>Risk Level</th>
                 <th>Date</th>
               </tr>
             </thead>
             <tbody>
               {% set rows = recent_screenings if recent_screenings is defined else [
-                {"id":"CAB-2025-0156","name":"Juan Dela Cruz","fbs":142,"category":"Diabetic","risk":"High","date":"May 27, 2025"},
-                {"id":"CAB-2025-0155","name":"Maria Santos","fbs":118,"category":"Prediabetic","risk":"Low","date":"May 27, 2025"},
-                {"id":"CAB-2025-0154","name":"Pedro Reyes","fbs":96,"category":"Normal","risk":"Moderate","date":"May 27, 2025"},
-                {"id":"CAB-2025-0153","name":"Ana Garcia","fbs":134,"category":"Prediabetic","risk":"High","date":"May 27, 2025"},
-                {"id":"CAB-2025-0152","name":"Lisa Perez","fbs":155,"category":"Diabetic","risk":"High","date":"May 26, 2025"}
+                {"id":"CAB-2025-0156","name":"Juan Dela Cruz","age_sex":"54/M","fbs":142,"risk":"High","date":"May 27, 2025"},
+                {"id":"CAB-2025-0155","name":"Maria Santos","age_sex":"41/F","fbs":118,"risk":"Low","date":"May 27, 2025"},
+                {"id":"CAB-2025-0154","name":"Pedro Reyes","age_sex":"38/M","fbs":96,"risk":"Moderate","date":"May 27, 2025"},
+                {"id":"CAB-2025-0153","name":"Ana Garcia","age_sex":"47/F","fbs":134,"risk":"High","date":"May 27, 2025"},
+                {"id":"CAB-2025-0152","name":"Lisa Perez","age_sex":"60/F","fbs":155,"risk":"High","date":"May 26, 2025"}
               ] %}
               {% for r in rows %}
               <tr>
                 <td style="font-size:12px;color:var(--text-muted)">{{ r.id }}</td>
                 <td>{{ r.name }}</td>
                 <td><strong>{{ r.fbs }}</strong></td>
-                <td><span class="badge-category">{{ r.category }}</span></td>
+                <td>{{ r.age_sex }}</td>
                 <td>
                   <span class="risk-pill risk-{{ r.risk | lower }}">{{ r.risk }}</span>
                 </td>
@@ -202,4 +202,16 @@
     </div>
   </div>
 
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    window.initAdminDashboardCharts({
+      riskDistribution: {{ risk_distribution | tojson }},
+      timeline: {{ timeline | tojson }},
+      modelPerformance: {{ model_performance | tojson }}
+    });
+  });
+</script>
 {% endblock %}

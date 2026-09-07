@@ -2,20 +2,22 @@
 // FBS-Based Diabetes Risk Prediction — Shared JS
 // ==========================================================
 
-// Chart.js global defaults for mobile responsiveness
 Chart.defaults.responsive = true;
 Chart.defaults.maintainAspectRatio = false;
 
 // ── Dashboard: Donut Chart ──
-function initDonutChart() {
+function initDonutChart(data) {
   const el = document.getElementById('donutChart');
   if (!el) return;
+  const values = data
+    ? [data.low.pct, data.moderate.pct, data.high.pct]
+    : [72.1, 17.0, 5.9];
   new Chart(el, {
     type: 'doughnut',
     data: {
       labels: ['Low Risk', 'Moderate Risk', 'High Risk'],
       datasets: [{
-        data: [72.1, 17.0, 5.9],
+        data: values,
         backgroundColor: ['#4caf50', '#ff9800', '#f44336'],
         borderWidth: 2, borderColor: '#fff', hoverOffset: 4
       }]
@@ -33,10 +35,12 @@ function initDonutChart() {
 }
 
 // ── Dashboard: Line Chart ──
-function initLineChart() {
+function initLineChart(data) {
   const el = document.getElementById('lineChart');
   if (!el) return;
-  const labels = ['May 14', 'May 16', 'May 18', 'May 20', 'May 22', 'May 24', 'May 27'];
+  const labels = data ? data.labels : ['May 14', 'May 16', 'May 18', 'May 20', 'May 22', 'May 24', 'May 27'];
+  const totalScreened = data ? data.totalScreened : [310, 295, 320, 305, 315, 300, 312];
+  const atRisk = data ? data.atRisk : [155, 148, 162, 152, 158, 150, 156];
   new Chart(el, {
     type: 'line',
     data: {
@@ -44,13 +48,13 @@ function initLineChart() {
       datasets: [
         {
           label: 'Total Screened',
-          data: [310, 295, 320, 305, 315, 300, 312],
+          data: totalScreened,
           borderColor: '#4caf50', backgroundColor: 'rgba(76,175,80,.08)',
           fill: true, tension: 0.35, pointRadius: 3, borderWidth: 2
         },
         {
           label: 'At Risk',
-          data: [155, 148, 162, 152, 158, 150, 156],
+          data: atRisk,
           borderColor: '#f44336', backgroundColor: 'rgba(244,67,54,.05)',
           fill: true, tension: 0.35, pointRadius: 3, borderWidth: 2
         }
@@ -71,16 +75,19 @@ function initLineChart() {
 }
 
 // ── Dashboard: Radar Chart ──
-function initRadarChart() {
+function initRadarChart(data) {
   const el = document.getElementById('radarChart');
   if (!el) return;
+  const values = data
+    ? [data.accuracy / 100, data.precision, data.recall, data.f1_score, data.roc_auc]
+    : [0.893, 0.87, 0.88, 0.87, 0.93];
   new Chart(el, {
     type: 'radar',
     data: {
       labels: ['Accuracy', 'Precision', 'Recall', 'F1-Score', 'ROC-AUC'],
       datasets: [{
         label: 'Current Model',
-        data: [0.893, 0.87, 0.88, 0.87, 0.93],
+        data: values,
         backgroundColor: 'rgba(76,175,80,.15)', borderColor: '#4caf50',
         borderWidth: 2, pointBackgroundColor: '#4caf50', pointRadius: 3
       }]
@@ -100,6 +107,14 @@ function initRadarChart() {
     }
   });
 }
+
+// ── Entry point called from dashboard/index.html's block scripts ──
+function initAdminDashboardCharts(data) {
+  initDonutChart(data ? data.riskDistribution : null);
+  initLineChart(data ? data.timeline : null);
+  initRadarChart(data ? data.modelPerformance : null);
+}
+window.initAdminDashboardCharts = initAdminDashboardCharts;
 
 // ── Mobile Sidebar Toggle ──
 function initSidebarToggle() {
@@ -125,7 +140,4 @@ function initSidebarToggle() {
 
 document.addEventListener('DOMContentLoaded', () => {
   initSidebarToggle();
-  initDonutChart();
-  initLineChart();
-  initRadarChart();
 });

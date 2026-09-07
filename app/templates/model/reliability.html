@@ -10,6 +10,10 @@
 
 {% block content %}
 <main class="page-content">
+  {% if is_placeholder %} <div class="alert alert-warning py-2 px-3 mb-3" style="font-size:12px;"> 
+    ⚠️ Showing placeholder data — real model evaluation results pending. 
+  </div> 
+  {% endif %}
 
   <!-- ── ROW 1: BENCHMARK TABLE + DETAILED METRICS ── -->
   <div class="row g-3 mb-3">
@@ -99,39 +103,28 @@
   <div class="row g-3 mb-3">
 
     <!-- Model Optimization Details -->
-    <div class="col-lg-4 col-md-6 col-12">
-      <div class="rel-card h-100">
-        <div class="rel-card-title">Model Optimization Details</div>
-        {% set opt = optimization %}
-        <div class="detail-row">
-          <span class="detail-label">Technique</span>
-          <span class="detail-value">{{ opt.technique }}</span>
-        </div>
-        <div class="detail-row">
-          <span class="detail-label">Original Size</span>
-          <span class="detail-value">{{ opt.original_size }}</span>
-        </div>
-        <div class="detail-row">
-          <span class="detail-label">Optimized Size</span>
-          <span class="detail-value">
-            {{ opt.optimized_size }}
-            <span class="reduction-badge">{{ opt.reduction }}</span>
-          </span>
-        </div>
-        <div class="detail-row">
-          <span class="detail-label">Accuracy loss</span>
-          <span class="detail-value">{{ opt.accuracy_loss }}</span>
-        </div>
-        <div class="detail-row">
-          <span class="detail-label">Inference time</span>
-          <span class="detail-value">{{ opt.inference_time }}</span>
-        </div>
-        <div class="detail-row">
-          <span class="detail-label">Target Device</span>
-          <span class="detail-value">{{ opt.target_device }}</span>
-        </div>
-      </div>
+<div class="col-lg-4 col-md-6 col-12">
+  <div class="rel-card h-100">
+    <div class="rel-card-title">Model Optimization Details</div>
+    {% set opt = optimization %}
+    <div class="detail-row">
+      <span class="detail-label">Optimization Technique</span>
+      <span class="detail-value">{{ opt.technique or "—" }}</span>
     </div>
+    <div class="detail-row">
+      <span class="detail-label">Serialized Model Size</span>
+      <span class="detail-value">{{ (opt.serialized_size_kb ~ " KB") if opt.serialized_size_kb else "—" }}</span>
+    </div>
+    <div class="detail-row">
+      <span class="detail-label">Avg. Inference Latency</span>
+      <span class="detail-value">{{ (opt.inference_time_ms ~ " ms") if opt.inference_time_ms else "—" }}</span>
+    </div>
+    <div class="detail-row">
+      <span class="detail-label">Target Deployment Device</span>
+      <span class="detail-value">{{ opt.target_device or "—" }}</span>
+    </div>
+  </div>
+</div>
 
     <!-- Training Set Details -->
     <div class="col-lg-4 col-md-6 col-12">

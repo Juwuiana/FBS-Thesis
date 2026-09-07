@@ -1,5 +1,10 @@
 from flask import Blueprint, render_template, request, redirect, url_for, abort
-from datetime import datetime
+from app.models.model_performance import ModelPerformanceLog
+from sqlalchemy import func
+from datetime import datetime, timedelta
+from app import db
+from app.models.patient import Patient
+from app.models.screening import Screening
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -42,147 +47,175 @@ EMPLOYEES = [
 # ── END TEMPORARY STUB ───────────────────────────────────────────────────
 
 
+from sqlalchemy import func
+from app.models.patient import Patient
+from app.models.screening import Screening
+
 @admin_bp.route("/dashboard")
 def dashboard():
+    total_screened = Screening.query.count()
+    at_risk_count = Screening.query.filter(Screening.ml_risk_level.in_(["Moderate", "High"])).count()
+    high_risk_count = Screening.query.filter(Screening.ml_risk_level == "High").count()
+    at_risk_pct = round(100 * at_risk_count / total_screened, 1) if total_screened else 0
+    high_risk_pct = round(100 * high_risk_count / total_screened, 1) if total_screened else 0
+
+    avg_fbs_row = db.session.query(func.avg(Screening.fbs_value)).scalar()
+    avg_fbs = round(avg_fbs_row, 1) if avg_fbs_row else 0
+
+    best_model = ModelPerformanceLog.query.filter_by(is_best=True).first()
+    model_accuracy = round(best_model.accuracy * 100, 1) if best_model else None
+
     metrics = {
-        "total_screened": 1392,
-        "total_screened_change": "+1.2% vs last week",
-        "at_risk": 276,
-        "at_risk_pct": 19.8,
-        "at_risk_change": "+8% vs last week",
-        "high_risk": 82,
-        "high_risk_pct": 5.9,
-        "high_risk_change": "+3% vs last week",
-        "avg_fbs": 111.4,
-        "avg_fbs_change": "+2.6 vs last week",
-        "model_accuracy": 89.3,
+        "total_screened": total_screened,
+        "at_risk": at_risk_count, "at_risk_pct": at_risk_pct,
+        "high_risk": high_risk_count, "high_risk_pct": high_risk_pct,
+        "avg_fbs": avg_fbs,
+        "model_accuracy": model_accuracy,
     }
 
+    risk_counts = dict(
+        db.session.query(Screening.ml_risk_level, func.count(Screening.id))
+        .group_by(Screening.ml_risk_level).all()
+    )
+    low_count = risk_counts.get("Low", 0)
+    moderate_count = risk_counts.get("Moderate", 0)
+    high_count = risk_counts.get("High", 0)
     risk_distribution = {
-        "low": {"count": 1073, "pct": 72.1},
-        "moderate": {"count": 237, "pct": 17.0},
-        "high": {"count": 82, "pct": 5.9},
+        "low":      {"count": low_count,      "pct": round(100*low_count/total_screened,1) if total_screened else 0},
+        "moderate": {"count": moderate_count, "pct": round(100*moderate_count/total_screened,1) if total_screened else 0},
+        "high":     {"count": high_count,     "pct": round(100*high_count/total_screened,1) if total_screened else 0},
     }
 
-    barangay_list = [
-        {"name": "Kanluran", "count": 58},
-        {"name": "Market Area", "count": 47},
-        {"name": "Dila", "count": 41},
-        {"name": "Dita", "count": 33},
-        {"name": "Malitlit", "count": 29},
-    ]
+    barangay_rows = (
+        db.session.query(Patient.barangay, func.count(Screening.id).label("cnt"))
+        .join(Screening, Screening.patient_id == Patient.id)
+        .group_by(Patient.barangay)
+        .order_by(func.count(Screening.id).desc())
+        .limit(5).all()
+    )
+    barangay_list = [{"name": b or "Unknown", "count": c} for b, c in barangay_rows]
 
+    recent_rows = (
+        db.session.query(Screening, Patient)
+        .join(Patient, Screening.patient_id == Patient.id)
+        .order_by(Screening.screened_at.desc())
+        .limit(10).all()
+    )
     recent_screenings = [
-        {"id": "CAB-2025-0156", "name": "Juan Dela Cruz", "fbs": 142,
-         "category": "Diabetic", "risk": "High", "date": "May 27, 2025"},
-        {"id": "CAB-2025-0155", "name": "Maria Santos", "fbs": 118,
-         "category": "Prediabetic", "risk": "Low", "date": "May 27, 2025"},
-        {"id": "CAB-2025-0154", "name": "Pedro Reyes", "fbs": 96,
-         "category": "Normal", "risk": "Moderate", "date": "May 27, 2025"},
-        {"id": "CAB-2025-0153", "name": "Ana Garcia", "fbs": 134,
-         "category": "Prediabetic", "risk": "High", "date": "May 27, 2025"},
-        {"id": "CAB-2025-0152", "name": "Lisa Perez", "fbs": 155,
-         "category": "Diabetic", "risk": "High", "date": "May 26, 2025"},
+        {
+            "id": s.screening_code, "name": p.full_name,
+            "age_sex": f"{p.age or '—'}/{p.sex or '—'}",
+            "fbs": s.fbs_value, "category": s.ada_category,
+            "risk": s.ml_risk_level, "date": s.screened_at.strftime("%b %d, %Y"),
+        }
+        for s, p in recent_rows
     ]
 
-    model_performance = {
-        "accuracy": 89.3,
-        "precision": 0.87,
-        "recall": 0.88,
-        "f1_score": 0.87,
-        "roc_auc": 0.93,
-    }
+    today = datetime.utcnow().date()
+    start_day = today - timedelta(days=6)
+    period_screenings = Screening.query.filter(
+        Screening.screened_at >= datetime.combine(start_day, datetime.min.time())
+    ).all()
+    day_totals, day_at_risk = {}, {}
+    for s in period_screenings:
+        d = s.screened_at.date()
+        day_totals[d] = day_totals.get(d, 0) + 1
+        if s.ml_risk_level in ("Moderate", "High"):
+            day_at_risk[d] = day_at_risk.get(d, 0) + 1
+    timeline_labels, timeline_total, timeline_at_risk = [], [], []
+    for i in range(7):
+        d = start_day + timedelta(days=i)
+        timeline_labels.append(d.strftime("%b %d"))
+        timeline_total.append(day_totals.get(d, 0))
+        timeline_at_risk.append(day_at_risk.get(d, 0))
+    timeline = {"labels": timeline_labels, "totalScreened": timeline_total, "atRisk": timeline_at_risk}
+
+    model_performance = None
+    if best_model:
+        model_performance = {
+            "accuracy": round(best_model.accuracy * 100, 1),
+            "precision": best_model.precision, "recall": best_model.recall,
+            "f1_score": best_model.f1_score, "roc_auc": best_model.roc_auc,
+        }
 
     return render_template(
         "dashboard/index.html",
-        metrics=metrics,
-        risk_distribution=risk_distribution,
-        barangay_list=barangay_list,
-        recent_screenings=recent_screenings,
-        model_performance=model_performance,
+        metrics=metrics, risk_distribution=risk_distribution,
+        barangay_list=barangay_list, recent_screenings=recent_screenings,
+        model_performance=model_performance, timeline=timeline,
     )
 
 
 @admin_bp.route("/reliability")
 def reliability():
+    logs = ModelPerformanceLog.query.order_by(ModelPerformanceLog.roc_auc.desc()).all()
+    if not logs:
+        abort(404, "No model performance data found. Run scripts/seed_model_performance.py first.")
+
     benchmarks = [
-        {"name": "Random Forest", "accuracy": 0.883, "precision": 0.871,
-         "recall": 0.856, "f1": 0.863, "auc": 0.889, "best": True},
-        {"name": "XGBoost",       "accuracy": 0.871, "precision": 0.858,
-         "recall": 0.843, "f1": 0.850, "auc": 0.878, "best": False},
-        {"name": "LightGBM",      "accuracy": 0.865, "precision": 0.851,
-         "recall": 0.837, "f1": 0.844, "auc": 0.872, "best": False},
+        {
+            "name": log.model_name,
+            "accuracy": log.accuracy,
+            "precision": log.precision,
+            "recall": log.recall,
+            "f1": log.f1_score,
+            "auc": log.roc_auc,
+            "best": log.is_best,
+        }
+        for log in logs
     ]
+
+    best = next((l for l in logs if l.is_best), logs[0])
+
     best_model = {
-        "name":      "Random Forest",
-        "accuracy":  0.883,
-        "precision": 0.871,
-        "recall":    0.856,
-        "f1":        0.863,
-        "auc":       0.889,
-        "test_n":    800,
-        "cm": {"tn": 512, "fp": 48, "fn": 65, "tp": 175},
+        "name": best.model_name,
+        "accuracy": best.accuracy,
+        "precision": best.precision,
+        "recall": best.recall,
+        "f1": best.f1_score,
+        "auc": best.roc_auc,
+        "test_n": best.test_set_size,
+        "cm": {"tn": best.cm_tn, "fp": best.cm_fp, "fn": best.cm_fn, "tp": best.cm_tp},
     }
+
     optimization = {
-        "technique":      "Post-Training Quantization",
-        "original_size":  "2.1 MB",
-        "optimized_size": "182 KB",
-        "reduction":      "91% \u2198",
-        "accuracy_loss":  "< 0.5%",
-        "inference_time": "0.4 ms",
-        "target_device":  "Rpi Zero 2W",
+        "technique": best.optimization_technique,
+        "serialized_size_kb": best.serialized_model_size_kb,
+        "inference_time_ms": best.avg_inference_latency_ms,
+        "target_device": best.target_device,
     }
+
+    total = best.total_records or 0
     training_set = {
-        "source":            "1 LHU \u2013 Santa Rosa City",
-        "total_records":     4820,
-        "diabetic_count":    1644,
-        "diabetic_pct":      34.1,
-        "non_diabetic_count": 3176,
-        "non_diabetic_pct":  65.9,
-        "train_split":       70,
-        "test_split":        30,
-        "primary_feature":   "FBS (mg/dL)",
+        "source": best.training_source,
+        "total_records": total,
+        "diabetic_count": best.diabetic_count,
+        "diabetic_pct": round(100 * best.diabetic_count / total, 1) if total else None,
+        "non_diabetic_count": best.non_diabetic_count,
+        "non_diabetic_pct": round(100 * best.non_diabetic_count / total, 1) if total else None,
+        "train_split": best.train_split_pct,
+        "test_split": best.test_split_pct,
+        "primary_feature": best.primary_feature,
     }
-    feature_importance = [
-        {"name": "FBS (mg/dL)",  "importance": 0.5821},
-        {"name": "Age",           "importance": 0.1342},
-        {"name": "BMI",           "importance": 0.0987},
-        {"name": "Systolic BP",   "importance": 0.0765},
-        {"name": "Diastolic BP",  "importance": 0.0534},
-        {"name": "Sex",           "importance": 0.0312},
-        {"name": "Waist Circum.", "importance": 0.0239},
-    ]
+
     cv = {
-        "fold_scores": [0.881, 0.893, 0.876, 0.901, 0.885,
-                        0.879, 0.897, 0.868, 0.891, 0.883],
-        "mean_auc": 0.885,
-        "std_auc":  0.009,
-        "min_auc":  0.868,
-        "max_auc":  0.901,
+        "fold_scores": best.cv_fold_scores or [],
+        "mean_auc": best.cv_mean_auc,
+        "std_auc": best.cv_std_auc,
+        "min_auc": best.cv_min_auc,
+        "max_auc": best.cv_max_auc,
     }
-    # Simplified ROC curve points (FPR, TPR pairs)
-    roc_points = [
-        {"fpr": 0.00, "tpr": 0.00},
-        {"fpr": 0.02, "tpr": 0.32},
-        {"fpr": 0.05, "tpr": 0.55},
-        {"fpr": 0.10, "tpr": 0.72},
-        {"fpr": 0.15, "tpr": 0.80},
-        {"fpr": 0.20, "tpr": 0.85},
-        {"fpr": 0.30, "tpr": 0.91},
-        {"fpr": 0.40, "tpr": 0.94},
-        {"fpr": 0.50, "tpr": 0.96},
-        {"fpr": 0.70, "tpr": 0.98},
-        {"fpr": 1.00, "tpr": 1.00},
-    ]
+
     return render_template(
         "model/reliability.html",
         benchmarks=benchmarks,
         best_model=best_model,
         optimization=optimization,
         training_set=training_set,
-        feature_importance=feature_importance,
+        feature_importance=best.feature_importance or [],
         cv=cv,
-        roc_points=roc_points,
+        roc_points=best.roc_curve_points or [],
+        is_placeholder=best.is_placeholder,
     )
 
 @admin_bp.route("/data-management")
