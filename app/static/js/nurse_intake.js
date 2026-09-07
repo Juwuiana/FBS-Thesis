@@ -128,22 +128,62 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
+    // ---- Inline field-error highlighting (replaces alert() popups) ----
+    function clearFieldError(input) {
+        input.classList.remove('field-error');
+        const msg = input.parentElement.querySelector('.field-error-text');
+        if (msg) msg.remove();
+    }
+
+    function markFieldError(input, message) {
+        input.classList.add('field-error');
+        let msg = input.parentElement.querySelector('.field-error-text');
+        if (!msg) {
+            msg = document.createElement('span');
+            msg.className = 'field-error-text';
+            input.insertAdjacentElement('afterend', msg);
+        }
+        msg.textContent = message;
+        // Clear the error as soon as the user fixes it
+        const clearOnce = () => { clearFieldError(input); input.removeEventListener('input', clearOnce); input.removeEventListener('change', clearOnce); };
+        input.addEventListener('input', clearOnce);
+        input.addEventListener('change', clearOnce);
+    }
+
+    function clearAllFieldErrors() {
+        document.querySelectorAll('.field-input.field-error').forEach(clearFieldError);
+    }
+
     function validate(payload) {
-        const errors = [];
-        if (!payload.last_name) errors.push('Last name is required.');
-        if (!payload.first_name) errors.push('First name is required.');
-        if (!payload.birthdate) errors.push('Date of birth is required.');
-        if (!payload.sex) errors.push('Sex is required.');
-        return errors;
+        clearAllFieldErrors();
+
+        const requiredFields = [
+            { input: $('lastName'),  value: payload.last_name,  message: 'Last name is required.' },
+            { input: $('firstName'), value: payload.first_name, message: 'First name is required.' },
+            { input: birthdateInput, value: payload.birthdate,  message: 'Date of birth is required.' },
+            { input: sexSelect,      value: payload.sex,        message: 'Sex is required.' },
+        ];
+
+        let firstInvalid = null;
+        requiredFields.forEach(({ input, value, message }) => {
+            if (!value) {
+                markFieldError(input, message);
+                if (!firstInvalid) firstInvalid = input;
+            }
+        });
+
+        if (firstInvalid) {
+            firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            firstInvalid.focus({ preventScroll: true });
+        }
+
+        return firstInvalid !== null; // true = has errors
     }
 
     async function submitIntake(redirectAfter) {
         const payload = buildPayload();
-        const errors = validate(payload);
-        if (errors.length) {
-            alert(errors.join('\n'));
-            return;
-        }
+        const hasErrors = validate(payload);
+        if (hasErrors) return;
 
         try {
             const res = await fetch('/api/patients', {

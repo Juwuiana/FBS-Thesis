@@ -80,6 +80,32 @@ textarea.field-input   { height: auto; padding: 0.625rem 0.875rem; resize: verti
 .field-input[readonly] { background: var(--bg); color: var(--t3); }
 .field-input:focus     { border-color: var(--g-accent); }
 
+/* ── INLINE FIELD VALIDATION ───────────────────────────────── */
+.field-input.field-error {
+    border-color: var(--danger);
+    background: var(--danger-bg);
+    animation: field-shake 0.3s ease;
+}
+.field-input.field-error:focus { border-color: var(--danger); }
+.field-error-text {
+    display: block;
+    color: var(--danger);
+    font-size: 0.75rem;
+    font-weight: 500;
+    margin-top: 0.35rem;
+    animation: field-error-in 0.15s ease-out;
+}
+@keyframes field-error-in {
+    from { opacity: 0; transform: translateY(-2px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes field-shake {
+    10%, 90% { transform: translateX(-1px); }
+    20%, 80% { transform: translateX(2px); }
+    30%, 50%, 70% { transform: translateX(-3px); }
+    40%, 60% { transform: translateX(3px); }
+}
+
 /* ── RADIO/CHECKBOX CARDS ──────────────────────────────────── */
 .radio-card-wrapper { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .radio-card { flex: 1 1 140px; position: relative; }
