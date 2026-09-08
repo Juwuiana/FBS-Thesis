@@ -7,7 +7,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const lightGreenBg = 'rgba(39, 174, 96, 0.2)';
     const mutedText    = '#475569';
 
-    // Guard: only configure Chart.js when it's actually loaded on this page
     if (typeof Chart !== 'undefined') {
         Chart.defaults.font.family = "'DM Sans', sans-serif";
         Chart.defaults.color       = mutedText;
@@ -17,20 +16,13 @@ document.addEventListener('DOMContentLoaded', function () {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-            legend: {
-                position: 'bottom',
-                labels: { usePointStyle: true, boxWidth: 8, font: { size: 11 } }
-            }
+            legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8, font: { size: 11 } } }
         }
     };
 
     /* =========================================================================
        SECTION 0 — UI INTERACTIVITY
-       Hub toggle and schema accordion live on the Data Management page and do
-       NOT need Chart.js, so they run unconditionally.
        ========================================================================= */
-
-    // Hub toggle (show / hide import-export panel)
     const toggleDataHubBtn = document.getElementById('toggleDataHubBtn');
     const dataHubWrapper   = document.getElementById('dataHubWrapper');
     const hubToggleLabel   = document.getElementById('hubToggleLabel');
@@ -46,7 +38,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // Schema accordion
     const toggleSchemaBtn        = document.getElementById('toggleSchemaBtn');
     const schemaAccordionContent = document.getElementById('schemaAccordionContent');
 
@@ -60,133 +51,129 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    /* =========================================================================
-       Everything below requires Chart.js — bail early if it isn't loaded.
-       ========================================================================= */
     if (typeof Chart === 'undefined') return;
 
     /* =========================================================================
        SECTION 1 — DASHBOARD CHARTS
+       Exposed as a function so nurse_dashboard.html can call it with real
+       server data. Falls back to placeholder values if called with nothing.
        ========================================================================= */
-
-    // 1. Risk Distribution Donut
-    const ctxDonut = document.getElementById('riskDonutChart');
-    if (ctxDonut) {
-        new Chart(ctxDonut, {
-            type: 'doughnut',
-            data: {
-                labels: ['Low Risk', 'Moderate Risk', 'High Risk'],
-                datasets: [{
-                    data: [77.1, 17.0, 5.9],
-                    backgroundColor: [green, yellow, red],
-                    borderWidth: 2,
-                    borderColor: '#ffffff'
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                cutout: '70%',
-                plugins: {
-                    legend: { position: 'right', labels: { usePointStyle: true, boxWidth: 8, font: { size: 11 } } }
+    window.initNurseDashboardCharts = function (data) {
+        // 1. Risk Distribution Donut
+        const ctxDonut = document.getElementById('riskDonutChart');
+        if (ctxDonut) {
+            const dist = data && data.riskDistribution;
+            new Chart(ctxDonut, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Low Risk', 'Moderate Risk', 'High Risk'],
+                    datasets: [{
+                        data: dist ? [dist.low, dist.moderate, dist.high] : [77.1, 17.0, 5.9],
+                        backgroundColor: [green, yellow, red],
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '70%',
+                    plugins: { legend: { position: 'right', labels: { usePointStyle: true, boxWidth: 8, font: { size: 11 } } } }
                 }
-            }
-        });
-    }
+            });
+        }
 
-    // 2. Screenings Over Time Line Chart
-    const ctxLine = document.getElementById('screeningsLineChart');
-    if (ctxLine) {
-        new Chart(ctxLine, {
-            type: 'line',
-            data: {
-                labels: ['May 14', 'May 16', 'May 18', 'May 20', 'May 22', 'May 24', 'May 27'],
-                datasets: [
-                    {
-                        label: 'Total Screened',
-                        data: [290, 260, 310, 320, 305, 315, 300],
-                        borderColor: green,
-                        backgroundColor: 'rgba(39,174,96,0.05)',
-                        tension: 0.3, fill: true, borderWidth: 2
-                    },
-                    {
-                        label: 'At Risk',
-                        data: [140, 120, 150, 145, 135, 142, 145],
-                        borderColor: red,
-                        backgroundColor: 'rgba(239,68,68,0.05)',
-                        tension: 0.3, fill: true, borderWidth: 2
+        // 2. Screenings Over Time Line Chart
+        const ctxLine = document.getElementById('screeningsLineChart');
+        if (ctxLine) {
+            const t = data && data.timeline;
+            new Chart(ctxLine, {
+                type: 'line',
+                data: {
+                    labels: t ? t.labels : ['May 14', 'May 16', 'May 18', 'May 20', 'May 22', 'May 24', 'May 27'],
+                    datasets: [
+                        {
+                            label: 'Total Screened',
+                            data: t ? t.totalScreened : [290, 260, 310, 320, 305, 315, 300],
+                            borderColor: green, backgroundColor: 'rgba(39,174,96,0.05)',
+                            tension: 0.3, fill: true, borderWidth: 2
+                        },
+                        {
+                            label: 'At Risk',
+                            data: t ? t.atRisk : [140, 120, 150, 145, 135, 142, 145],
+                            borderColor: red, backgroundColor: 'rgba(239,68,68,0.05)',
+                            tension: 0.3, fill: true, borderWidth: 2
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, font: { size: 11 } } } },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: '#e2e8f0' } },
+                        x: { grid: { display: false } }
                     }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, font: { size: 11 } } } },
-                scales: {
-                    y: { beginAtZero: true, max: 400, grid: { color: '#e2e8f0' } },
-                    x: { grid: { display: false } }
                 }
-            }
-        });
-    }
+            });
+        }
 
-    // 3. Top Barangays Horizontal Bar
-    const ctxBar = document.getElementById('barangayBarChart');
-    if (ctxBar) {
-        new Chart(ctxBar, {
-            type: 'bar',
-            data: {
-                labels: ['Kanluran', 'Market Area', 'Dila', 'Dita', 'Malitlit'],
-                datasets: [{
-                    label: 'At Risk Count',
-                    data: [58, 47, 41, 33, 29],
-                    backgroundColor: green,
-                    borderRadius: 4
-                }]
-            },
-            options: {
-                indexAxis: 'y',
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                    x: { beginAtZero: true, max: 60, grid: { color: '#e2e8f0' } },
-                    y: { grid: { display: false } }
+        // 3. Top Barangays Horizontal Bar
+        const ctxBar = document.getElementById('barangayBarChart');
+        if (ctxBar) {
+            const b = data && data.barangayList;
+            new Chart(ctxBar, {
+                type: 'bar',
+                data: {
+                    labels: b ? b.map(x => x.name) : ['Kanluran', 'Market Area', 'Dila', 'Dita', 'Malitlit'],
+                    datasets: [{
+                        label: 'At Risk Count',
+                        data: b ? b.map(x => x.count) : [58, 47, 41, 33, 29],
+                        backgroundColor: green,
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { beginAtZero: true, grid: { color: '#e2e8f0' } },
+                        y: { grid: { display: false } }
+                    }
                 }
-            }
-        });
-    }
+            });
+        }
 
-    // 4. Model Performance Radar
-    const ctxRadar = document.getElementById('modelRadarChart');
-    if (ctxRadar) {
-        new Chart(ctxRadar, {
-            type: 'radar',
-            data: {
-                labels: ['Accuracy', 'Precision', 'Recall', 'F1-Score', 'ROC-AUC'],
-                datasets: [{
-                    label: 'Current Model',
-                    data: [0.89, 0.87, 0.88, 0.87, 0.93],
-                    backgroundColor: lightGreenBg,
-                    borderColor: green,
-                    pointBackgroundColor: green,
-                    borderWidth: 2
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: { r: { min: 0.5, max: 1.0, ticks: { display: false } } }
-            }
-        });
-    }
+        // 4. Model Performance Radar
+        const ctxRadar = document.getElementById('modelRadarChart');
+        if (ctxRadar) {
+            const m = data && data.modelPerformance;
+            new Chart(ctxRadar, {
+                type: 'radar',
+                data: {
+                    labels: ['Accuracy', 'Precision', 'Recall', 'F1-Score', 'ROC-AUC'],
+                    datasets: [{
+                        label: 'Current Model',
+                        data: m ? [m.accuracy, m.precision, m.recall, m.f1_score, m.roc_auc] : [0.89, 0.87, 0.88, 0.87, 0.93],
+                        backgroundColor: lightGreenBg, borderColor: green,
+                        pointBackgroundColor: green, borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { r: { min: 0.5, max: 1.0, ticks: { display: false } } }
+                }
+            });
+        }
+    };
 
     /* =========================================================================
-       SECTION 2 — HEALTH RESULTS CHARTS
+       SECTION 2 — HEALTH RESULTS CHARTS (unchanged, still auto-run)
        ========================================================================= */
-
-    // Dynamic attribute chart (dropdown-driven)
     const dynamicAttrCanvas = document.getElementById('dynamicAttributeChart');
     if (dynamicAttrCanvas) {
         let attributeChartInstance = null;
@@ -289,7 +276,6 @@ document.addEventListener('DOMContentLoaded', function () {
         if (selector) selector.addEventListener('change', e => renderAttrChart(e.target.value));
     }
 
-    // Full 18-barangay stacked bar
     const ctxFullBarangay = document.getElementById('fullBarangayBarChart');
     if (ctxFullBarangay) {
         new Chart(ctxFullBarangay, {
@@ -312,7 +298,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // Risk by sex
     const ctxSexSplit = document.getElementById('riskBySexChart');
     if (ctxSexSplit) {
         new Chart(ctxSexSplit, {
@@ -329,7 +314,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // Risk by age
     const ctxAgeSplit = document.getElementById('riskByAgeChart');
     if (ctxAgeSplit) {
         new Chart(ctxAgeSplit, {
@@ -345,7 +329,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // SHAP feature importance
     const ctxShap = document.getElementById('shapImportanceChart');
     if (ctxShap) {
         new Chart(ctxShap, {
@@ -368,3 +351,4 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 });
+

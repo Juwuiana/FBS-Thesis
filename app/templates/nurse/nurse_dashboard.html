@@ -12,27 +12,23 @@
 <div class="dash-grid-top">
     <div class="stat-card">
         <div class="stat-title">Total Screened</div>
-        <div class="stat-value">1,392</div>
-        <div class="stat-trend trend-good">▲ 1.2% vs last week</div>
+        <div class="stat-value">{{ metrics.total_screened }}</div>
     </div>
     <div class="stat-card">
         <div class="stat-title">At Risk (Predicted)</div>
-        <div class="stat-value">276</div>
-        <div class="stat-trend trend-bad">▲ 8% vs last week</div>
+        <div class="stat-value">{{ metrics.at_risk }}</div>
     </div>
     <div class="stat-card">
         <div class="stat-title">High Risk</div>
-        <div class="stat-value">82</div>
-        <div class="stat-trend trend-bad">▲ 3% vs last week</div>
+        <div class="stat-value">{{ metrics.high_risk }}</div>
     </div>
     <div class="stat-card">
         <div class="stat-title">Avg. FBS (mg/dL)</div>
-        <div class="stat-value">111.4</div>
-        <div class="stat-trend trend-good">▼ 2.6 vs last week</div>
+        <div class="stat-value">{{ metrics.avg_fbs }}</div>
     </div>
     <div class="stat-card">
         <div class="stat-title">Model Accuracy</div>
-        <div class="stat-value">89.3%</div>
+        <div class="stat-value">{{ metrics.model_accuracy }}%</div>
         <div class="stat-trend" style="color:var(--text-muted);">Current active model</div>
     </div>
 </div>
@@ -82,47 +78,22 @@
                     </tr>
                 </thead>
                 <tbody>
+                    {% for r in recent_registries %}
                     <tr>
-                        <td>CAB-2026-0412</td>
-                        <td>Maria Santos</td>
-                        <td>52 / F</td>
-                        <td>138</td>
-                        <td><span class="risk-badge badge-danger">High</span></td>
-                        <td>Jun 10, 2026</td>
+                        <td>{{ r.id }}</td>
+                        <td>{{ r.name }}</td>
+                        <td>{{ r.age }} / {{ r.sex }}</td>
+                        <td>{{ r.fbs }}</td>
+                        <td>
+                        {% if r.risk == 'High' %}<span class="risk-badge badge-danger">High</span>
+                        {% elif r.risk == 'Moderate' %}<span class="risk-badge badge-warning">Moderate</span>
+                        {% else %}<span class="risk-badge badge-success">Low</span>
+                        {% endif %}
+                        </td>
+                        <td>{{ r.date }}</td>
                     </tr>
-                    <tr>
-                        <td>CAB-2026-0411</td>
-                        <td>Ricardo Cruz</td>
-                        <td>45 / M</td>
-                        <td>118</td>
-                        <td><span class="risk-badge badge-warning">Moderate</span></td>
-                        <td>Jun 10, 2026</td>
-                    </tr>
-                    <tr>
-                        <td>CAB-2026-0410</td>
-                        <td>Luzviminda Reyes</td>
-                        <td>38 / F</td>
-                        <td>95</td>
-                        <td><span class="risk-badge badge-success">Low</span></td>
-                        <td>Jun 10, 2026</td>
-                    </tr>
-                    <tr>
-                        <td>CAB-2026-0409</td>
-                        <td>Eduardo Bautista</td>
-                        <td>61 / M</td>
-                        <td>142</td>
-                        <td><span class="risk-badge badge-danger">High</span></td>
-                        <td>Jun 9, 2026</td>
-                    </tr>
-                    <tr>
-                        <td>CAB-2026-0408</td>
-                        <td>Anabel Torres</td>
-                        <td>29 / F</td>
-                        <td>88</td>
-                        <td><span class="risk-badge badge-success">Low</span></td>
-                        <td>Jun 9, 2026</td>
-                    </tr>
-                </tbody>
+                    {% endfor %}
+                    </tbody>
             </table>
         </div>
     </div>
@@ -137,7 +108,10 @@
 </div>
 {% endblock %}
 
-{% block scripts %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="{{ url_for('static', filename='js/nurse_dashboard.js') }}"></script>
-{% endblock %}
+ {% block scripts %} 
+ <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js">
+
+ </script> <script src="{{ url_for('static', filename='js/nurse_dashboard.js') }}">
+
+ </script> <script> document.addEventListener('DOMContentLoaded', () => { window.initNurseDashboardCharts({ riskDistribution: {{ risk_distribution | tojson }}, timeline: {{ timeline | tojson }}, barangayList: {{ barangay_list | tojson }}, modelPerformance: {{ model_performance | tojson }} }); }); </script> 
+ {% endblock %}

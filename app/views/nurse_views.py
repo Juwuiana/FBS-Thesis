@@ -1,13 +1,108 @@
 from flask import Blueprint, render_template
+from sqlalchemy import func
+from datetime import datetime, timedelta
+from app import db
+from app.models.patient import Patient
+from app.models.screening import Screening
+from app.models.model_performance import ModelPerformanceLog
+from sqlalchemy import func
 
 nurse_bp = Blueprint('nurse', __name__, url_prefix='/nurse')
 
 @nurse_bp.route('/nurse_dashboard')
 def nurse_dashboard():
-    low = 77.1
-    mod = 17.0
-    high = 5.9
-    return render_template('nurse/nurse_dashboard.html', risk_data=[low, mod, high], active_page='dashboard')
+    total_screened = Screening.query.count()
+    at_risk_count = Screening.query.filter(Screening.ml_risk_level.in_(["Moderate", "High"])).count()
+    high_risk_count = Screening.query.filter(Screening.ml_risk_level == "High").count()
+
+    avg_fbs_row = db.session.query(func.avg(Screening.fbs_value)).scalar()
+    avg_fbs = round(avg_fbs_row, 1) if avg_fbs_row else 0
+
+    best_model = ModelPerformanceLog.query.filter_by(is_best=True).first()
+    model_accuracy = round(best_model.accuracy * 100, 1) if best_model else None
+
+    metrics = {
+        "total_screened": total_screened,
+        "at_risk": at_risk_count,
+        "high_risk": high_risk_count,
+        "avg_fbs": avg_fbs,
+        "model_accuracy": model_accuracy,
+    }
+
+    risk_counts = dict(
+        db.session.query(Screening.ml_risk_level, func.count(Screening.id))
+        .group_by(Screening.ml_risk_level).all()
+    )
+    low_count = risk_counts.get("Low", 0)
+    moderate_count = risk_counts.get("Moderate", 0)
+    high_count = risk_counts.get("High", 0)
+    risk_distribution = {
+        "low":      round(100*low_count/total_screened,1) if total_screened else 0,
+        "moderate": round(100*moderate_count/total_screened,1) if total_screened else 0,
+        "high":     round(100*high_count/total_screened,1) if total_screened else 0,
+    }
+
+    barangay_rows = (
+        db.session.query(Patient.barangay, func.count(Screening.id).label("cnt"))
+        .join(Screening, Screening.patient_id == Patient.id)
+        .group_by(Patient.barangay)
+        .order_by(func.count(Screening.id).desc())
+        .limit(5).all()
+    )
+    barangay_list = [{"name": b or "Unknown", "count": c} for b, c in barangay_rows]
+
+    recent_rows = (
+        db.session.query(Screening, Patient)
+        .join(Patient, Screening.patient_id == Patient.id)
+        .order_by(Screening.screened_at.desc())
+        .limit(5).all()
+    )
+    recent_registries = [
+        {
+            "id": s.screening_code, "name": p.full_name,
+            "age": p.age, "sex": p.sex, "fbs": s.fbs_value,
+            "risk": s.ml_risk_level, "date": s.screened_at.strftime("%b %d, %Y"),
+        }
+        for s, p in recent_rows
+    ]
+
+    today = datetime.utcnow().date()
+    start_day = today - timedelta(days=6)
+    period_screenings = Screening.query.filter(
+        Screening.screened_at >= datetime.combine(start_day, datetime.min.time())
+    ).all()
+    day_totals, day_at_risk = {}, {}
+    for s in period_screenings:
+        d = s.screened_at.date()
+        day_totals[d] = day_totals.get(d, 0) + 1
+        if s.ml_risk_level in ("Moderate", "High"):
+            day_at_risk[d] = day_at_risk.get(d, 0) + 1
+    timeline_labels, timeline_total, timeline_at_risk = [], [], []
+    for i in range(7):
+        d = start_day + timedelta(days=i)
+        timeline_labels.append(d.strftime("%b %d"))
+        timeline_total.append(day_totals.get(d, 0))
+        timeline_at_risk.append(day_at_risk.get(d, 0))
+    timeline = {"labels": timeline_labels, "totalScreened": timeline_total, "atRisk": timeline_at_risk}
+
+    model_performance = None
+    if best_model:
+        model_performance = {
+            "accuracy": best_model.accuracy, "precision": best_model.precision,
+            "recall": best_model.recall, "f1_score": best_model.f1_score,
+            "roc_auc": best_model.roc_auc,
+        }
+
+    return render_template(
+        'nurse/nurse_dashboard.html',
+        metrics=metrics,
+        risk_distribution=risk_distribution,
+        barangay_list=barangay_list,
+        recent_registries=recent_registries,
+        timeline=timeline,
+        model_performance=model_performance,
+        active_page='dashboard',
+    )
 
 @nurse_bp.route('/nurse_intake')
 def nurse_intake():
