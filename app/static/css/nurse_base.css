@@ -1,4 +1,4 @@
-/* ── TOKENS ────────────────────────────────────────────────── */
+/* mga tokens */
 :root {
     --sidebar-w:    260px;
     --gap:          1.25rem;
@@ -20,11 +20,11 @@
     --danger-bg:    #fee2e2;
 }
 
-/* ── RESET ─────────────────────────────────────────────────── */
+/* rest */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body { display: flex; min-height: 100vh; background: var(--bg); color: var(--t1); font-family: 'DM Sans', sans-serif; font-size: 14px; }
 
-/* ── SIDEBAR ───────────────────────────────────────────────── */
+/* sidebar*/
 .sidebar { width: var(--sidebar-w); background: var(--g-dark); color: var(--white); display: flex; flex-direction: column; position: fixed; height: 100vh; z-index: 100; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 .sidebar-header { padding: 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.06); }
 .sidebar-brand  { font-size: 0.85rem; font-weight: 700; line-height: 1.4; }
@@ -34,11 +34,10 @@ body { display: flex; min-height: 100vh; background: var(--bg); color: var(--t1)
 .nav-item.active { background: var(--g-mid); color: var(--white); border-left: 4px solid var(--g-accent); font-weight: 600; }
 .user-avatar  { width: 38px; height: 38px; background: #aaa; border-radius: 50%; flex-shrink: 0; }
 
-/* ── MAIN WRAPPER ──────────────────────────────────────────── */
-.main-wrapper  { flex: 1; margin-left: var(--sidebar-w); padding: 2rem 2.5rem; min-width: 0; }
-.topbar        { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: var(--gap); padding-bottom: 1rem; border-bottom: 1px solid var(--border); }
 
-/* Page header — always visible, stacks vertically on mobile */
+.main-wrapper  { flex: 1; margin-left: var(--sidebar-w); padding: 2rem 2.5rem; min-width: 0; }
+.topbar {display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem;}
+/* page header para kita sa mobile */
 .page-header {
     display: flex;
     justify-content: space-between;
@@ -53,18 +52,15 @@ body { display: flex; min-height: 100vh; background: var(--bg); color: var(--t1)
 .page-title    { font-size: clamp(1.2rem, 2.5vw, 1.5rem); font-weight: 600; }
 .page-subtitle, .breadcrumbs { font-size: 0.78rem; color: var(--t3); margin-top: 0.2rem; }
 
-/* ── CARDS ─────────────────────────────────────────────────── */
 .form-card   { background: var(--white); border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: var(--gap); overflow: hidden; }
 .card-header { background: var(--g-header); padding: 0.875rem 1.25rem; font-size: 0.75rem; font-weight: 700; color: var(--g-dark); border-bottom: 1px solid var(--border); border-top: 3px solid var(--g-accent); text-transform: uppercase; letter-spacing: 0.04em; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
 .card-body   { padding: 1.25rem; }
 
-/* ── FLUID GRIDS (auto-fit = collapses naturally on any screen) */
 .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: var(--gap); }
 .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: var(--gap); }
 .grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); gap: var(--gap); }
 .grid-5 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr)); gap: var(--gap); }
 
-/* ── FORM ELEMENTS ─────────────────────────────────────────── */
 .field-group { margin-bottom: 0.875rem; }
 .field-label { display: block; font-size: 0.78rem; font-weight: 600; margin-bottom: 0.4rem; }
 .field-input {
@@ -80,7 +76,6 @@ textarea.field-input   { height: auto; padding: 0.625rem 0.875rem; resize: verti
 .field-input[readonly] { background: var(--bg); color: var(--t3); }
 .field-input:focus     { border-color: var(--g-accent); }
 
-/* ── INLINE FIELD VALIDATION ───────────────────────────────── */
 .field-input.field-error {
     border-color: var(--danger);
     background: var(--danger-bg);
@@ -106,7 +101,6 @@ textarea.field-input   { height: auto; padding: 0.625rem 0.875rem; resize: verti
     40%, 60% { transform: translateX(3px); }
 }
 
-/* ── RADIO/CHECKBOX CARDS ──────────────────────────────────── */
 .radio-card-wrapper { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .radio-card { flex: 1 1 140px; position: relative; }
 .radio-card input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
@@ -115,7 +109,6 @@ textarea.field-input   { height: auto; padding: 0.625rem 0.875rem; resize: verti
 .radio-card input:checked + label { border-color: var(--g-accent); background: var(--g-light); color: var(--g-dark); font-weight: 600; }
 .radio-card input:checked + label::before { border-color: var(--g-accent); background: var(--g-accent); box-shadow: inset 0 0 0 2px var(--g-light); }
 
-/* ── BUTTONS ───────────────────────────────────────────────── */
 .btn { display: inline-flex; align-items: center; justify-content: center; padding: 0.625rem 1.25rem; border-radius: 6px; font-size: 0.85rem; font-weight: 600; font-family: inherit; cursor: pointer; border: none; text-decoration: none; transition: background 0.2s; white-space: nowrap; }
 .btn-primary           { background: var(--g-accent); color: var(--white); }
 .btn-primary:hover     { background: var(--g-mid); }
@@ -123,23 +116,19 @@ textarea.field-input   { height: auto; padding: 0.625rem 0.875rem; resize: verti
 .btn-secondary:hover   { background: var(--border); }
 .action-bar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; padding-top: 1.25rem; border-top: 1px solid var(--border); }
 
-/* ── BADGES ────────────────────────────────────────────────── */
 .risk-badge    { display: inline-block; padding: 0.3rem 0.65rem; border-radius: 5px; font-size: 0.78rem; font-weight: 600; }
 .badge-success { background: var(--g-light);   color: var(--g-dark); }
 .badge-warning { background: var(--warn-bg);   color: #b45309; }
 .badge-danger  { background: var(--danger-bg); color: var(--danger); }
 
-/* ── DATA TABLE ────────────────────────────────────────────── */
 .data-table { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
 .data-table th { padding: 0.875rem 1rem; color: var(--t3); font-weight: 600; border-bottom: 2px solid var(--border); }
 .data-table td { padding: 0.875rem 1rem; border-bottom: 1px solid var(--border); }
 .log-timestamp { color: var(--t3); font-size: 0.78rem; }
 
-/* Security/audit tables — fluid, no overflow */
 .security-table { table-layout: fixed; }
 .security-table th, .security-table td { word-break: break-word; vertical-align: top; }
 
-/* ── STAT CARDS ────────────────────────────────────────────── */
 .dash-grid-top { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr)); gap: var(--gap); margin-bottom: var(--gap); }
 .dash-grid-mid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: var(--gap); margin-bottom: var(--gap); }
 .dash-grid-bot { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: var(--gap); }
@@ -152,14 +141,12 @@ textarea.field-input   { height: auto; padding: 0.625rem 0.875rem; resize: verti
 .chart-container       { position: relative; height: 220px; margin-top: 0.875rem; }
 .chart-container-large { position: relative; height: 300px; margin-top: 0.875rem; }
 
-/* ── SCREENING ─────────────────────────────────────────────── */
 .patient-info-header { background: var(--g-dark); color: var(--white); padding: 1.25rem; border-radius: var(--radius); margin-bottom: var(--gap); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.875rem; }
 .patient-info-header h2 { font-size: 1.1rem; }
 .screening-layout { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: var(--gap); }
 .result-circle-wrapper { display: flex; justify-content: center; margin: 1.5rem 0; }
 .result-circle { width: 140px; height: 140px; border-radius: 50%; border: 7px solid var(--warn); display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 700; color: var(--warn); text-align: center; }
 
-/* ── DATA MANAGEMENT ───────────────────────────────────────── */
 .hub-toggle-btn { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 0.875rem 1.25rem; background: var(--white); border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.85rem; font-weight: 600; cursor: pointer; color: var(--t1); transition: background 0.2s; margin-bottom: var(--gap); }
 .hub-toggle-btn:hover { background: var(--bg); }
 .hub-toggle-icon { font-size: 0.72rem; color: var(--t3); }
@@ -180,21 +167,17 @@ textarea.field-input   { height: auto; padding: 0.625rem 0.875rem; resize: verti
 .schema-item  { font-size: 0.72rem; background: var(--white); border: 1px solid var(--border); border-radius: 4px; padding: 0.25rem 0.5rem; font-family: monospace; }
 .schema-item span { color: var(--t3); }
 
-/* ── SECURITY PAGE ─────────────────────────────────────────── */
 .security-grid   { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: var(--gap); align-items: start; }
 .status-indicator { background: var(--g-light); color: var(--g-dark); border-radius: 6px; padding: 0.75rem 1rem; font-size: 0.8rem; font-weight: 600; }
 
-/* ── BACK TO TOP ───────────────────────────────────────────── */
 .back-to-top { position: fixed; bottom: 1.5rem; right: 1.5rem; width: 42px; height: 42px; background: var(--g-accent); color: var(--white); border: none; border-radius: 50%; font-size: 1.1rem; font-weight: bold; cursor: pointer; box-shadow: 0 3px 8px rgba(0,0,0,0.25); z-index: 999; opacity: 0; visibility: hidden; transform: translateY(16px); transition: opacity 0.3s, visibility 0.3s, transform 0.3s; display: flex; align-items: center; justify-content: center; }
 .back-to-top.show { opacity: 1; visibility: visible; transform: translateY(0); }
 
-/* ── MOBILE HEADER & OVERLAY ───────────────────────────────── */
 .mobile-header  { display: none; align-items: center; gap: 1rem; margin-bottom: var(--gap); }
 .menu-toggle    { background: none; border: none; font-size: 1.5rem; color: var(--t1); cursor: pointer; }
 .mobile-brand   { font-weight: 700; color: var(--g-dark); }
 .mobile-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 90; }
 
-/* ── SINGLE BREAKPOINT — sidebar only ─────────────────────── */
 @media (max-width: 768px) {
     .sidebar { transform: translateX(-100%); transition: transform 0.3s; box-shadow: 4px 0 12px rgba(0,0,0,0.2); }
     .sidebar.active { transform: translateX(0); }
@@ -207,7 +190,6 @@ textarea.field-input   { height: auto; padding: 0.625rem 0.875rem; resize: verti
     .action-bar { flex-direction: column-reverse; }
     .action-bar .btn { width: 100%; }
 }
-/* ── USER MENU DROPDOWN ────────────────────────────────────── */
 .user-menu-wrapper {
     position: relative;
 }

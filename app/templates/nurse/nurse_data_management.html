@@ -6,6 +6,9 @@
         <h1 class="page-title">Data Management</h1>
         <p class="page-subtitle">Import, export, and review patient screening records</p>
     </div>
+    <a href="{{ url_for('nurse.nurse_recycle_bin') }}" class="btn btn-secondary">
+        Recycle Bin
+    </a>
 </header>
 
 <!-- Hub Toggle -->
@@ -145,20 +148,39 @@
                         <th>Action</th>
                     </tr>
                 </thead>
-                <tbody>
+                    <tbody>
+                    {% for p in patients %}
                     <tr>
-                        <td>CAB-2025-0156</td>
-                        <td>Juan Dela Cruz</td>
-                        <td>30</td>
-                        <td>M</td>
-                        <td>142</td>
-                        <td><span class="risk-badge badge-danger">High</span></td>
-                        <td>May 27, 2025</td>
+                        <td>{{ p.patient_code }}</td>
+                        <td>{{ p.last_name }}, {{ p.first_name }}</td>
+                        <td>{{ p.age }}</td>
+                        <td>{{ p.sex }}</td>
+                        <td>{{ (p.fbs ~ " mg/dL") if p.fbs else "—" }}</td>
                         <td>
-                            <a href="{{ url_for('nurse.nurse_patient_file_view', patient_id='CAB-2025-0156') }}" class="btn btn-secondary" style="padding:0.35rem 0.75rem; font-size:0.75rem;">View</a>
-                            <a href="{{ url_for('nurse.nurse_new_record', patient_id='CAB-2025-0156') }}" class="btn btn-secondary" style="padding:0.35rem 0.75rem; font-size:0.75rem;">+ Add Record</a>
+                            {% if p.risk == "High" %}
+                                <span class="risk-badge badge-danger">High</span>
+                            {% elif p.risk == "Moderate" %}
+                                <span class="risk-badge badge-warning">Moderate</span>
+                            {% elif p.risk == "Low" %}
+                                <span class="risk-badge badge-success">Low</span>
+                            {% else %}
+                                <span style="color:var(--text-muted);">Pending</span>
+                            {% endif %}
                         </td>
+                        <td>{{ p.date or "—" }}</td>
+                           <td>
+                                <a href="{{ url_for('nurse.nurse_patient_file_view', patient_id=p.patient_code) }}" class="btn btn-secondary" style="padding:0.35rem 0.75rem; font-size:0.75rem;">View</a>
+                                <a href="{{ url_for('nurse.nurse_new_record', patient_id=p.patient_code) }}" class="btn btn-secondary" style="padding:0.35rem 0.75rem; font-size:0.75rem;">+ Add Record</a>
+                                <form method="POST" action="{{ url_for('nurse.nurse_patient_delete', patient_id=p.patient_code) }}" style="display:inline;" onsubmit="return confirm('Move {{ p.first_name }} {{ p.last_name }} to Recycle Bin? This record will be permanently deleted after 15 days unless restored.');">
+                                    <button type="submit" class="btn btn-secondary" style="padding:0.35rem 0.75rem; font-size:0.75rem; color:#b91c1c; border-color:#fca5a5;">Delete</button>
+                                </form>
+                            </td>
                     </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" style="padding:1rem; color:var(--text-muted);">No patient records yet.</td>
+                    </tr>
+                    {% endfor %}
                 </tbody>
             </table>
         </div>

@@ -1,8 +1,5 @@
 /**
  * Nurse Patient Intake — client-side logic.
- * Fields are kept atomic (split first/last names, split systolic/diastolic BP)
- * so the saved data maps cleanly to individual CSV/database columns instead
- * of needing to be re-parsed out of combined strings later.
  */
 document.addEventListener('DOMContentLoaded', () => {
     const $ = (id) => document.getElementById(id);
@@ -30,12 +27,21 @@ document.addEventListener('DOMContentLoaded', () => {
     birthdateInput.addEventListener('change', calcAge);
 
     // ---- BMI auto-calculation ----
+    // Numeric value is kept in a data attribute (bmiInput.dataset.raw) so the
+    // displayed "kg/m²" suffix never has to be parsed back out for submission.
     function calcBmi() {
         const h = parseFloat(heightInput.value);
         const w = parseFloat(weightInput.value);
-        if (!h || !w) { bmiInput.value = ''; obesityInput.value = ''; return; }
+        if (!h || !w) {
+            bmiInput.value = '';
+            bmiInput.dataset.raw = '';
+            obesityInput.value = '';
+            return;
+        }
         const bmi = w / Math.pow(h / 100, 2);
         bmiInput.value = bmi.toFixed(1) + ' kg/m²';
+        bmiInput.dataset.raw = bmi.toFixed(1);
+
         let cls = 'Obese Class II';
         if (bmi < 18.5) cls = 'Underweight';
         else if (bmi < 23) cls = 'Normal';
@@ -53,79 +59,104 @@ document.addEventListener('DOMContentLoaded', () => {
     sexSelect.addEventListener('change', toggleObGyne);
     toggleObGyne();
 
-    // ---- Collect checkbox-group values ----
+    // ---- Helpers ----
     function checkedValues(selector) {
         return Array.from(document.querySelectorAll(selector + ':checked')).map(el => el.value);
     }
 
-    function buildPayload() {
-        return {
-            last_name: $('lastName').value.trim(),
-            first_name: $('firstName').value.trim(),
-            middle_name: $('middleName').value.trim(),
+    function strOrNull(id) {
+        const v = $(id).value.trim();
+        return v === '' ? null : v;
+    }
 
-            // Split name fields -> clean, independent CSV/DB columns
-            father_first_name: $('fatherFirstName').value.trim(),
-            father_last_name: $('fatherLastName').value.trim(),
-            mother_first_name: $('motherFirstName').value.trim(),
-            mother_last_name: $('motherLastName').value.trim(),
-            spouse_first_name: $('spouseFirstName').value.trim(),
-            spouse_last_name: $('spouseLastName').value.trim(),
+    function numOrNull(id) {
+        const v = $(id).value;
+        return v === '' ? null : Number(v);
+    }
 
-            date_of_assessment: $('dateAssessment').value,
-            birthdate: birthdateInput.value,
-            sex: sexSelect.value,
-            civil_status: $('civilStatus').value,
-            religion: $('religion').value.trim(),
-            contact_number: $('contactNumber').value.trim(),
-            address: $('address').value.trim(),
-            barangay: $('barangay').value,
-            occupation: $('occupation').value.trim(),
-            educational_attainment: $('education').value,
+    // The 8 CVD questions render in document order as .cvd-q selects.
+    // Anything starting with "Yes" counts as a positive answer.
+    function cvdAnswers() {
+        const selects = document.querySelectorAll('.cvd-q');
+        const keys = [
+            'q1_chest_discomfort', 'q2_pain_center_left_arm',
+            'q3_occurs_uphill_hurrying', 'q4_slows_down_if_occurs',
+            'q5_relieved_by_rest_tablet', 'q6_relieved_under_10min',
+            'q7_severe_pain_30min_plus', 'q8_tia_stroke_symptoms',
+        ];
+        const answers = {};
+        selects.forEach((sel, i) => {
+            answers[keys[i]] = sel.value.startsWith('Yes');
+        });
+        return answers;
+    }
 
-            phic_membership: $('phicMembership').value,
-            phic_type: $('phicType').value,
-
-            past_medical_history: checkedValues('.pmh'),
-            past_surgical_history: $('pastSurgical').value.trim(),
-            family_history: checkedValues('.fh'),
-
-            smoking_status: (document.querySelector('input[name="smoke"]:checked') || {}).value || '',
-            alcohol_intake: $('alcohol').value,
-            illicit_drugs: $('illicitDrugs').value,
-            physical_activity: $('physicalActivity').value,
-            dietary_factors: checkedValues('.diet'),
-
-            cvd_answers: Array.from(document.querySelectorAll('.cvd-q')).map(el => el.value),
-
-            diabetes_diagnosis: $('diabetesDiagnosis').value,
-            diabetes_symptoms: checkedValues('.dm-sym'),
-
-            immunizations: checkedValues('.immu'),
-
-            menarche_age: $('menarcheAge').value,
-            lmp: $('lmp').value,
-            gravida: $('gravida').value,
-            para: $('para').value,
-
-            pe_findings: {
-                skin: $('peSkin').value.trim(),
-                heent: $('peHeent').value.trim(),
-                chest: $('peChest').value.trim(),
-                heart: $('peHeart').value.trim(),
-                abdomen: $('peAbdomen').value.trim(),
-                extremities: $('peExtremities').value.trim(),
-            },
-
-            // Split BP -> two numeric columns instead of one "120/80" string
-            bp_systolic: $('bpSystolic').value || null,
-            bp_diastolic: $('bpDiastolic').value || null,
-            heart_rate: $('hr').value.trim(),
-            respiratory_rate: $('rr').value.trim(),
-            height_cm: heightInput.value || null,
-            weight_kg: weightInput.value || null,
-            waist_cm: $('waist').value || null,
+    function buildPayload(status) {
+        const patient = {
+            last_name: strOrNull('lastName'),
+            first_name: strOrNull('firstName'),
+            middle_name: strOrNull('middleName'),
+            father_last_name: strOrNull('fatherLastName'),
+            father_first_name: strOrNull('fatherFirstName'),
+            mother_last_name: strOrNull('motherLastName'),
+            mother_first_name: strOrNull('motherFirstName'),
+            spouse_last_name: strOrNull('spouseLastName'),
+            spouse_first_name: strOrNull('spouseFirstName'),
+            contact_number: strOrNull('contactNumber'),
+            birthdate: strOrNull('birthdate'),
+            sex: strOrNull('sex'),
+            civil_status: strOrNull('civilStatus'),
+            religion: strOrNull('religion'),
+            occupation: strOrNull('occupation'),
+            education: strOrNull('education'),
+            barangay_name: strOrNull('barangay'),
+            address: strOrNull('address'),
+            phic_membership: strOrNull('phicMembership'),
+            phic_type: strOrNull('phicType'),
         };
+
+        const visit = {
+            assessment_date: strOrNull('dateAssessment') || new Date().toISOString().slice(0, 10),
+            smoking_status: (document.querySelector('input[name="smoke"]:checked') || {}).value || null,
+            alcohol_intake: strOrNull('alcohol'),
+            illicit_drug_use: strOrNull('illicitDrugs'),
+            physical_activity: strOrNull('physicalActivity'),
+            past_surgical_history: strOrNull('pastSurgical'),
+            diabetes_diagnosis: strOrNull('diabetesDiagnosis'),
+            bp_systolic: numOrNull('bpSystolic'),
+            bp_diastolic: numOrNull('bpDiastolic'),
+            heart_rate: numOrNull('hr'),
+            respiratory_rate: numOrNull('rr'),
+            height_cm: numOrNull('height'),
+            weight_kg: numOrNull('weight'),
+            waist_cm: numOrNull('waist'),
+            bmi: bmiInput.dataset.raw ? Number(bmiInput.dataset.raw) : null,
+            obesity_class: strOrNull('obesityClass'),
+            pe_skin: strOrNull('peSkin'),
+            pe_heent: strOrNull('peHeent'),
+            pe_chest: strOrNull('peChest'),
+            pe_heart: strOrNull('peHeart'),
+            pe_abdomen: strOrNull('peAbdomen'),
+            pe_extremities: strOrNull('peExtremities'),
+            menarche_age: numOrNull('menarcheAge'),
+            lmp_date: strOrNull('lmp'),
+            gravida: numOrNull('gravida'),
+            para: numOrNull('para'),
+            clinical_notes: null,
+            status: status, // 'draft' or 'submitted'
+        };
+
+        const conditions = {
+            pmh: checkedValues('.pmh'),
+            family_history: checkedValues('.fh'),
+            diet: checkedValues('.diet'),
+            immunization: checkedValues('.immu'),
+            dm_symptom: checkedValues('.dm-sym'),
+        };
+
+        const cvd_responses = cvdAnswers();
+
+        return { patient, visit, conditions, cvd_responses };
     }
 
     // ---- Inline field-error highlighting (replaces alert() popups) ----
@@ -144,7 +175,6 @@ document.addEventListener('DOMContentLoaded', () => {
             input.insertAdjacentElement('afterend', msg);
         }
         msg.textContent = message;
-        // Clear the error as soon as the user fixes it
         const clearOnce = () => { clearFieldError(input); input.removeEventListener('input', clearOnce); input.removeEventListener('change', clearOnce); };
         input.addEventListener('input', clearOnce);
         input.addEventListener('change', clearOnce);
@@ -154,14 +184,14 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('.field-input.field-error').forEach(clearFieldError);
     }
 
-    function validate(payload) {
+    function validate(patient, visit) {
         clearAllFieldErrors();
 
         const requiredFields = [
-            { input: $('lastName'),  value: payload.last_name,  message: 'Last name is required.' },
-            { input: $('firstName'), value: payload.first_name, message: 'First name is required.' },
-            { input: birthdateInput, value: payload.birthdate,  message: 'Date of birth is required.' },
-            { input: sexSelect,      value: payload.sex,        message: 'Sex is required.' },
+            { input: $('lastName'),  value: patient.last_name,  message: 'Last name is required.' },
+            { input: $('firstName'), value: patient.first_name, message: 'First name is required.' },
+            { input: birthdateInput, value: patient.birthdate,  message: 'Date of birth is required.' },
+            { input: sexSelect,      value: patient.sex,        message: 'Sex is required.' },
         ];
 
         let firstInvalid = null;
@@ -181,15 +211,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function submitIntake(redirectAfter) {
-        const payload = buildPayload();
-        const hasErrors = validate(payload);
+        const status = redirectAfter ? 'submitted' : 'draft';
+        const { patient, visit, conditions, cvd_responses } = buildPayload(status);
+
+        const hasErrors = validate(patient, visit);
         if (hasErrors) return;
 
         try {
             const res = await fetch('/api/patients', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
+                body: JSON.stringify({ patient, visit, conditions, cvd_responses }),
             });
 
             if (res.status === 401) {
@@ -206,7 +238,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             patientIdInput.value = data.patient.patient_code;
             if (redirectAfter) {
-                window.location.href = '/nurse_screening';
+                window.location.href = `/nurse_screening/${data.patient.patient_code}`;
             } else {
                 alert('Draft saved. Patient ID: ' + data.patient.patient_code);
             }
