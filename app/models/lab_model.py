@@ -15,6 +15,11 @@ def classify_fbs_preliminary(fbs_mg_dl: float) -> dict:
 
 def create_lab_screening(visit_id: int, data: dict, staff_id: int | None = None) -> int:
     prelim = classify_fbs_preliminary(data["fbs_mg_dl"])
+
+    ALLOWED_RISK_LEVELS = {"Low", "Moderate", "High"}
+    raw_final_risk = data.get("final_risk_level")
+    final_risk_level = raw_final_risk if raw_final_risk in ALLOWED_RISK_LEVELS else None
+
     conn = get_connection()
     try:
         conn.execute("""
@@ -48,7 +53,7 @@ def create_lab_screening(visit_id: int, data: dict, staff_id: int | None = None)
             visit_id, data["fbs_mg_dl"], data.get("test_method", "Capillary (Fingerprick)"),
             data.get("glucometer_id"), data["test_datetime"],
             prelim["level"], prelim["score"],
-            data.get("final_risk_level"), staff_id,
+            final_risk_level, staff_id,
             int(bool(data.get("fasted_ge_8h"))), int(bool(data.get("identity_verified"))),
             int(bool(data.get("glucometer_calibrated"))), int(bool(data.get("capillary_sample_taken"))),
             int(bool(data.get("consent_signed"))), int(bool(data.get("result_recorded_within_5min"))),

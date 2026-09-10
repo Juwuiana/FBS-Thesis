@@ -9,22 +9,14 @@
         <div class="breadcrumbs">Data Management / <span style="color:var(--text-primary); font-weight:600;">New Record — {{ patient.first_name }} {{ patient.last_name }}</span></div>
     </header>
 
-    <!--
-        TEMPORARY DEMO DATA — pre-filled from MOCK_PATIENT (see
-        nurse_views.py) regardless of `patient_id`. There is no Patient
-        model / DB lookup on this branch. When the real Patient model
-        lands, pass the actual looked-up record as `patient` instead, and
-        point the submit button at an endpoint that creates a new
-        screening record tied to this patient_id rather than a new patient.
-    -->
 
-    <form id="intakeForm">
-        <!-- 1. PATIENT DEMOGRAPHICS -->
+   <form id="intakeForm" data-patient-id="{{ patient_id }}">
+        <!-- demographics -->
         <div class="form-card">
             <div class="card-header">1. Patient Demographics <span id="patientIdBadge" style="font-weight:600; text-transform:none;"></span></div>
             <div class="card-body">
                 <div class="grid-4">
-                    <div class="field-group"><label class="field-label">Patient ID No.</label><input type="text" id="patientId" class="field-input" value="{{ patient.patient_id }}" disabled></div>
+                    <input type="text" id="patientId" class="field-input" value="{{ patient.patient_code }}" disabled>                    
                     <div class="field-group"><label class="field-label">Last Name</label><input type="text" id="lastName" class="field-input" value="{{ patient.last_name }}" required></div>
                     <div class="field-group"><label class="field-label">First Name</label><input type="text" id="firstName" class="field-input" value="{{ patient.first_name }}" required></div>
                     <div class="field-group"><label class="field-label">Middle Name</label><input type="text" id="middleName" class="field-input" value="{{ patient.middle_name }}"></div>
@@ -90,7 +82,7 @@
             </div>
         </div>
 
-        <!-- 2. PHIC MEMBERSHIP -->
+        <!-- membership -->
         <div class="form-card">
             <div class="card-header">2. PHIC Membership</div>
             <div class="card-body">
@@ -123,7 +115,7 @@
             </div>
         </div>
 
-        <!-- 3. PAST MEDICAL / SURGICAL HISTORY (reassessed each visit) -->
+        <!-- med and surg histo -->
         <div class="form-card">
             <div class="card-header">3. Past Medical History <span style="font-weight:400; text-transform:none; font-size:0.75rem; color:var(--text-muted);">(confirm still accurate)</span></div>
             <div class="card-body">
@@ -149,7 +141,7 @@
             </div>
         </div>
 
-        <!-- 4. FAMILY HISTORY (1ST DEGREE RELATIVE) -->
+        <!-- fam histo -->
         <div class="form-card">
             <div class="card-header">4. Family History (1st Degree Relative)</div>
             <div class="card-body">
@@ -165,7 +157,7 @@
             </div>
         </div>
 
-        <!-- 5. CVD QUESTIONNAIRE (reassessed each visit) -->
+        <!-- cvd  -->
         <div class="form-card">
             <div class="card-header">5. CVD Questionnaire (Probable Angina, Heart Attack, Stroke)</div>
             <div class="card-body">
@@ -185,7 +177,7 @@
             </div>
         </div>
 
-        <!-- 6. LIFESTYLE FACTORS (reassessed each visit) -->
+        <!-- lifestyle -->
         <div class="form-card">
             <div class="card-header">6. Personal / Social History &amp; Lifestyle Factors</div>
             <div class="card-body">
@@ -226,7 +218,7 @@
             </div>
         </div>
 
-        <!-- 7. DIABETES HISTORY (reassessed each visit) -->
+        <!-- diabetes histo -->
         <div class="form-card">
             <div class="card-header">7. Diabetes History</div>
             <div class="card-body">
@@ -249,7 +241,7 @@
             </div>
         </div>
 
-        <!-- 8. IMMUNIZATIONS -->
+        <!-- immuno -->
         <div class="form-card">
             <div class="card-header">8. Immunizations <span style="font-weight:400; text-transform:none; font-size:0.75rem; color:var(--text-muted);">(update if new since last visit)</span></div>
             <div class="card-body">
@@ -268,7 +260,7 @@
             </div>
         </div>
 
-        <!-- 9. MENSTRUAL & PREGNANCY HISTORY (female patients) -->
+        <!-- mens histo -->
         <div class="form-card" id="obGyneCard">
             <div class="card-header">9. Menstrual &amp; Pregnancy History <span style="font-weight:600; text-transform:none;">(for female patients)</span></div>
             <div class="card-body">
@@ -281,7 +273,7 @@
             </div>
         </div>
 
-        <!-- 10. VITALS & PHYSICAL EXAM (new measurements for this visit) -->
+        <!-- vitals and physical exam -->
         <div class="form-card">
             <div class="card-header">10. Anthropometric Measurements, Vitals &amp; Physical Exam <span style="font-weight:400; text-transform:none; font-size:0.75rem; color:var(--text-muted);">(new measurements for this visit)</span></div>
             <div class="card-body">
@@ -322,5 +314,5 @@
 {% endblock %}
 
 {% block scripts %}
-    <script src="{{ url_for('static', filename='js/nurse_intake.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/nurse_new_record.js') }}"></script>
 {% endblock %}

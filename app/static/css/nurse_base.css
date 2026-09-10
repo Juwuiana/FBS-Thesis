@@ -251,3 +251,81 @@ textarea.field-input   { height: auto; padding: 0.625rem 0.875rem; resize: verti
 .user-dropdown-signout:hover { background: rgba(239,68,68,0.15); color: #fca5a5; }
 
 .udd-icon { font-size: 1rem; }
+
+
+@media print {
+    /* Hide everything that isn't part of the record itself */
+    .sidebar, .mobile-header, .mobile-overlay, .topbar .breadcrumbs,
+    .action-bar, .hub-toggle-bar, .back-to-top,
+    button, .btn { display: none !important; }
+
+    @page {
+        size: auto;
+        margin: 12mm 10mm;
+    }
+
+    html, body {
+        background: white !important;
+        font-size: 11px !important;
+    }
+
+    .grid-2 { display: grid !important; grid-template-columns: repeat(2, 1fr) !important; gap: 0.5rem 1rem !important; }
+    .grid-3 { display: grid !important; grid-template-columns: repeat(3, 1fr) !important; gap: 0.5rem 1rem !important; }
+    .grid-4 { display: grid !important; grid-template-columns: repeat(4, 1fr) !important; gap: 0.5rem 1rem !important; }
+    .grid-5 { display: grid !important; grid-template-columns: repeat(4, 1fr) !important; gap: 0.5rem 1rem !important; }
+
+    .field-group { margin-bottom: 0.4rem !important; }
+    .field-label { font-size: 0.68rem !important; margin-bottom: 0.1rem !important; }
+    
+    .form-card {
+        border: none !important;
+        box-shadow: none !important;
+        margin-bottom: 0.5rem !important;
+        page-break-inside: auto;
+    }
+    .card-header {
+        background: none !important;
+        border: none !important;
+        border-bottom: 1px solid #000 !important;
+        color: #000 !important;
+        padding: 0.25rem 0 !important;
+        font-size: 0.72rem !important;
+    }
+    .card-body { padding: 0.3rem 0 !important; }
+
+    .field-input:disabled, .field-input[readonly] {
+        background: none !important;
+        border: none !important;
+        border-bottom: 1px solid #ccc !important;
+        color: #000 !important;
+        padding: 0.1rem 0 !important;
+        height: auto !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    .result-circle-wrapper, #predictionScoreBar,
+    .chart-container, .chart-container-large, canvas { display: none !important; }
+
+    .main-wrapper { margin: 0 !important; padding: 0 !important; }
+
+    .patient-info-header {
+        background: none !important;
+        color: #000 !important;
+        border-bottom: 2px solid #000 !important;
+        border-radius: 0 !important;
+        padding: 0.3rem 0 !important;
+    }
+    .patient-info-header p { color: #333 !important; }
+
+    table, tr { page-break-inside: avoid; }
+
+    .radio-card-wrapper { gap: 0.3rem !important; }
+    .radio-card { flex: 1 1 110px !important; }
+    .radio-card label {
+        border: none !important;
+        background: none !important;
+        padding: 0.1rem 0.5rem 0.1rem 0 !important;
+        font-size: 0.7rem !important;
+    }
+}

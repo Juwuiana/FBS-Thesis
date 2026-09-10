@@ -11,7 +11,6 @@
     </a>
 </header>
 
-<!-- Hub Toggle -->
 <div class="hub-toggle-bar">
     <button type="button" id="toggleDataHubBtn" class="hub-toggle-btn collapsed">
         <span id="hubToggleLabel">Show Import / Export Tools</span>
@@ -68,22 +67,33 @@
             </div>
         </div>
 
-        <div class="form-card" style="margin-bottom:0;">
-            <div class="card-header">Export Data Archives</div>
+       <div class="form-card" style="margin-bottom:0;">
+        <div class="card-header">Export Data Archives</div>
             <div class="card-body">
                 <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:1rem;">
                     Compile staging data records accumulated on this terminal into an encrypted, standardized file for transfer to the central health office.
                 </p>
                 <p style="font-size:0.8rem; color:var(--text-muted); line-height:1.5; margin-bottom:1.5rem;">
-                    Patient names and row identifiers are hashed before export to protect personal records.
+                    Patient names are excluded from export. Patient ID (e.g. CAB-2026-0003) is retained for internal cross-reference.
                 </p>
-                <form method="POST" action="#">
+                <form method="POST" action="{{ url_for('nurse.nurse_data_management_export') }}">
+                    <input type="hidden" name="barangay" value="{{ request.args.get('barangay', '') }}">
+                    <input type="hidden" name="risk" value="{{ request.args.get('risk', '') }}">
+                    <input type="hidden" name="date" value="{{ request.args.get('date', '') }}">
                     <div class="field-group">
                         <label class="field-label">Export Format</label>
                         <select class="field-input" name="export_format">
-                            <option value="standard_csv">Standardized Feature Matrix (.csv)</option>
+                            <option value="standard_csv">Comma-Separated Values (.csv)</option>
                         </select>
                     </div>
+
+                    <div class="field-group" style="margin-top:0.75rem;">
+                        <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.8rem; cursor:pointer;">
+                            <input type="checkbox" name="all_visits" value="true">
+                            Include full screening history (all visits, not just latest)
+                        </label>
+                    </div>
+
                     <button type="submit" class="btn btn-secondary" style="width:100%; height:42px; margin-top:1rem; background:var(--green-light); color:var(--green-sidebar); border-color:var(--green-accent);">
                         Compile and Download Data Ledger
                     </button>
@@ -94,7 +104,7 @@
     </div>
 </div>
 
-<!-- Records Table -->
+<!-- records table -->
 <div class="form-card" style="margin-top:1.5rem;">
     <div class="card-header">Patient Records — Filter and Manage</div>
     <div class="card-body">

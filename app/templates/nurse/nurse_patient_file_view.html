@@ -19,28 +19,85 @@
         </div>
         <div class="breadcrumbs">Data Management / <span style="color:var(--text-primary); font-weight:600;">Patient Record — {{ patient_id }}</span></div>
     </header>
-
+    
     <div class="patient-info-header">
         <div>
             <h2>Patient: {{ patient.first_name }} {{ patient.last_name }}</h2>
             <p>
                 {{ patient.patient_code }} •
                 {{ patient.sex }}, {{ patient.age }} yrs •
-                Barangay {{ patient.barangay or "—" }} •
-                FBS: {{ (existing_screening.fbs_mg_dl ~ " mg/dL") if existing_screening else "—" }} •
-                Risk: {{ (existing_screening.final_risk_level or existing_screening.preliminary_risk_level) if existing_screening else "—" }}
+                Barangay {{ patient.barangay or "—" }}
+                {% if latest_visit %}
+                    • FBS: {{ (existing_screening.fbs_mg_dl ~ " mg/dL") if existing_screening else "—" }} •
+                    Risk: {{ (existing_screening.final_risk_level or existing_screening.preliminary_risk_level) if existing_screening else "—" }}
+                {% endif %}
             </p>
             <p style="font-size: 0.75rem; color: rgba(255,255,255,0.5); margin-top: 0.25rem;">
                 {% if latest_visit %}
-                    Last assessment: {{ latest_visit.assessment_date }}
+                    Viewing visit from: {{ latest_visit.assessment_date }}
                 {% else %}
-                    No visits recorded yet
+                    Select a screening date below to view full record
                 {% endif %}
             </p>
         </div>
     </div>
 
-    <!-- 1. PATIENT DEMOGRAPHICS -->
+    <!-- para kita agad past visits -->
+    <div class="form-card">
+        <div class="card-header" style="background:var(--green-light); border-top-color:var(--green-light);">Past Records — Screening History</div>
+        <div class="card-body" style="padding: 0;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 0.8rem;">
+                <tr style="border-bottom: 1px solid var(--border); color: var(--text-muted);">
+                    <th style="padding: 1rem; text-align: left; font-weight: 500;">Date</th>
+                    <th style="padding: 1rem; text-align: left; font-weight: 500;">FBS</th>
+                    <th style="padding: 1rem; text-align: left; font-weight: 500;">Risk Level</th>
+                    <th></th>
+                </tr>
+                {% for r in records %}
+                <tr style="border-bottom: 1px solid var(--border); {% if latest_visit and r.visit_id == latest_visit.visit_id %}background: var(--green-light);{% endif %}">
+                    <td style="padding: 1rem;">
+                        {{ r.date }}
+                        {% if latest_visit and r.visit_id == latest_visit.visit_id %}
+                            <span style="font-size:0.7rem; color:var(--green-accent); font-weight:600; margin-left:0.4rem;">● Viewing</span>
+                        {% endif %}
+                    </td>
+                    <td style="padding: 1rem;">{{ (r.fbs ~ " mg/dL") if r.fbs else "—" }}</td>
+                    <td style="padding: 1rem;">
+                        {% if r.risk == 'High' %}
+                            <span style="background:var(--danger-light); color:var(--danger); padding:0.25rem 0.5rem; border-radius:4px; font-size:0.7rem;">{{ r.risk }}</span>
+                        {% elif r.risk == 'Moderate' %}
+                            <span style="background:var(--warning-light); color:#b45309; padding:0.25rem 0.5rem; border-radius:4px; font-size:0.7rem;">{{ r.risk }}</span>
+                        {% elif r.risk == 'Low' %}
+                            <span style="background:var(--green-light); color:var(--green-active); padding:0.25rem 0.5rem; border-radius:4px; font-size:0.7rem;">{{ r.risk }}</span>
+                        {% else %}
+                            <span style="color:var(--text-muted);">Pending</span>
+                        {% endif %}
+                    </td>
+                    <td style="padding: 1rem; text-align: right;">
+                        {% if latest_visit and r.visit_id == latest_visit.visit_id %}
+                            <span style="color:var(--text-muted); font-size:0.75rem;">Currently Viewing</span>
+                        {% else %}
+                            <a href="{{ url_for('nurse.nurse_patient_file_view', patient_id=patient_id, visit_id=r.visit_id) }}" class="btn btn-primary" style="padding:0.35rem 0.9rem; font-size:0.75rem; text-decoration:none;">View →</a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="4" style="padding: 1rem; color: var(--text-muted);">No prior screenings on record.</td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+    </div>
+
+    {% if not latest_visit %}
+        <div class="action-bar">
+            <a href="{{ url_for('nurse.nurse_data_management') }}" class="btn btn-secondary" style="text-decoration:none; display:inline-block; text-align:center;">← Back to Data Management</a>
+            <a href="{{ url_for('nurse.nurse_new_record', patient_id=patient_id) }}" class="btn btn-primary" style="text-decoration:none; display:inline-block; text-align:center;">+ Add New Record</a>
+        </div>
+    {% else %}
+    
+    <!-- patient demo -->
     <div class="form-card">
         <div class="card-header">1. Patient Demographics</div>
         <div class="card-body">
@@ -78,7 +135,7 @@
         </div>
     </div>
 
-    <!-- 2. PHIC MEMBERSHIP -->
+    <!-- membership -->
     <div class="form-card">
         <div class="card-header">2. PHIC Membership</div>
         <div class="card-body">
@@ -89,7 +146,7 @@
         </div>
     </div>
 
-    <!-- 3. PAST MEDICAL HISTORY -->
+    <!-- past med histo -->
     <div class="form-card">
         <div class="card-header">3. Past Medical History</div>
         <div class="card-body">
@@ -106,7 +163,7 @@
         </div>
     </div>
 
-    <!-- 4. FAMILY HISTORY -->
+    <!-- fam histo -->
     <div class="form-card">
         <div class="card-header">4. Family History (1st Degree Relative)</div>
         <div class="card-body">
@@ -122,7 +179,7 @@
         </div>
     </div>
 
-    <!-- 5. CVD QUESTIONNAIRE -->
+    <!-- cvd -->
     <div class="form-card">
         <div class="card-header">5. CVD Questionnaire</div>
         <div class="card-body">
@@ -137,7 +194,7 @@
         </div>
     </div>
 
-    <!-- 6. LIFESTYLE FACTORS -->
+    <!-- lifestyle -->
     <div class="form-card">
         <div class="card-header">6. Personal / Social History &amp; Lifestyle Factors</div>
         <div class="card-body">
@@ -159,7 +216,7 @@
         </div>
     </div>
 
-    <!-- 7. DIABETES HISTORY -->
+    <!-- dia histo -->
     <div class="form-card">
         <div class="card-header">7. Diabetes History</div>
         <div class="card-body">
@@ -177,7 +234,7 @@
         </div>
     </div>
 
-    <!-- 8. IMMUNIZATIONS -->
+    <!-- immuno -->
     <div class="form-card">
         <div class="card-header">8. Immunizations</div>
         <div class="card-body">
@@ -193,7 +250,7 @@
         </div>
     </div>
 
-    <!-- 9. MENSTRUAL & PREGNANCY HISTORY (female only) -->
+    <!-- mens and preg histo -->
     {% if patient.sex == 'Female' %}
     <div class="form-card">
         <div class="card-header">9. Menstrual &amp; Pregnancy History</div>
@@ -208,7 +265,7 @@
     </div>
     {% endif %}
 
-    <!-- 10. VITALS & PHYSICAL EXAM -->
+    <!-- vitals and physical exam -->
     <div class="form-card">
         <div class="card-header">10. Anthropometric Measurements, Vitals &amp; Physical Exam</div>
         <div class="card-body">
@@ -239,49 +296,15 @@
         </div>
     </div>
 
-    <!-- PAST RECORDS -->
-    <div class="form-card">
-        <div class="card-header" style="background:var(--green-light); border-top-color:var(--green-light);">Past Records — Screening History</div>
-        <div class="card-body" style="padding: 0;">
-            <table style="width: 100%; border-collapse: collapse; font-size: 0.8rem;">
-                <tr style="border-bottom: 1px solid var(--border); color: var(--text-muted);">
-                    <th style="padding: 1rem; text-align: left; font-weight: 500;">Date</th>
-                    <th style="padding: 1rem; text-align: left; font-weight: 500;">FBS</th>
-                    <th style="padding: 1rem; text-align: left; font-weight: 500;">Risk Level</th>
-                    <th></th>
-                </tr>
-                {% for r in records %}
-                <tr style="border-bottom: 1px solid var(--border);">
-                    <td style="padding: 1rem;">{{ r.date }}</td>
-                    <td style="padding: 1rem;">{{ (r.fbs ~ " mg/dL") if r.fbs else "—" }}</td>
-                    <td style="padding: 1rem;">
-                        {% if r.risk == 'High' %}
-                            <span style="background:var(--danger-light); color:var(--danger); padding:0.25rem 0.5rem; border-radius:4px; font-size:0.7rem;">{{ r.risk }}</span>
-                        {% elif r.risk == 'Moderate' %}
-                            <span style="background:var(--warning-light); color:#b45309; padding:0.25rem 0.5rem; border-radius:4px; font-size:0.7rem;">{{ r.risk }}</span>
-                        {% elif r.risk == 'Low' %}
-                            <span style="background:var(--green-light); color:var(--green-active); padding:0.25rem 0.5rem; border-radius:4px; font-size:0.7rem;">{{ r.risk }}</span>
-                        {% else %}
-                            <span style="color:var(--text-muted);">Pending</span>
-                        {% endif %}
-                    </td>
-                    <td style="padding: 1rem; text-align: right;"><a href="{{ url_for('nurse.nurse_screening', patient_id=patient_id) }}" style="color:var(--green-accent); text-decoration:none;">View →</a></td>
-                </tr>
-                {% else %}
-                <tr>
-                    <td colspan="4" style="padding: 1rem; color: var(--text-muted);">No prior screenings on record.</td>
-                </tr>
-                {% endfor %}
-            </table>
-        </div>
-    </div>
-
     <div class="action-bar">
         <a href="{{ url_for('nurse.nurse_data_management') }}" class="btn btn-secondary" style="text-decoration:none; display:inline-block; text-align:center;">← Back to Data Management</a>
         <div style="display:flex; gap:1rem;">
-            <button type="button" class="btn btn-secondary">Print Record</button>
+            <button type="button" class="btn btn-secondary" onclick="window.print()">Print / Save as PDF</button>
+            <a href="{{ url_for('nurse.nurse_patient_export_all', patient_id=patient_id) }}" class="btn btn-secondary" style="text-decoration:none; display:inline-block; text-align:center;">Export Full History (CSV)</a>
+            <a href="{{ url_for('nurse.nurse_patient_export_visit', patient_id=patient_id, visit_id=latest_visit.visit_id) }}" class="btn btn-secondary" style="text-decoration:none; display:inline-block; text-align:center;">Export This Visit (CSV)</a>
             <a href="{{ url_for('nurse.nurse_new_record', patient_id=patient_id) }}" class="btn btn-secondary" style="text-decoration:none; display:inline-block; text-align:center;">+ Add New Record</a>
-            <a href="{{ url_for('nurse.nurse_screening', patient_id=patient_id) }}" class="btn btn-primary" style="text-decoration:none; display:inline-block; text-align:center;">View Screening Result →</a>
+            <a href="{{ url_for('nurse.nurse_screening', patient_id=patient_id, visit_id=latest_visit.visit_id) }}" class="btn btn-primary" style="text-decoration:none; display:inline-block; text-align:center;">View Screening Result →</a>
         </div>
     </div>
+    {% endif %}
 {% endblock %}

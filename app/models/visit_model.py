@@ -45,10 +45,6 @@ def save_visit_conditions(visit_id: int, category: str, codes: list[str]) -> Non
             (category, code)
         ).fetchone()
         if row is None:
-            # Unknown option -- likely a typo between the form and the
-            # catalog seed data. Fail loud rather than silently dropping
-            # a checked box (this is exactly the kind of silent-drop bug
-            # that already bit the smoking/alcohol mapping, per thesis notes).
             raise ValueError(f"Unknown condition_catalog entry: ({category!r}, {code!r})")
         conn.execute(
             "INSERT OR IGNORE INTO visit_conditions (visit_id, condition_id) VALUES (?, ?)",
@@ -99,7 +95,7 @@ def list_visits_for_patient(patient_id: int) -> list[dict]:
         FROM visits v
         LEFT JOIN lab_screenings ls ON ls.visit_id = v.id
         WHERE v.patient_id = ?
-        ORDER BY v.assessment_date DESC
+        ORDER BY v.id DESC
     """, (patient_id,)).fetchall()
     conn.close()
     return [dict(r) for r in rows]

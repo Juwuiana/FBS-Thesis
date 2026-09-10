@@ -1,7 +1,7 @@
-from flask import Blueprint, render_template, request, jsonify, abort, redirect, url_for
-
+from flask import Blueprint, render_template, request, jsonify, abort, redirect, url_for, Response
 from app.models import patient_model, visit_model, lab_model, lookup_model
 from app.models.db import get_connection
+from datetime import date as date_cls
 
 nurse_bp = Blueprint('nurse', __name__)
 
@@ -137,40 +137,15 @@ def create_followup_record(patient_id):
         "visit_id": visit_id,
     }), 201
 
-
-@nurse_bp.route('/nurse_screening/<patient_id>')
-def nurse_screening(patient_id):
+@nurse_bp.route('/nurse_screening/<patient_id>/<int:visit_id>/submit', methods=['POST'])
+def nurse_screening_submit(patient_id, visit_id):
     patient = patient_model.get_patient_by_code(patient_id)
     if patient is None:
         abort(404)
 
     visits = visit_model.list_visits_for_patient(patient["id"])
-    latest_visit = visits[0] if visits else None
-
-    existing_screening = None
-    if latest_visit:
-        existing_screening = lab_model.get_lab_screening_for_visit(latest_visit["visit_id"])
-
-    return render_template(
-        'nurse/nurse_screening.html',
-        patient_id=patient_id,
-        patient=patient,
-        latest_visit=latest_visit,
-        visits=visits,
-        existing_screening=existing_screening,
-    )
-
-
-@nurse_bp.route('/nurse_screening/<patient_id>/submit', methods=['POST'])
-def nurse_screening_submit(patient_id):
-    patient = patient_model.get_patient_by_code(patient_id)
-    if patient is None:
+    if not any(v["visit_id"] == visit_id for v in visits):
         abort(404)
-
-    visits = visit_model.list_visits_for_patient(patient["id"])
-    if not visits:
-        abort(400, "This patient has no visit record to attach a screening to.")
-    visit_id = visits[0]["visit_id"]
 
     data = {
         "fbs_mg_dl": float(request.form["fbs_mg_dl"]),
@@ -188,30 +163,75 @@ def nurse_screening_submit(patient_id):
         "follow_up_date": request.form.get("follow_up_date"),
         "referred_to": request.form.get("referred_to"),
     }
+    
+    lab_model.create_lab_screening(visit_id, data)
 
-    lab_model.create_lab_screening(visit_id, data)  # add staff_id once auth exists
+    return redirect(url_for('nurse.nurse_screening', patient_id=patient_id, visit_id=visit_id))
 
-    return redirect(url_for('nurse.nurse_screening', patient_id=patient_id))
+@nurse_bp.route('/nurse_screening/<patient_id>')
+@nurse_bp.route('/nurse_screening/<patient_id>/<int:visit_id>')
+def nurse_screening(patient_id, visit_id=None):
+    patient = patient_model.get_patient_by_code(patient_id)
+    if patient is None:
+        abort(404)
 
+    visits = visit_model.list_visits_for_patient(patient["id"])
+
+    if visit_id is not None:
+        if not any(v["visit_id"] == visit_id for v in visits):
+            abort(404)
+        selected_visit_id = visit_id
+    else:
+        selected_visit_id = visits[0]["visit_id"] if visits else None
+
+    is_latest = bool(visits) and selected_visit_id == visits[0]["visit_id"]
+
+    latest_visit = None
+    existing_screening = None
+    if selected_visit_id is not None:
+        latest_visit = visit_model.get_visit_by_id(selected_visit_id)
+        latest_visit["visit_id"] = latest_visit["id"]
+        latest_visit["date"] = latest_visit["assessment_date"]
+        existing_screening = lab_model.get_lab_screening_for_visit(selected_visit_id)
+
+    return render_template(
+        'nurse/nurse_screening.html',
+        patient_id=patient_id,
+        patient=patient,
+        latest_visit=latest_visit,
+        visits=visits,
+        existing_screening=existing_screening,
+        is_latest=is_latest,
+    )
 
 @nurse_bp.route('/nurse_patient_file_view/<patient_id>')
-def nurse_patient_file_view(patient_id):
+@nurse_bp.route('/nurse_patient_file_view/<patient_id>/<int:visit_id>')
+def nurse_patient_file_view(patient_id, visit_id=None):
     patient = patient_model.get_patient_by_code(patient_id)
     if patient is None:
         abort(404)
 
     records = visit_model.list_visits_for_patient(patient["id"])
 
+    if visit_id is not None:
+        if not any(v["visit_id"] == visit_id for v in records):
+            abort(404)
+        selected_visit_id = visit_id
+    else:
+        selected_visit_id = records[0]["visit_id"] if records else None
+
     latest_visit = None
     conditions = {"pmh": [], "family_history": [], "diet": [], "immunization": [], "dm_symptom": []}
     cvd_responses = None
     existing_screening = None
 
-    if records:
-        latest_visit = visit_model.get_visit_by_id(records[0]["visit_id"])
-        conditions = visit_model.get_conditions_for_visit(latest_visit["id"])
-        cvd_responses = visit_model.get_cvd_responses_for_visit(latest_visit["id"])
-        existing_screening = lab_model.get_lab_screening_for_visit(latest_visit["id"])
+    if selected_visit_id is not None:
+        latest_visit = visit_model.get_visit_by_id(selected_visit_id)
+        latest_visit["visit_id"] = latest_visit["id"]        
+        latest_visit["date"] = latest_visit["assessment_date"]  
+        conditions = visit_model.get_conditions_for_visit(selected_visit_id)
+        cvd_responses = visit_model.get_cvd_responses_for_visit(selected_visit_id)
+        existing_screening = lab_model.get_lab_screening_for_visit(selected_visit_id)
 
     return render_template(
         'nurse/nurse_patient_file_view.html',
@@ -223,7 +243,6 @@ def nurse_patient_file_view(patient_id):
         cvd_responses=cvd_responses,
         existing_screening=existing_screening,
     )
-
 
 @nurse_bp.route('/nurse_new_record/<patient_id>')
 def nurse_new_record(patient_id):
@@ -304,3 +323,60 @@ def nurse_patient_purge(patient_id):
         abort(404)
     patient_model.purge_patient_permanently(patient["id"])
     return redirect(url_for('nurse.nurse_recycle_bin'))
+
+@nurse_bp.route('/nurse_data_management/export', methods=['POST'])
+def nurse_data_management_export():
+    barangay = request.form.get('barangay') or request.args.get('barangay') or None
+    risk = request.form.get('risk') or request.args.get('risk') or None
+    date = request.form.get('date') or request.args.get('date') or None
+    all_visits = request.form.get('all_visits') == 'true'
+
+    csv_content = patient_model.export_patients_csv(barangay=barangay, risk=risk, date=date, all_visits=all_visits)
+
+    filename = f"srcho_fbs_export_{date_cls.today().isoformat()}.csv"
+
+    return Response(
+        csv_content,
+        mimetype="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+@nurse_bp.route('/nurse_patient/<patient_id>/export')
+def nurse_patient_export_all(patient_id):
+    patient = patient_model.get_patient_by_code(patient_id)
+    if patient is None:
+        abort(404)
+
+    csv_content = patient_model.export_single_patient_csv(patient_id, all_visits=True)
+    filename = f"{patient_id}_full_history_{date_cls.today().isoformat()}.csv"
+
+    return Response(
+        csv_content,
+        mimetype="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
+@nurse_bp.route('/nurse_patient/<patient_id>/export/<int:visit_id>')
+def nurse_patient_export_visit(patient_id, visit_id):
+    patient = patient_model.get_patient_by_code(patient_id)
+    if patient is None:
+        abort(404)
+
+    visits = visit_model.list_visits_for_patient(patient["id"])
+    if not any(v["visit_id"] == visit_id for v in visits):
+        abort(404)
+    full_csv = patient_model.export_single_patient_csv(patient_id, all_visits=True)
+    lines = full_csv.splitlines()
+    header = lines[0]
+    target_visit = next(v for v in visits if v["visit_id"] == visit_id)
+    matching_lines = [ln for ln in lines[1:] if f",{target_visit['date']}," in ln]
+
+    csv_content = header + "\n" + "\n".join(matching_lines)
+    filename = f"{patient_id}_visit_{target_visit['date']}_{date_cls.today().isoformat()}.csv"
+
+    return Response(
+        csv_content,
+        mimetype="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )

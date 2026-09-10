@@ -1,5 +1,5 @@
 /**
- * Nurse Patient Intake — client-side logic.
+ * Nurse Patient Intake — client-side logic
  */
 document.addEventListener('DOMContentLoaded', () => {
     const $ = (id) => document.getElementById(id);
@@ -14,7 +14,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const obGyneCard = $('obGyneCard');
     const patientIdInput = $('patientId');
 
-    // ---- Age auto-calculation ----
     function calcAge() {
         if (!birthdateInput.value) { ageInput.value = ''; return; }
         const bd = new Date(birthdateInput.value);
@@ -26,9 +25,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     birthdateInput.addEventListener('change', calcAge);
 
-    // ---- BMI auto-calculation ----
-    // Numeric value is kept in a data attribute (bmiInput.dataset.raw) so the
-    // displayed "kg/m²" suffix never has to be parsed back out for submission.
     function calcBmi() {
         const h = parseFloat(heightInput.value);
         const w = parseFloat(weightInput.value);
@@ -52,14 +48,13 @@ document.addEventListener('DOMContentLoaded', () => {
     heightInput.addEventListener('input', calcBmi);
     weightInput.addEventListener('input', calcBmi);
 
-    // ---- Show/hide OB-Gyne section based on sex ----
     function toggleObGyne() {
         obGyneCard.style.display = (sexSelect.value === 'Female') ? '' : 'none';
     }
     sexSelect.addEventListener('change', toggleObGyne);
     toggleObGyne();
 
-    // ---- Helpers ----
+    // helpers ito
     function checkedValues(selector) {
         return Array.from(document.querySelectorAll(selector + ':checked')).map(el => el.value);
     }
@@ -74,8 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return v === '' ? null : Number(v);
     }
 
-    // The 8 CVD questions render in document order as .cvd-q selects.
-    // Anything starting with "Yes" counts as a positive answer.
+    // toh yung sa cvd
     function cvdAnswers() {
         const selects = document.querySelectorAll('.cvd-q');
         const keys = [
@@ -143,7 +137,7 @@ document.addEventListener('DOMContentLoaded', () => {
             gravida: numOrNull('gravida'),
             para: numOrNull('para'),
             clinical_notes: null,
-            status: status, // 'draft' or 'submitted'
+            status: status, 
         };
 
         const conditions = {
@@ -159,7 +153,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return { patient, visit, conditions, cvd_responses };
     }
 
-    // ---- Inline field-error highlighting (replaces alert() popups) ----
     function clearFieldError(input) {
         input.classList.remove('field-error');
         const msg = input.parentElement.querySelector('.field-error-text');
@@ -207,47 +200,56 @@ document.addEventListener('DOMContentLoaded', () => {
             firstInvalid.focus({ preventScroll: true });
         }
 
-        return firstInvalid !== null; // true = has errors
+        return firstInvalid !== null; 
     }
 
     async function submitIntake(redirectAfter) {
-        const status = redirectAfter ? 'submitted' : 'draft';
-        const { patient, visit, conditions, cvd_responses } = buildPayload(status);
+    const status = redirectAfter ? 'submitted' : 'draft';
+    const { patient, visit, conditions, cvd_responses } = buildPayload(status);
 
-        const hasErrors = validate(patient, visit);
-        if (hasErrors) return;
+    const hasErrors = validate(patient, visit);
+    if (hasErrors) return;
 
-        try {
-            const res = await fetch('/api/patients', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ patient, visit, conditions, cvd_responses }),
-            });
+    const submitBtn = $('submitIntakeBtn');
+    const draftBtn = $('saveDraftBtn');
+    submitBtn.disabled = true;
+    draftBtn.disabled = true;
 
-            if (res.status === 401) {
-                alert('Your session has expired. Please sign in again.');
-                window.location.href = '/login';
-                return;
-            }
+    try {
+        const res = await fetch('/api/patients', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ patient, visit, conditions, cvd_responses }),
+        });
 
-            const data = await res.json();
-            if (!res.ok) {
-                alert(data.error || 'Could not save patient intake.');
-                return;
-            }
-
-            patientIdInput.value = data.patient.patient_code;
-            if (redirectAfter) {
-                window.location.href = `/nurse_screening/${data.patient.patient_code}`;
-            } else {
-                alert('Draft saved. Patient ID: ' + data.patient.patient_code);
-            }
-        } catch (err) {
-            console.error(err);
-            alert('Network error while saving intake. Please try again.');
+        if (res.status === 401) {
+            alert('Your session has expired. Please sign in again.');
+            window.location.href = '/login';
+            return;
         }
-    }
 
-    $('submitIntakeBtn').addEventListener('click', () => submitIntake(true));
-    $('saveDraftBtn').addEventListener('click', () => submitIntake(false));
-});
+        const data = await res.json();
+        if (!res.ok) {
+            alert(data.error || 'Could not save patient intake.');
+            return;
+        }
+
+        patientIdInput.value = data.patient.patient_code;
+        if (redirectAfter) {
+            window.location.href = `/nurse_screening/${data.patient.patient_code}`;
+        } else {
+            alert('Draft saved. Patient ID: ' + data.patient.patient_code);
+        }
+    } catch (err) {
+        console.error(err);
+        alert('Network error while saving intake. Please try again.');
+    } finally {
+        submitBtn.disabled = false;
+        draftBtn.disabled = false;
+    }
+}  
+
+$('submitIntakeBtn').addEventListener('click', () => submitIntake(true));
+$('saveDraftBtn').addEventListener('click', () => submitIntake(false));
+
+}); 
