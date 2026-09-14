@@ -61,8 +61,8 @@
                         <input type="file" id="settingsAvatarUpload" accept="image/*" style="display:none;">
                     </div>
                     <div class="avatar-info">
-                        <div class="avatar-name">Maria Santos</div>
-                        <div class="avatar-id">Patient ID: CAB-P-00165</div>
+                        <div class="avatar-name">{{ patient.first_name }} {{ patient.last_name }}</div>
+                        <div class="avatar-id">Patient ID: {{ patient.patient_code }}</div>
                         <div class="avatar-hint">JPG or PNG, max 2 MB</div>
                     </div>
                 </div>
@@ -74,30 +74,11 @@
                     <span class="section-badge">From LHU Records</span>
                 </div>
                 <div class="info-readonly-grid">
-                    <div class="info-field">
-                        <span class="if-label">Full Name</span>
-                        <span class="if-value">Santos, Maria Luisa B.</span>
-                    </div>
-                    <div class="info-field">
-                        <span class="if-label">Date of Birth</span>
-                        <span class="if-value">March 14, 1988</span>
-                    </div>
-                    <div class="info-field">
-                        <span class="if-label">Age</span>
-                        <span class="if-value">37 years old</span>
-                    </div>
-                    <div class="info-field">
-                        <span class="if-label">Sex</span>
-                        <span class="if-value">Female</span>
-                    </div>
-                    <div class="info-field">
-                        <span class="if-label">Civil Status</span>
-                        <span class="if-value">Married</span>
-                    </div>
-                    <div class="info-field">
-                        <span class="if-label">PhilHealth No.</span>
-                        <span class="if-value">04-123456789-0</span>
-                    </div>
+                    <div class="info-field"><span class="if-label">Full Name</span><span class="if-value">{{ patient.last_name }}, {{ patient.first_name }} {{ patient.middle_name or '' }}</span></div>
+                    <div class="info-field"><span class="if-label">Date of Birth</span><span class="if-value">{{ patient.birthdate_display }}</span></div>
+                    <div class="info-field"><span class="if-label">Age</span><span class="if-value">{{ patient.age }} years old</span></div>
+                    <div class="info-field"><span class="if-label">Sex</span><span class="if-value">{{ patient.sex }}</span></div>
+                    <div class="info-field"><span class="if-label">Civil Status</span><span class="if-value">{{ patient.civil_status or "—" }}</span></div>
                 </div>
                 <p class="readonly-note">
                     Personal information is sourced from your LHU registration record.

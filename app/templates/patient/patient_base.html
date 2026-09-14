@@ -23,8 +23,8 @@
                 <i class="fas fa-user"></i>
             </div>
             <div>
-                <div class="profile-name">Patient</div>
-                <div class="profile-sub">LHU Santa Rosa</div>
+                <div class="profile-name">{{ patient.first_name }} {{ patient.last_name }}</div>
+                <div class="profile-sub">{{ patient.patient_code }} · LHU Santa Rosa</div>
             </div>
         </div>
 
@@ -40,11 +40,12 @@
             </a>
         </nav>
 
-        <div class="sidebar-footer">
-            {# TODO: Replace href once auth blueprint is connected #}
-            <a href="#" class="nav-link sign-out">
-                <i class="fas fa-sign-out-alt"></i> Sign Out
-            </a>
+       <div class="sidebar-footer">
+            <form action="{{ url_for('auth.patient_logout') }}" method="POST" style="margin:0;">
+                <button type="submit" class="nav-link sign-out" style="width:100%; text-align:left; background:none; border:none;">
+                    <i class="fas fa-sign-out-alt"></i> Sign Out
+                </button>
+            </form>
         </div>
     </aside>
 
