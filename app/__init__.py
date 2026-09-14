@@ -1,7 +1,10 @@
 from flask import Flask, url_for
 from werkzeug.routing.exceptions import BuildError
+from flask import Flask, redirect, url_for
 
 def create_app(config=None):
+def create_app():
+    # Initialize the app
     app = Flask(__name__)
     app.config["SECRET_KEY"] = "change-me-in-production"
 
@@ -28,5 +31,13 @@ def create_app(config=None):
 
     from app.models.db import run_migrations
     run_migrations()
+    app.secret_key = "fbs-thesis-secret-key"
+
+    @app.route('/')
+    def index():
+        return redirect(url_for('patient.patient_dashboard'))
+
+    from app.controllers.patient_controller import patient_bp
+    app.register_blueprint(patient_bp)
 
     return app

@@ -1,0 +1,242 @@
+{% extends "patient/patient_base.html" %}
+{% block title %}My Results{% endblock %}
+
+{% block content %}
+
+<div class="results-header">
+    <div>
+        <h1 class="results-title">My Results</h1>
+        <p class="results-subtitle">Your complete FBS screening history</p>
+    </div>
+    <div class="results-header-actions">
+        <button class="btn btn-outline" id="printAllBtn"><i class="fas fa-print"></i> Print All</button>
+        <button class="btn btn-outline" id="downloadAllBtn"><i class="fas fa-file-download"></i> Download PDF</button>
+    </div>
+</div>
+
+{% if not history %}
+<div class="results-body">
+    <p>No screenings on record yet. Results will appear here after your first LHU visit.</p>
+</div>
+{% else %}
+
+{% set latest = history[0] %}
+{% set prior = history[1] if history|length > 1 else None %}
+
+<div class="results-summary-strip">
+    <div class="rs-item">
+        <span class="rs-value">{{ history|length }}</span>
+        <span class="rs-label">Total Screenings</span>
+    </div>
+    <div class="rs-divider"></div>
+    <div class="rs-item">
+        <span class="rs-value moderate-text">{{ latest.risk_level }}</span>
+        <span class="rs-label">Latest Risk Level</span>
+    </div>
+    <div class="rs-divider"></div>
+    <div class="rs-item">
+        <span class="rs-value">{{ latest.fbs_score }} mg/dL</span>
+        <span class="rs-label">Latest FBS</span>
+    </div>
+    <div class="rs-divider"></div>
+    <div class="rs-item">
+        {% if prior and prior.fbs_score is not none and latest.fbs_score is not none %}
+            {% set delta = latest.fbs_score - prior.fbs_score %}
+            <span class="rs-value">{{ "↓" if delta < 0 else "↑" if delta > 0 else "→" }} {{ delta|abs }}</span>
+        {% else %}
+            <span class="rs-value">—</span>
+        {% endif %}
+        <span class="rs-label">Change Since Last</span>
+    </div>
+</div>
+
+<div class="results-body">
+
+    <!-- Left: History List -->
+    <div class="history-list-panel">
+        <h2 class="panel-title">Screening History</h2>
+        {% for v in history %}
+        <div class="screening-card {{ 'active' if loop.first }}" data-id="visit-{{ v.visit_id }}">
+            <div class="sc-date">{{ v.date }}</div>
+            <div class="sc-row">
+                <div class="sc-fbs">{{ v.fbs_score if v.fbs_score is not none else "—" }} <span>mg/dL</span></div>
+                {% if v.fbs_band == 'Normal' %}<span class="range-badge normal">Normal</span>
+                {% elif v.fbs_band == 'Pre-Diabetic' %}<span class="range-badge pre-diabetic">Pre-Diabetic</span>
+                {% elif v.fbs_band == 'Diabetic' %}<span class="range-badge diabetic">Diabetic</span>
+                {% else %}<span class="range-badge">Pending</span>{% endif %}
+            </div>
+            <div class="sc-meta">BMI: {{ v.obesity_class or "—" }} · Waist: {{ v.waist_cm or "—" }} cm</div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Right: Detail Panel -->
+    <div class="detail-panel" id="detailPanel">
+        <button class="back-btn" id="backToListBtn" style="display:none;"><i class="fas fa-arrow-left"></i> Back to History</button>
+
+        {% for v in history %}
+        <div class="detail-view {{ 'active' if loop.first }}" id="detail-visit-{{ v.visit_id }}">
+
+            <div class="detail-header">
+                <div>
+                    <div class="detail-date">{{ v.date }}</div>
+                    <div class="detail-id">Assessment No. {{ patient.patient_code }}-{{ v.visit_id }}</div>
+                </div>
+                <div class="detail-actions">
+                    <button class="btn btn-outline btn-sm" data-print-id="visit-{{ v.visit_id }}"><i class="fas fa-print"></i> Print</button>
+                    <button class="btn btn-outline btn-sm" data-download-id="visit-{{ v.visit_id }}"><i class="fas fa-file-download"></i> PDF</button>
+                </div>
+            </div>
+
+            <div class="detail-cards-row">
+                <div class="detail-metric-card {{ 'warn-card' if v.fbs_band != 'Normal' else '' }}">
+                    <div class="dm-label">FBS Reading</div>
+                    <div class="dm-value">{{ v.fbs_score if v.fbs_score is not none else "—" }} <span>mg/dL</span></div>
+                    <div class="dm-badge">
+                        {% if v.fbs_band == 'Normal' %}<span class="range-badge normal">Normal</span>
+                        {% elif v.fbs_band == 'Pre-Diabetic' %}<span class="range-badge pre-diabetic">Pre-Diabetic</span>
+                        {% elif v.fbs_band == 'Diabetic' %}<span class="range-badge diabetic">Diabetic</span>
+                        {% else %}<span class="range-badge">Pending</span>{% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="detail-section">
+                <div class="ds-label">Position on FBS Range</div>
+                <div class="range-track" style="margin-top:0.5rem;">
+                    <div class="range-normal"></div><div class="range-pre"></div><div class="range-diabetic"></div>
+                    {% if v.range_marker_pct is not none %}
+                    <div class="range-marker" style="left:{{ v.range_marker_pct }}%">▲</div>
+                    {% endif %}
+                </div>
+                <div class="range-labels" style="margin-top:0.35rem;">
+                    <span class="rl-normal">Normal &lt;100</span>
+                    <span class="rl-pre">Pre-diabetic 100–125</span>
+                    <span class="rl-diabetic">Diabetic ≥126</span>
+                </div>
+            </div>
+
+            <div class="detail-section">
+                <div class="ds-label">1. Patient Demographics</div>
+                <div class="detail-data-grid">
+                    <div class="dd-item"><span class="dd-key">Full Name</span><span class="dd-val">{{ patient.last_name }}, {{ patient.first_name }}</span></div>
+                    <div class="dd-item"><span class="dd-key">Patient ID</span><span class="dd-val">{{ patient.patient_code }}</span></div>
+                    <div class="dd-item"><span class="dd-key">Date of Assessment</span><span class="dd-val">{{ v.date }}</span></div>
+                    <div class="dd-item"><span class="dd-key">Age at Assessment</span><span class="dd-val">{{ patient.age }} years old</span></div>
+                    <div class="dd-item"><span class="dd-key">Sex</span><span class="dd-val">{{ patient.sex }}</span></div>
+                    <div class="dd-item"><span class="dd-key">Civil Status</span><span class="dd-val">{{ patient.civil_status or "—" }}</span></div>
+                    <div class="dd-item"><span class="dd-key">Occupation</span><span class="dd-val">{{ patient.occupation or "—" }}</span></div>
+                    <div class="dd-item"><span class="dd-key">Barangay</span><span class="dd-val">{{ patient.barangay or "—" }}</span></div>
+                </div>
+            </div>
+
+            <div class="detail-section">
+                <div class="ds-label">2. Family History (1st Degree Relative)</div>
+                <div class="risk-factors-grid">
+                    {% for code in v.conditions.family_history %}
+                    <div class="rf-pill danger-pill">⛔ {{ code }}</div>
+                    {% else %}
+                    <div class="rf-pill ok-pill">✓ No family history reported</div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="detail-section">
+                <div class="ds-label">3. CVD Questionnaire</div>
+                <div class="cvd-table">
+                    {% set cvd_labels = {
+                        "q1_chest_discomfort": "1. Pain/discomfort/pressure in chest?",
+                        "q2_pain_center_left_arm": "2. Pain in center/left chest or left arm?",
+                        "q3_occurs_uphill_hurrying": "3. Occurs when walking uphill or hurrying?",
+                        "q4_slows_down_if_occurs": "4. Do you slow down if you get it while walking?",
+                        "q5_relieved_by_rest_tablet": "5. Does pain go away standing still or under-tongue tablet?",
+                        "q6_relieved_under_10min": "6. Does pain go away in less than 10 minutes?",
+                        "q7_severe_pain_30min_plus": "7. Severe chest pain lasting half an hour or more?",
+                        "q8_tia_stroke_symptoms": "8. TIA/Stroke: Difficulty talking, weakness or numbness?",
+                    } %}
+                    {% for key, label in cvd_labels.items() %}
+                    {% set answered_yes = v.cvd_responses.get(key) %}
+                    <div class="cvd-row {{ 'cvd-row-alert' if key == 'q8_tia_stroke_symptoms' and answered_yes }}">
+                        <span class="cvd-q">{{ label }}</span>
+                        <span class="cvd-a {{ 'cvd-yes' if answered_yes else 'cvd-no' }}">{{ "Yes" if answered_yes else "No" }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="detail-section">
+                <div class="ds-label">4. Lifestyle Factors</div>
+                <div class="detail-data-grid" style="margin-bottom:0.75rem;">
+                    <div class="dd-item"><span class="dd-key">Smoking Status</span><span class="dd-val">{{ v.smoking_status or "—" }}</span></div>
+                    <div class="dd-item"><span class="dd-key">Alcohol Intake</span><span class="dd-val">{{ v.alcohol_intake or "—" }}</span></div>
+                    <div class="dd-item"><span class="dd-key">Physical Activity</span><span class="dd-val">{{ v.physical_activity or "—" }}</span></div>
+                </div>
+                <div class="dd-key" style="margin-bottom:0.4rem;">Dietary Factors</div>
+                <div class="risk-factors-grid">
+                    {% for code in v.conditions.diet %}
+                    <div class="rf-pill warn-pill">⚠ {{ code }}</div>
+                    {% else %}
+                    <div class="rf-pill ok-pill">✓ No diet risk factors reported</div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="detail-section">
+                <div class="ds-label">5. Diabetes History</div>
+                <div class="detail-data-grid" style="margin-bottom:0.75rem;">
+                    <div class="dd-item" style="grid-column:1/-1;">
+                        <span class="dd-key">Previously Diagnosed with Diabetes</span>
+                        <span class="dd-val">{{ v.diabetes_diagnosis or "No / Do not know" }}</span>
+                    </div>
+                </div>
+                <div class="dd-key" style="margin-bottom:0.4rem;">Symptoms Present</div>
+                <div class="risk-factors-grid">
+                    {% for code in v.conditions.dm_symptom %}
+                    <div class="rf-pill warn-pill">⚠ {{ code }}</div>
+                    {% else %}
+                    <div class="rf-pill ok-pill">✓ No symptoms reported</div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="detail-section">
+                <div class="ds-label">6. Anthropometric Measurements &amp; Vitals</div>
+                <div class="detail-data-grid">
+                    <div class="dd-item"><span class="dd-key">Blood Pressure</span><span class="dd-val">{{ v.bp_systolic or "—" }}/{{ v.bp_diastolic or "—" }} mmHg</span></div>
+                    <div class="dd-item"><span class="dd-key">Height</span><span class="dd-val">{{ v.height_cm or "—" }} cm</span></div>
+                    <div class="dd-item"><span class="dd-key">Weight</span><span class="dd-val">{{ v.weight_kg or "—" }} kg</span></div>
+                    <div class="dd-item"><span class="dd-key">BMI</span><span class="dd-val">{{ v.bmi or "—" }} kg/m²</span></div>
+                    <div class="dd-item"><span class="dd-key">Waist Circumference</span><span class="dd-val">{{ v.waist_cm or "—" }} cm</span></div>
+                    <div class="dd-item"><span class="dd-key">Obesity Classification</span><span class="dd-val">{{ v.obesity_class or "—" }}</span></div>
+                </div>
+            </div>
+
+            <div class="detail-section">
+                <div class="ds-label">Follow-up &amp; Referral</div>
+                <div class="detail-data-grid">
+                    <div class="dd-item"><span class="dd-key">Next Follow-up</span><span class="dd-val followup-date">{{ v.follow_up_date or "Not scheduled" }}</span></div>
+                    <div class="dd-item"><span class="dd-key">Referred To</span><span class="dd-val">{{ v.referred_to or "—" }}</span></div>
+                    <div class="dd-item"><span class="dd-key">Facility</span><span class="dd-val">LHU, Sta. Rosa</span></div>
+                </div>
+            </div>
+
+            <div class="detail-footer">
+                <button class="btn btn-outline" data-print-id="visit-{{ v.visit_id }}"><i class="fas fa-print"></i> Print This Result</button>
+                <button class="btn btn-outline" data-download-id="visit-{{ v.visit_id }}"><i class="fas fa-file-download"></i> Save as PDF</button>
+            </div>
+        </div>
+        {% endfor %}
+
+    </div>
+</div>
+{% endif %}
+
+<div id="printArea" style="display:none;"></div>
+
+<footer class="patient-footer">
+    <span>© 2026 Santa Rosa City Health Office — FBS Diabetes Risk System</span>
+    <div class="footer-links">
+        <a href="#">Privacy Policy</a><span>·</span><a href="#">Help</a>
+    </div>
+</footer>
+{% endblock %}
