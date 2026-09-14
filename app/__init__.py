@@ -9,8 +9,7 @@ def create_app():
     def index():
         return redirect(url_for('patient.patient_dashboard'))
 
-    # Register ONLY the Patient Blueprint (because we are on the patient branch!)
-    from app.views.patient_views import patient_bp
+    from app.controllers.patient_controller import patient_bp
     app.register_blueprint(patient_bp)
 
     return app
