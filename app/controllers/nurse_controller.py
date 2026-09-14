@@ -1,45 +1,55 @@
 from flask import Blueprint, render_template, request, jsonify, abort, redirect, url_for, Response
-from app.models import patient_model, visit_model, lab_model, lookup_model
+from app.models import patient_model, visit_model, lab_model, lookup_model, health_analytics_model, ml_model
 from app.models.db import get_connection
 from datetime import date as date_cls
+from app.rate_limit import rate_limit
+
 
 nurse_bp = Blueprint('nurse', __name__)
 
 
 @nurse_bp.route('/nurse_dashboard')
 def nurse_dashboard():
-    conn = get_connection()
-    rows = conn.execute("""
-        SELECT COALESCE(final_risk_level, preliminary_risk_level) AS risk, COUNT(*) AS n
-        FROM lab_screenings
-        GROUP BY risk
-    """).fetchall()
-    conn.close()
+    summary = health_analytics_model.get_dashboard_summary()
+    risk_status = health_analytics_model.get_risk_status_distribution()
+    timeline = health_analytics_model.get_screening_volume_timeline()
+    top_barangays = health_analytics_model.get_top_barangays()
+    recent = health_analytics_model.get_recent_registries()
 
-    counts = {"Low": 0, "Moderate": 0, "High": 0}
-    for r in rows:
-        if r["risk"] in counts:
-            counts[r["risk"]] = r["n"]
+    risk_counts = {
+        "Low": risk_status.get("Low", 0),
+        "Moderate": risk_status.get("Moderate", 0),
+        "High": risk_status.get("High", 0),
+    }
+    total = sum(risk_counts.values())
 
-    total = sum(counts.values())
     if total:
         risk_data = [
-            round(counts["Low"] / total * 100, 1),
-            round(counts["Moderate"] / total * 100, 1),
-            round(counts["High"] / total * 100, 1),
+            round(risk_counts["Low"] / total * 100, 1),
+            round(risk_counts["Moderate"] / total * 100, 1),
+            round(risk_counts["High"] / total * 100, 1),
         ]
     else:
         risk_data = [0, 0, 0]
 
-    return render_template('nurse/nurse_dashboard.html', risk_data=risk_data)
-
-
+    return render_template(
+        'nurse/nurse_dashboard.html',
+        summary=summary,
+        risk_data=risk_data,
+        risk_counts=risk_counts,  
+        risk_total=total,          
+        timeline=timeline,
+        top_barangays=top_barangays,
+        recent=recent,
+        active_page='dashboard',
+    )
 @nurse_bp.route('/nurse_intake')
 def nurse_intake():
-    return render_template('nurse/nurse_intake.html', barangays=lookup_model.list_barangays())
+    return render_template('nurse/nurse_intake.html', barangays=lookup_model.list_barangays(), active_page='intake')
 
 
 @nurse_bp.route('/api/patients', methods=['POST'])
+@rate_limit(max_calls=10, period_seconds=60)
 def create_patient():
     """
     Expects the JSON shape sent by static/js/nurse_intake.js:
@@ -168,6 +178,47 @@ def nurse_screening_submit(patient_id, visit_id):
 
     return redirect(url_for('nurse.nurse_screening', patient_id=patient_id, visit_id=visit_id))
 
+@nurse_bp.route('/nurse_screening/<patient_id>/<int:visit_id>/submit', methods=['POST'])
+def nurse_screening_submit(patient_id, visit_id):
+    patient = patient_model.get_patient_by_code(patient_id)
+    if patient is None:
+        abort(404)
+
+    visits = visit_model.list_visits_for_patient(patient["id"])
+    if not any(v["visit_id"] == visit_id for v in visits):
+        abort(404)
+
+    data = {
+        "fbs_mg_dl": float(request.form["fbs_mg_dl"]),
+        "test_method": request.form.get("test_method"),
+        "glucometer_id": request.form.get("glucometer_id"),
+        "test_datetime": request.form.get("test_datetime"),
+        "final_risk_level": request.form.get("final_risk_level"),
+        "fasted_ge_8h": request.form.get("fasted_ge_8h"),
+        "identity_verified": request.form.get("identity_verified"),
+        "glucometer_calibrated": request.form.get("glucometer_calibrated"),
+        "capillary_sample_taken": request.form.get("capillary_sample_taken"),
+        "consent_signed": request.form.get("consent_signed"),
+        "result_recorded_within_5min": request.form.get("result_recorded_within_5min"),
+        "referral_action": request.form.get("referral_action"),
+        "follow_up_date": request.form.get("follow_up_date"),
+        "referred_to": request.form.get("referred_to"),
+    }
+
+    lab_model.create_lab_screening(visit_id, data)
+
+    # ML PREDICTION 
+    visit = visit_model.get_visit_by_id(visit_id)
+    conditions = visit_model.get_conditions_for_visit(visit_id)
+    try:
+        risk_level, confidence = ml_model.predict_risk(visit, patient, conditions)
+        lab_model.set_model_prediction(visit_id, risk_level, confidence)
+    except FileNotFoundError:
+        pass  # no model file 
+
+    return redirect(url_for('nurse.nurse_screening', patient_id=patient_id, visit_id=visit_id))
+
+
 @nurse_bp.route('/nurse_screening/<patient_id>')
 @nurse_bp.route('/nurse_screening/<patient_id>/<int:visit_id>')
 def nurse_screening(patient_id, visit_id=None):
@@ -202,6 +253,7 @@ def nurse_screening(patient_id, visit_id=None):
         visits=visits,
         existing_screening=existing_screening,
         is_latest=is_latest,
+        active_page='intake',
     )
 
 @nurse_bp.route('/nurse_patient_file_view/<patient_id>')
@@ -242,6 +294,7 @@ def nurse_patient_file_view(patient_id, visit_id=None):
         conditions=conditions,
         cvd_responses=cvd_responses,
         existing_screening=existing_screening,
+        active_page='data_management',
     )
 
 @nurse_bp.route('/nurse_new_record/<patient_id>')
@@ -255,13 +308,14 @@ def nurse_new_record(patient_id):
         patient_id=patient_id,
         patient=patient,
         barangays=lookup_model.list_barangays(),
+        active_page='data_management',
     )
 
 
 @nurse_bp.route('/nurse_health_results')
 def nurse_health_results():
     # TODO: no model backs this page yet 
-    return render_template('nurse/nurse_health_results.html')
+    return render_template('nurse/nurse_health_results.html', active_page='health_results')
 
 
 @nurse_bp.route('/nurse_data_management')
@@ -281,14 +335,15 @@ def nurse_data_management():
         barangays=lookup_model.list_barangays(),
         patients=patients,
         selected_barangay=barangay,
+        active_page='data_management',
     )
 
 
 @nurse_bp.route('/nurse_privacy_security')
 def nurse_privacy_security():
-    # TODO: needs a staff_model + logged-in staff_id before this can read
+    # TODO: needs a staff_model + logged-in 
 
-    return render_template('nurse/nurse_privacy_security.html')
+    return render_template('nurse/nurse_privacy_security.html', active_page='privacy')
 
 
 @nurse_bp.route('/nurse_patient/<patient_id>/delete', methods=['POST'])
@@ -304,7 +359,7 @@ def nurse_patient_delete(patient_id):
 def nurse_recycle_bin():
     patient_model.purge_expired_deleted_patients()
     deleted_patients = patient_model.list_deleted_patients()
-    return render_template('nurse/nurse_recycle_bin.html', deleted_patients=deleted_patients)
+    return render_template('nurse/nurse_recycle_bin.html', deleted_patients=deleted_patients, active_page='data_management')
 
 
 @nurse_bp.route('/nurse_patient/<patient_id>/restore', methods=['POST'])
@@ -325,6 +380,7 @@ def nurse_patient_purge(patient_id):
     return redirect(url_for('nurse.nurse_recycle_bin'))
 
 @nurse_bp.route('/nurse_data_management/export', methods=['POST'])
+@rate_limit(max_calls=5, period_seconds=60)
 def nurse_data_management_export():
     barangay = request.form.get('barangay') or request.args.get('barangay') or None
     risk = request.form.get('risk') or request.args.get('risk') or None
@@ -380,3 +436,54 @@ def nurse_patient_export_visit(patient_id, visit_id):
         mimetype="text/csv",
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
+
+@nurse_bp.route('/api/analytics/health_results')
+def api_health_results():
+    return jsonify({
+        "fbs": health_analytics_model.get_fbs_distribution(),
+        "status": health_analytics_model.get_risk_status_distribution(),
+        "age": health_analytics_model.get_age_distribution(),
+        "sex": health_analytics_model.get_sex_distribution(),
+        "bmi": health_analytics_model.get_bmi_distribution(),
+        "bp": health_analytics_model.get_bp_distribution(),
+        "hypertension": health_analytics_model.get_hypertension_history_distribution(),
+        "waist": health_analytics_model.get_waist_distribution(),
+        "smoking": health_analytics_model.get_smoking_distribution(),
+        "family": health_analytics_model.get_family_history_distribution(),
+        "barangay_matrix": health_analytics_model.get_barangay_risk_matrix(),
+        "risk_by_sex": health_analytics_model.get_risk_by_sex(),
+        "risk_by_age": health_analytics_model.get_risk_by_age(),
+    })
+
+@nurse_bp.route('/nurse_data_management/import_template')
+def nurse_data_management_import_template():
+    csv_content = patient_model.generate_import_template_csv()
+    return Response(
+        csv_content,
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=patient_import_template.csv"}
+    )
+
+
+@nurse_bp.route('/nurse_data_management/import', methods=['POST'])
+@rate_limit(max_calls=5, period_seconds=60)
+def nurse_data_management_import():
+    file = request.files.get('csv_import')
+    if file is None or file.filename == '':
+        return jsonify({"error": "No file selected."}), 400
+    if not file.filename.lower().endswith('.csv'):
+        return jsonify({"error": "Only .csv files are accepted."}), 400
+
+    staff_id = None  # wire ng auth sesh
+    result = patient_model.import_patients_from_csv(file.stream, staff_id=staff_id)
+
+    return jsonify({
+        "message": (
+            f"Import complete: {result['new_patients']} new patient(s) created, "
+            f"{result['matched_existing']} visit(s) matched to existing patients, "
+            f"{result['skipped']} row(s) skipped."
+        ),
+        **result
+    }), 200
+
+

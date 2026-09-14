@@ -30,8 +30,10 @@ body { display: flex; min-height: 100vh; background: var(--bg); color: var(--t1)
 .sidebar-brand  { font-size: 0.85rem; font-weight: 700; line-height: 1.4; }
 .sidebar-nav    { flex: 1; padding: 1.25rem 0; }
 .nav-item { display: block; padding: 0.875rem 2rem; color: rgba(255,255,255,0.65); text-decoration: none; font-size: 0.88rem; transition: background 0.2s, color 0.2s; }
-.nav-item:hover  { color: var(--white); background: rgba(255,255,255,0.06); }
-.nav-item.active { background: var(--g-mid); color: var(--white); border-left: 4px solid var(--g-accent); font-weight: 600; }
+.nav-item:hover { color: var(--white); background: rgba(0,0,0,0.15); }
+.nav-item.active {background: var(--g-accent); color: var(--white); font-weight: 700;}
+.nav-item:active { background: rgba(0,0,0,0.25); }
+.nav-item.active:hover { background: var(--g-accent); } 
 .user-avatar  { width: 38px; height: 38px; background: #aaa; border-radius: 50%; flex-shrink: 0; }
 
 
@@ -276,7 +278,7 @@ textarea.field-input   { height: auto; padding: 0.625rem 0.875rem; resize: verti
 
     .field-group { margin-bottom: 0.4rem !important; }
     .field-label { font-size: 0.68rem !important; margin-bottom: 0.1rem !important; }
-    
+
     .form-card {
         border: none !important;
         box-shadow: none !important;

@@ -296,15 +296,13 @@
         </div>
     </div>
 
-    <div class="action-bar">
-        <a href="{{ url_for('nurse.nurse_data_management') }}" class="btn btn-secondary" style="text-decoration:none; display:inline-block; text-align:center;">← Back to Data Management</a>
-        <div style="display:flex; gap:1rem;">
-            <button type="button" class="btn btn-secondary" onclick="window.print()">Print / Save as PDF</button>
-            <a href="{{ url_for('nurse.nurse_patient_export_all', patient_id=patient_id) }}" class="btn btn-secondary" style="text-decoration:none; display:inline-block; text-align:center;">Export Full History (CSV)</a>
-            <a href="{{ url_for('nurse.nurse_patient_export_visit', patient_id=patient_id, visit_id=latest_visit.visit_id) }}" class="btn btn-secondary" style="text-decoration:none; display:inline-block; text-align:center;">Export This Visit (CSV)</a>
-            <a href="{{ url_for('nurse.nurse_new_record', patient_id=patient_id) }}" class="btn btn-secondary" style="text-decoration:none; display:inline-block; text-align:center;">+ Add New Record</a>
-            <a href="{{ url_for('nurse.nurse_screening', patient_id=patient_id, visit_id=latest_visit.visit_id) }}" class="btn btn-primary" style="text-decoration:none; display:inline-block; text-align:center;">View Screening Result →</a>
-        </div>
+    <div class="action-bar" style="justify-content:flex-start; flex-wrap:nowrap; overflow-x:auto; gap:0.5rem; padding-bottom:0.35rem;">
+        <a href="{{ url_for('nurse.nurse_data_management') }}" class="btn btn-secondary" style="text-decoration:none; display:inline-flex; text-align:center; padding:0.625rem 1rem; flex-shrink:0;">← Back to Data Management</a>
+        <button type="button" class="btn btn-secondary" style="padding:0.625rem 1rem; flex-shrink:0;" onclick="window.print()">Print / Save as PDF</button>
+        <a href="{{ url_for('nurse.nurse_patient_export_all', patient_id=patient_id) }}" class="btn btn-secondary" style="text-decoration:none; display:inline-flex; text-align:center; padding:0.625rem 1rem; flex-shrink:0;">Export Full History (CSV)</a>
+        <a href="{{ url_for('nurse.nurse_patient_export_visit', patient_id=patient_id, visit_id=latest_visit.visit_id) }}" class="btn btn-secondary" style="text-decoration:none; display:inline-flex; text-align:center; padding:0.625rem 1rem; flex-shrink:0;">Export This Visit (CSV)</a>
+        <a href="{{ url_for('nurse.nurse_new_record', patient_id=patient_id) }}" class="btn btn-secondary" style="text-decoration:none; display:inline-flex; text-align:center; padding:0.625rem 1rem; flex-shrink:0;">+ Add New Record</a>
+        <a href="{{ url_for('nurse.nurse_screening', patient_id=patient_id, visit_id=latest_visit.visit_id) }}" class="btn btn-primary" style="text-decoration:none; display:inline-flex; text-align:center; padding:0.625rem 1rem; flex-shrink:0;">View Screening Result →</a>
     </div>
     {% endif %}
 {% endblock %}

@@ -8,43 +8,36 @@
     </div>
 </header>
 
-<!-- Stat Cards Row -->
 <div class="dash-grid-top">
     <div class="stat-card">
         <div class="stat-title">Total Screened</div>
-        <div class="stat-value">1,392</div>
-        <div class="stat-trend trend-good">▲ 1.2% vs last week</div>
+        <div class="stat-value">{{ summary.total_screened }}</div>
     </div>
     <div class="stat-card">
-        <div class="stat-title">At Risk (Predicted)</div>
-        <div class="stat-value">276</div>
-        <div class="stat-trend trend-bad">▲ 8% vs last week</div>
+        <div class="stat-title">At Risk (Moderate + High)</div>
+        <div class="stat-value">{{ summary.at_risk }}</div>
     </div>
     <div class="stat-card">
         <div class="stat-title">High Risk</div>
-        <div class="stat-value">82</div>
-        <div class="stat-trend trend-bad">▲ 3% vs last week</div>
+        <div class="stat-value">{{ summary.high_risk }}</div>
     </div>
     <div class="stat-card">
         <div class="stat-title">Avg. FBS (mg/dL)</div>
-        <div class="stat-value">111.4</div>
-        <div class="stat-trend trend-good">▼ 2.6 vs last week</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-title">Model Accuracy</div>
-        <div class="stat-value">89.3%</div>
-        <div class="stat-trend" style="color:var(--text-muted);">Current active model</div>
+        <div class="stat-value">{{ summary.avg_fbs }}</div>
     </div>
 </div>
 
-<!-- Middle Row: Donut | Line | Barangay Bar -->
 <div class="dash-grid-mid">
     <div class="form-card">
-        <div class="card-header">Risk Profile Distribution</div>
+    <div class="card-header">Risk Profile Distribution</div>
         <div class="card-body">
             <div class="chart-container">
                 <canvas id="riskDonutChart"></canvas>
             </div>
+            <p style="font-size:0.72rem; color:var(--text-muted); text-align:center; margin-top:0.5rem;">
+                Based on {{ risk_total }} completed screening{{ 's' if risk_total != 1 else '' }}
+                (Low: {{ risk_counts.Low }}, Moderate: {{ risk_counts.Moderate }}, High: {{ risk_counts.High }})
+            </p>
         </div>
     </div>
     <div class="form-card">
@@ -82,56 +75,30 @@
                     </tr>
                 </thead>
                 <tbody>
+                    {% for r in recent %}
                     <tr>
-                        <td>CAB-2026-0412</td>
-                        <td>Maria Santos</td>
-                        <td>52 / F</td>
-                        <td>138</td>
-                        <td><span class="risk-badge badge-danger">High</span></td>
-                        <td>Jun 10, 2026</td>
+                        <td>{{ r.patient_code }}</td>
+                        <td>{{ r.last_name }}, {{ r.first_name }}</td>
+                        <td>{{ r.age }} / {{ r.sex }}</td>
+                        <td>{{ r.fbs_mg_dl if r.fbs_mg_dl is not none else "—" }}</td>
+                        <td>
+                            {% if r.risk == 'High' %}
+                                <span class="risk-badge badge-danger">High</span>
+                            {% elif r.risk == 'Moderate' %}
+                                <span class="risk-badge badge-warning">Moderate</span>
+                            {% elif r.risk == 'Low' %}
+                                <span class="risk-badge badge-success">Low</span>
+                            {% else %}
+                                <span style="color:var(--text-muted);">Pending</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ r.assessment_date or "—" }}</td>
                     </tr>
-                    <tr>
-                        <td>CAB-2026-0411</td>
-                        <td>Ricardo Cruz</td>
-                        <td>45 / M</td>
-                        <td>118</td>
-                        <td><span class="risk-badge badge-warning">Moderate</span></td>
-                        <td>Jun 10, 2026</td>
-                    </tr>
-                    <tr>
-                        <td>CAB-2026-0410</td>
-                        <td>Luzviminda Reyes</td>
-                        <td>38 / F</td>
-                        <td>95</td>
-                        <td><span class="risk-badge badge-success">Low</span></td>
-                        <td>Jun 10, 2026</td>
-                    </tr>
-                    <tr>
-                        <td>CAB-2026-0409</td>
-                        <td>Eduardo Bautista</td>
-                        <td>61 / M</td>
-                        <td>142</td>
-                        <td><span class="risk-badge badge-danger">High</span></td>
-                        <td>Jun 9, 2026</td>
-                    </tr>
-                    <tr>
-                        <td>CAB-2026-0408</td>
-                        <td>Anabel Torres</td>
-                        <td>29 / F</td>
-                        <td>88</td>
-                        <td><span class="risk-badge badge-success">Low</span></td>
-                        <td>Jun 9, 2026</td>
-                    </tr>
+                    {% else %}
+                    <tr><td colspan="6" style="padding:1rem; color:var(--text-muted);">No screenings recorded yet.</td></tr>
+                    {% endfor %}
                 </tbody>
             </table>
-        </div>
-    </div>
-    <div class="form-card">
-        <div class="card-header">Model Performance</div>
-        <div class="card-body">
-            <div class="chart-container">
-                <canvas id="modelRadarChart"></canvas>
-            </div>
         </div>
     </div>
 </div>
@@ -139,5 +106,12 @@
 
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+    window.__dashboardData = {
+        riskData: {{ risk_data | tojson }},
+        timeline: {{ timeline | tojson }},
+        topBarangays: {{ top_barangays | tojson }},
+    };
+</script>
 <script src="{{ url_for('static', filename='js/nurse_dashboard.js') }}"></script>
 {% endblock %}

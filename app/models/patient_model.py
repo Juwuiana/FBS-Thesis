@@ -5,9 +5,11 @@ all reads/writes to `patients`
 import csv
 import hashlib
 import io
+import re
 from datetime import date
 from app.models.db import get_connection
 from datetime import date, datetime  
+import sqlite3
 
 
 def _compute_age(birthdate_iso: str) -> int:
@@ -42,10 +44,55 @@ def generate_next_patient_code(conn=None) -> str:
         conn.close()
     return f"{prefix}{next_seq:04d}"
 
-import sqlite3
+
+def _normalize_name_part(s: str | None) -> str:
+    """Lowercase and strip everything but letters, so 'Dela Cruz', 'dela  cruz',
+    and 'DELACRUZ' all compare equal."""
+    return re.sub(r"[^a-z]", "", (s or "").strip().lower())
+
+
+def find_existing_patient_id(last_name: str, first_name: str, middle_name: str | None, birthdate: str) -> int | None:
+    """
+    Look for a patient already in the system with the same normalized
+    last name, first name, middle name, and birthdate.
+
+    Used by CSV import so a repeat visit for the same person attaches to
+    their existing patient_code instead of minting a brand new one.
+    Only compares against non-deleted patients.
+    """
+    conn = get_connection()
+    try:
+        candidates = conn.execute(
+            """
+            SELECT id, last_name, first_name, middle_name
+            FROM patients
+            WHERE birthdate = ? AND deleted_at IS NULL
+            """,
+            (birthdate,)
+        ).fetchall()
+    finally:
+        conn.close()
+
+    target = (
+        _normalize_name_part(last_name),
+        _normalize_name_part(first_name),
+        _normalize_name_part(middle_name),
+    )
+    for c in candidates:
+        candidate_key = (
+            _normalize_name_part(c["last_name"]),
+            _normalize_name_part(c["first_name"]),
+            _normalize_name_part(c["middle_name"]),
+        )
+        if candidate_key == target:
+            return c["id"]
+    return None
+
+
 
 def create_patient(data: dict, staff_id: int | None = None) -> int:
     max_attempts = 5
+    last_error = None
     for attempt in range(max_attempts):
         conn = get_connection()
         try:
@@ -69,12 +116,18 @@ def create_patient(data: dict, staff_id: int | None = None) -> int:
             ))
             conn.commit()
             return cur.lastrowid
-        except sqlite3.IntegrityError:
+        except sqlite3.IntegrityError as e:
             conn.rollback()
-            continue  
+            last_error = str(e)
+            if "patient_code" not in last_error:
+                raise RuntimeError(f"Patient insert failed: {last_error}") from e
+            continue
         finally:
             conn.close()
-    raise RuntimeError(f"Could not generate a unique patient_code after {max_attempts} attempts")
+    raise RuntimeError(
+        f"Could not generate a unique patient_code after {max_attempts} attempts "
+        f"(last error: {last_error})"
+    )
 
 def get_patient_code_by_id(patient_id: int) -> str | None:
     conn = get_connection()
@@ -145,12 +198,17 @@ def update_patient(patient_id: int, data: dict) -> None:
     columns = ", ".join(f"{k} = ?" for k in data.keys())
     values = list(data.values()) + [patient_id]
     conn = get_connection()
-    conn.execute(
-        f"UPDATE patients SET {columns}, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-        values
-    )
-    conn.commit()
-    conn.close()
+    try:
+        conn.execute(
+            f"UPDATE patients SET {columns}, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            values
+        )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 def list_patients_with_latest_screening(barangay=None, risk=None, date=None, entries_limit=None):
     conn = get_connection()
@@ -503,3 +561,173 @@ def export_single_patient_csv(patient_code: str, all_visits: bool = True) -> str
         ])
 
     return output.getvalue()
+
+def generate_import_template_csv() -> str:
+    """CSV template matching nurse_intake.html's actual fields."""
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "last_name", "first_name", "middle_name",
+        "birthdate", "sex", "civil_status", "religion", "occupation", "education",
+        "barangay", "address", "contact_number",
+        "phic_membership", "phic_type",
+        "assessment_date",
+        "smoking_status", "alcohol_intake", "illicit_drug_use", "physical_activity",
+        "diabetes_diagnosis", "past_surgical_history",
+        "bp_systolic", "bp_diastolic", "heart_rate", "respiratory_rate",
+        "height_cm", "weight_kg", "waist_cm",
+        "pmh", "family_history", "diet", "immunization", "dm_symptom",
+        "fbs_mg_dl",
+    ])
+    return output.getvalue()
+
+
+def import_patients_from_csv(file_stream, staff_id: int | None = None) -> dict:
+    import csv as csv_module
+    from datetime import date as date_module
+    from app.models import visit_model, lab_model, lookup_model
+
+    text = file_stream.read().decode("utf-8-sig")
+    reader = csv_module.DictReader(io.StringIO(text))
+
+    required_columns = {"last_name", "first_name", "birthdate", "sex"}
+    if not required_columns.issubset(set(reader.fieldnames or [])):
+        missing = required_columns - set(reader.fieldnames or [])
+        return {"created": 0, "skipped": 0, "errors": [f"Missing required column(s): {', '.join(missing)}"]}
+
+    created, skipped, errors = 0, 0, []
+    new_patients = 0
+    matched_existing = 0
+
+    def multi(val):
+        return [v.strip() for v in (val or "").split(";") if v.strip()]
+
+    for i, row in enumerate(reader, start=2):
+        try:
+            last_name = (row.get("last_name") or "").strip()
+            first_name = (row.get("first_name") or "").strip()
+            birthdate = (row.get("birthdate") or "").strip()
+            sex_raw = (row.get("sex") or "").strip()
+
+            if not (last_name and first_name and birthdate and sex_raw):
+                errors.append(f"Row {i}: missing required field(s), skipped.")
+                skipped += 1
+                continue
+
+            sex = "Male" if sex_raw.upper().startswith("M") else "Female" if sex_raw.upper().startswith("F") else None
+            if sex is None:
+                errors.append(f"Row {i}: unrecognized sex value {sex_raw!r}, skipped.")
+                skipped += 1
+                continue
+
+            try:
+                date_module.fromisoformat(birthdate)
+            except ValueError:
+                errors.append(f"Row {i}: birthdate {birthdate!r} is not YYYY-MM-DD, skipped.")
+                skipped += 1
+                continue
+
+            barangay_id = None
+            barangay_name = (row.get("barangay") or "").strip()
+            if barangay_name:
+                barangay_id = lookup_model.get_barangay_id(barangay_name)
+                if barangay_id is None:
+                    errors.append(f"Row {i}: unrecognized barangay {barangay_name!r}, created without barangay.")
+
+            patient_data = {
+                "last_name": last_name, "first_name": first_name,
+                "middle_name": (row.get("middle_name") or "").strip() or None,
+                "birthdate": birthdate, "sex": sex,
+                "civil_status": (row.get("civil_status") or "").strip() or None,
+                "religion": (row.get("religion") or "").strip() or None,
+                "occupation": (row.get("occupation") or "").strip() or None,
+                "education": (row.get("education") or "").strip() or None,
+                "barangay_id": barangay_id,
+                "address": (row.get("address") or "").strip() or None,
+                "contact_number": (row.get("contact_number") or "").strip() or None,
+                "phic_membership": (row.get("phic_membership") or "").strip() or None,
+                "phic_type": (row.get("phic_type") or "").strip() or None,
+            }
+
+            existing_patient_id = find_existing_patient_id(
+                last_name, first_name, patient_data["middle_name"], birthdate
+            )
+
+            if existing_patient_id is not None:
+                patient_id = existing_patient_id
+                matched_existing += 1
+            else:
+                patient_id = create_patient(patient_data, staff_id=staff_id)
+                new_patients += 1
+
+            assessment_date = (row.get("assessment_date") or "").strip() or date_module.today().isoformat()
+            visit_data = {
+                "assessment_date": assessment_date, "status": "submitted",
+                "smoking_status": (row.get("smoking_status") or "").strip() or None,
+                "alcohol_intake": (row.get("alcohol_intake") or "").strip() or None,
+                "illicit_drug_use": (row.get("illicit_drug_use") or "").strip() or None,
+                "physical_activity": (row.get("physical_activity") or "").strip() or None,
+                "diabetes_diagnosis": (row.get("diabetes_diagnosis") or "").strip() or None,
+                "past_surgical_history": (row.get("past_surgical_history") or "").strip() or None,
+            }
+
+            for num_field, csv_col in [
+                ("bp_systolic", "bp_systolic"), ("bp_diastolic", "bp_diastolic"),
+                ("heart_rate", "heart_rate"), ("respiratory_rate", "respiratory_rate"),
+                ("height_cm", "height_cm"), ("weight_kg", "weight_kg"), ("waist_cm", "waist_cm"),
+            ]:
+                raw = (row.get(csv_col) or "").strip()
+                if raw:
+                    try:
+                        visit_data[num_field] = float(raw)
+                    except ValueError:
+                        errors.append(f"Row {i}: {csv_col} value {raw!r} is not numeric, ignored.")
+
+            # calc ng bmi
+            if visit_data.get("height_cm") and visit_data.get("weight_kg"):
+                h_m = visit_data["height_cm"] / 100
+                bmi = visit_data["weight_kg"] / (h_m * h_m)
+                visit_data["bmi"] = round(bmi, 1)
+                if bmi < 18.5: visit_data["obesity_class"] = "Underweight"
+                elif bmi < 23: visit_data["obesity_class"] = "Normal"
+                elif bmi < 25: visit_data["obesity_class"] = "Overweight"
+                elif bmi < 30: visit_data["obesity_class"] = "Obese Class I"
+                else: visit_data["obesity_class"] = "Obese Class II"
+
+            visit_id = visit_model.create_visit(patient_id, "intake", visit_data, staff_id=staff_id)
+
+            for category, csv_col in [
+                ("pmh", "pmh"), ("family_history", "family_history"),
+                ("diet", "diet"), ("immunization", "immunization"), ("dm_symptom", "dm_symptom"),
+            ]:
+                codes = multi(row.get(csv_col))
+                if codes:
+                    try:
+                        visit_model.save_visit_conditions(visit_id, category, codes)
+                    except ValueError as ve:
+                        errors.append(f"Row {i}: {ve}")
+
+            fbs_raw = (row.get("fbs_mg_dl") or "").strip()
+            if fbs_raw:
+                try:
+                    fbs_value = float(fbs_raw)
+                    lab_model.create_lab_screening(visit_id, {
+                        "fbs_mg_dl": fbs_value,
+                        "test_datetime": f"{assessment_date}T00:00",
+                    }, staff_id=staff_id)
+                except ValueError:
+                    errors.append(f"Row {i}: fbs_mg_dl {fbs_raw!r} is not numeric, screening skipped.")
+
+            created += 1
+
+        except Exception as e:
+            errors.append(f"Row {i}: unexpected error — {e}")
+            skipped += 1
+
+    return {
+        "created": created,
+        "new_patients": new_patients,
+        "matched_existing": matched_existing,
+        "skipped": skipped,
+        "errors": errors,
+    }

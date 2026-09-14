@@ -73,11 +73,10 @@
                         </div>
                         <div class="field-group">
                             <label class="field-label">Test Date & Time</label>
-                            <input type="datetime-local" name="test_datetime" id="testDateTime" class="field-input"
-                                   value="{{ existing_screening.test_datetime if existing_screening else '' }}">
+                            <input type="datetime-local" name="test_datetime" id="testDateTime" class="field-input" required
+                                value="{{ existing_screening.test_datetime if existing_screening else '' }}">
                         </div>
                     </div>
-
                     <div style="margin-top: 1.25rem; display:flex; justify-content:flex-end;">
                         <button type="button" id="calculateRiskBtn" class="btn btn-primary" {% if not is_latest %}disabled style="opacity:0.5; cursor:not-allowed;"{% endif %}>Calculate Risk →</button>
                     </div>
