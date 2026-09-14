@@ -173,37 +173,6 @@ def nurse_screening_submit(patient_id, visit_id):
         "follow_up_date": request.form.get("follow_up_date"),
         "referred_to": request.form.get("referred_to"),
     }
-    
-    lab_model.create_lab_screening(visit_id, data)
-
-    return redirect(url_for('nurse.nurse_screening', patient_id=patient_id, visit_id=visit_id))
-
-@nurse_bp.route('/nurse_screening/<patient_id>/<int:visit_id>/submit', methods=['POST'])
-def nurse_screening_submit(patient_id, visit_id):
-    patient = patient_model.get_patient_by_code(patient_id)
-    if patient is None:
-        abort(404)
-
-    visits = visit_model.list_visits_for_patient(patient["id"])
-    if not any(v["visit_id"] == visit_id for v in visits):
-        abort(404)
-
-    data = {
-        "fbs_mg_dl": float(request.form["fbs_mg_dl"]),
-        "test_method": request.form.get("test_method"),
-        "glucometer_id": request.form.get("glucometer_id"),
-        "test_datetime": request.form.get("test_datetime"),
-        "final_risk_level": request.form.get("final_risk_level"),
-        "fasted_ge_8h": request.form.get("fasted_ge_8h"),
-        "identity_verified": request.form.get("identity_verified"),
-        "glucometer_calibrated": request.form.get("glucometer_calibrated"),
-        "capillary_sample_taken": request.form.get("capillary_sample_taken"),
-        "consent_signed": request.form.get("consent_signed"),
-        "result_recorded_within_5min": request.form.get("result_recorded_within_5min"),
-        "referral_action": request.form.get("referral_action"),
-        "follow_up_date": request.form.get("follow_up_date"),
-        "referred_to": request.form.get("referred_to"),
-    }
 
     lab_model.create_lab_screening(visit_id, data)
 

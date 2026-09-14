@@ -154,6 +154,21 @@ def get_patient_by_code(patient_code: str) -> dict | None:
     patient["birthdate_display"] = date.fromisoformat(patient["birthdate"]).strftime("%B %d, %Y")
     return patient
 
+def get_patient_by_id(patient_id: int) -> dict | None:
+    conn = get_connection()
+    row = conn.execute("""
+        SELECT p.*, b.name AS barangay
+        FROM patients p
+        LEFT JOIN barangays b ON b.id = p.barangay_id
+        WHERE p.id = ?
+    """, (patient_id,)).fetchone()
+    conn.close()
+    if row is None:
+        return None
+    patient = dict(row)
+    patient["age"] = _compute_age(patient["birthdate"])
+    patient["birthdate_display"] = date.fromisoformat(patient["birthdate"]).strftime("%B %d, %Y")
+    return patient
 
 def list_patients(barangay: str = None, entries_limit: int = None) -> list[dict]:
     conn = get_connection()
