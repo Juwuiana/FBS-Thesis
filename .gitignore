@@ -1,0 +1,22 @@
+﻿# Virtual Environment 
+venv/
+env/
+.venv/
+
+# Python Cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment variables / Secrets (Passwords, API keys)
+.env
+.flaskenv
+
+# Database files (if SQLite ang gagamitin)
+*.sqlite3
+instance/
+
+# VS Code settings / OS files
+.vscode/
+.DS_Store
+Thumbs.db

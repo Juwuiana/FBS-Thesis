@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
   {% block head %}{% endblock %}
 </head>
-<body>
+<body data-session-timeout-minutes="{{ session_timeout_minutes | default(30) }}" data-logout-url="{{ url_for('auth.logout') }}">
 
   <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
@@ -66,9 +66,8 @@
       </a>
     </div>
 
-    <!-- TODO: point at the real auth.logout route once auth is wired on this branch -->
     <div class="sidebar-bottom-signout">
-      <a href="#" class="sidebar-signout-link">
+      <a href="{{ url_for('auth.logout') }}" class="sidebar-signout-link">
         <i class="bi bi-box-arrow-right me-2"></i> Sign Out
       </a>
     </div>

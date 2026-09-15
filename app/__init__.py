@@ -1,19 +1,21 @@
+import os
+
 from flask import Flask
-from flask_sqlalchemy import SQLAlchemy
 
-db = SQLAlchemy()
+from config import Config
 
 
-def create_app(config=None):
-    app = Flask(__name__)
+def create_app(config_class=Config):
+    app = Flask(__name__, instance_relative_config=True)
+    app.config.from_object(config_class)
 
-    app.config["SECRET_KEY"] = "change-me-in-production"
-    app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///fbs_thesis.db"
-    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+    # Make sure the instance folder (holds the sqlite file, gitignored)
+    # exists, and default the DB path there if one wasn't set via env var.
+    os.makedirs(app.instance_path, exist_ok=True)
+    if not app.config.get("DATABASE"):
+        app.config["DATABASE"] = os.path.join(app.instance_path, "fbs_thesis.sqlite3")
 
-    if config:
-        app.config.update(config)
-
+    from app import db
     db.init_app(app)
 
     from app.views.auth_views import auth_bp
@@ -29,7 +31,106 @@ def create_app(config=None):
         except (ValueError, TypeError):
             return value
 
+    @app.context_processor
+    def inject_session_settings():
+        from app.models import settings as settings_model
+        return {"session_timeout_minutes": settings_model.get_session_timeout_minutes()}
+
+    @app.before_request
+    def _enforce_session_timeout():
+        """Log the user out if they've been inactive longer than the
+        timeout configured on the Privacy & Security admin page."""
+        from datetime import datetime, timezone
+
+        from flask import flash, redirect, request, session, url_for
+
+        if request.endpoint == "static" or "user_id" not in session:
+            return
+
+        from app.models import settings as settings_model
+
+        timeout_minutes = settings_model.get_session_timeout_minutes()
+        now = datetime.now(timezone.utc)
+        last_active_raw = session.get("last_active")
+
+        if last_active_raw:
+            last_active = datetime.fromisoformat(last_active_raw)
+            elapsed_seconds = (now - last_active).total_seconds()
+            if elapsed_seconds > timeout_minutes * 60:
+                session.clear()
+                flash(
+                    "You were signed out after "
+                    f"{timeout_minutes} minute(s) of inactivity.",
+                    "error",
+                )
+                return redirect(url_for("auth.login"))
+
+        session["last_active"] = now.isoformat()
+
+    _register_cli(app)
+
+    # Idempotent: schema.sql uses CREATE TABLE IF NOT EXISTS, so this is
+    # safe to run on every startup.
     with app.app_context():
-        db.create_all()
+        db.init_db()
+        from app.models import user as user_model
+        user_model.seed_demo_users()
 
     return app
+
+
+def _register_cli(app):
+    import click
+
+    @app.cli.command("init-db")
+    def init_db_command():
+        """flask init-db — (re)create tables from schema.sql."""
+        from app import db as db_module
+
+        db_module.init_db()
+        click.echo("Initialized the database.")
+
+    @app.cli.command("create-admin")
+    @click.option("--email", prompt=True)
+    @click.option("--password", prompt=True, hide_input=True, confirmation_prompt=True)
+    @click.option("--first-name", default="Admin")
+    @click.option("--last-name", default="User")
+    def create_admin_command(email, password, first_name, last_name):
+        """flask create-admin — seed one pre-approved account so you have
+        a way to log in and start approving other sign-ups."""
+        from werkzeug.security import generate_password_hash
+
+        from app.models import user as user_model
+
+        if user_model.email_exists(email):
+            click.echo(f"A user with email {email} already exists.")
+            return
+
+        data = {
+            "first_name": first_name,
+            "middle_name": None,
+            "last_name": last_name,
+            "birthday": "1990-01-01",
+            "sex": "male",
+            "email": email,
+            "phone": "9000000000",
+            "role": "medical_officer",
+            "facility": "rhui",
+            "barangay": "aplaya",
+        }
+        password_hash = generate_password_hash(password)
+        user_model.create_user(data, password_hash, status="approved")
+        click.echo(f"Admin account created for {email} (status=approved).")
+
+    @app.cli.command("approve-user")
+    @click.option("--email", prompt=True)
+    def approve_user_command(email):
+        """flask approve-user — flip a pending account to approved."""
+        from app.models import user as user_model
+
+        user = user_model.get_user_by_email(email)
+        if not user:
+            click.echo(f"No user found with email {email}.")
+            return
+        user_model.set_status(user["id"], "approved")
+        click.echo(f"{email} is now approved.")

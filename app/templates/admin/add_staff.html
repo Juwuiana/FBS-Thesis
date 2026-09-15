@@ -14,12 +14,6 @@
       </a>
     </div>
 
-    <!--
-        TEMPORARY DEMO DATA — this appends to the in-memory EMPLOYEES list
-        in admin_views.py. There is no Staff/User model or DB table yet;
-        new employees are lost on app restart.
-    -->
-
     {% if errors %}
     <div class="alert alert-danger" role="alert">
       <ul class="mb-0" style="padding-left:1.2rem;">
@@ -60,15 +54,9 @@
         <input type="text" class="ps-input" name="contact" value="{{ form_data.contact or '' }}" placeholder="09171234567">
       </div>
       <div class="col-md-6 col-12">
-        <label class="ps-field-label">Status</label>
-        <select class="ps-select" name="status" required>
-          <option value="">Select Status</option>
-          {% for s in statuses %}
-            <option value="{{ s }}" {{ 'selected' if s == form_data.status }}>{{ s }}</option>
-          {% endfor %}
-        </select>
+        <label class="ps-field-label">Temporary Password</label>
+        <input type="password" class="ps-input" name="password" minlength="12" required>
       </div>
-
       <div class="col-12 mt-4">
         <button type="submit" class="filter-btn" style="padding:8px 20px;">
           <i class="bi bi-person-plus me-1"></i> Add Employee

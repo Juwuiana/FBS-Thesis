@@ -147,7 +147,7 @@
     </div>
   </div>
 
-  <!-- ── ROW 3: LOCAL ENCRYPTION ── -->
+  <!-- ── ROW 3: LOCAL ENCRYPTION & SESSION SECURITY ── -->
   <div class="row g-3">
     <div class="col-lg-6 col-12">
       <div class="ps-card h-100">
@@ -182,53 +182,58 @@
       </div>
     </div>
 
-    <!-- Session & Login Security -->
     <div class="col-lg-6 col-12">
       <div class="ps-card h-100">
         <div class="ps-section-header">SESSION &amp; LOGIN SECURITY</div>
         <p class="ps-description mt-2">
           Configure authentication policies and session timeout rules for all LHU system users.
         </p>
-        <div class="row g-3 mb-3">
-          <div class="col-md-6 col-12">
-            <label class="ps-field-label">Session Timeout</label>
-            <select class="ps-select">
-              <option>15 minutes of inactivity</option>
-              <option selected>30 minutes of inactivity</option>
-              <option>60 minutes of inactivity</option>
-            </select>
-          </div>
-          <div class="col-md-6 col-12">
-            <label class="ps-field-label">Max Failed Login Attempts</label>
-            <select class="ps-select">
-              <option>3 attempts</option>
-              <option selected>5 attempts</option>
-              <option>10 attempts</option>
-            </select>
-          </div>
-        </div>
-        <div class="row g-3 mb-3">
-          <div class="col-12">
-            <label class="ps-field-label">Two-Factor Authentication</label>
-            <div class="ps-toggle-row">
-              <span style="font-size:13px;color:var(--text-muted)">Require 2FA for Admin accounts</span>
-              <label class="ps-toggle">
-                <input type="checkbox" checked />
-                <span class="ps-toggle-slider"></span>
-              </label>
+        <form method="POST" action="{{ url_for('admin.update_session_timeout') }}">
+          <div class="row g-3 mb-3">
+            <div class="col-md-6 col-12">
+              <label class="ps-field-label">Session Timeout</label>
+              <select class="ps-select" name="session_timeout_minutes">
+                <option value="1" {% if session_timeout_minutes == 1 %}selected{% endif %}>1 minute (testing)</option>
+                <option value="15" {% if session_timeout_minutes == 15 %}selected{% endif %}>15 minutes of inactivity</option>
+                <option value="30" {% if session_timeout_minutes == 30 %}selected{% endif %}>30 minutes of inactivity</option>
+                <option value="60" {% if session_timeout_minutes == 60 %}selected{% endif %}>60 minutes of inactivity</option>
+              </select>
             </div>
-            <div class="ps-toggle-row">
-              <span style="font-size:13px;color:var(--text-muted)">Require 2FA for Health Officer accounts</span>
-              <label class="ps-toggle">
-                <input type="checkbox" />
-                <span class="ps-toggle-slider"></span>
-              </label>
+            <div class="col-md-6 col-12">
+              <label class="ps-field-label">Max Failed Login Attempts</label>
+              <select class="ps-select" disabled>
+                <option>3 attempts</option>
+                <option selected>5 attempts</option>
+                <option>10 attempts</option>
+              </select>
+              <div class="ps-field-meta" style="font-size:11px;color:var(--text-muted);margin-top:4px;">
+                Not wired up yet
+              </div>
             </div>
           </div>
-        </div>
-        <button class="ps-primary-btn">
-          <i class="bi bi-floppy me-2"></i>Save Security Settings
-        </button>
+          <div class="row g-3 mb-3">
+            <div class="col-12">
+              <label class="ps-field-label">Two-Factor Authentication</label>
+              <div class="ps-toggle-row">
+                <span style="font-size:13px;color:var(--text-muted)">Require 2FA for Admin accounts (not wired up yet)</span>
+                <label class="ps-toggle">
+                  <input type="checkbox" checked disabled />
+                  <span class="ps-toggle-slider"></span>
+                </label>
+              </div>
+              <div class="ps-toggle-row">
+                <span style="font-size:13px;color:var(--text-muted)">Require 2FA for Health Officer accounts (not wired up yet)</span>
+                <label class="ps-toggle">
+                  <input type="checkbox" disabled />
+                  <span class="ps-toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+          </div>
+          <button type="submit" class="ps-primary-btn">
+            <i class="bi bi-floppy me-2"></i>Save Security Settings
+          </button>
+        </form>
       </div>
     </div>
   </div>

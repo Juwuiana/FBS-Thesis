@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Account — FBS-Based Diabetes Prediction System</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
+</head>
+<body>
+
+    <div class="left-panel">
+        <div class="circle circle-1"></div>
+        <div class="circle circle-2"></div>
+        <div class="circle circle-3"></div>
+        <div class="circle circle-4"></div>
+        <div class="circle circle-5"></div>
+        <div class="circle circle-6"></div>
+
+        <div class="left-top">
+            <div class="brand-icon"></div>
+            <h1 class="brand-title">Create Your<br>Account</h1>
+            <p class="brand-subtitle">Join the LHU Decision Support System</p>
+            <div class="brand-divider"></div>
+            <p class="brand-description">
+                Register to access the FBS-Based Diabetes
+                Risk Prediction platform and help protect
+                your community's health.
+            </p>
+
+            <div class="left-steps">
+                <div class="step-item">
+                    <div class="step-number active">1</div>
+                    <div class="step-text">Fill in your details</div>
+                </div>
+                <div class="step-item">
+                    <div class="step-number active">2</div>
+                    <div class="step-text">Select your role & facility</div>
+                </div>
+                <div class="step-item">
+                    <div class="step-number active">3</div>
+                    <div class="step-text">Submit for admin approval</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="left-bottom">
+            For authorized LHU personnel only
+        </div>
+    </div>
+
+    <div class="right-panel">
+        <div class="right-top"></div>
+
+        <div class="form-container signup-container">
+            <div class="form-header">
+                <h2 class="form-title">Create an Account</h2>
+                <p class="form-description">Fill in your information to request access to the system</p>
+                <div class="form-divider" style="margin-top: 1.5rem;"></div>
+            </div>
+
+            <div class="stepper-horizontal">
+                <div class="stepper-step">
+                    <div class="step-circle active" id="circle-1">1</div>
+                    <span class="step-label active" id="label-1">Personal Info</span>
+                </div>
+                
+                <div class="stepper-line" id="line-1"></div> 
+                
+                <div class="stepper-step">
+                    <div class="step-circle outline" id="circle-2">2</div>
+                    <span class="step-label" id="label-2">Role & Facility</span>
+                </div>
+                
+                <div class="stepper-line" id="line-2"></div>
+                
+                <div class="stepper-step">
+                    <div class="step-circle outline" id="circle-3">3</div>
+                    <span class="step-label" id="label-3">Security</span>
+                </div>
+            </div>
+
+            <!-- Flash messages from Flask -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+              {% if messages %}
+                <div class="flash-messages">
+                  {% for category, message in messages %}
+                    <div class="flash-{{ category }}">{{ message }}</div>
+                  {% endfor %}
+                </div>
+              {% endif %}
+            {% endwith %}
+
+            <form method="POST" action="{{ url_for('auth.signup') }}">
+                {{ form.hidden_tag() if form else '' }}
+
+               <h3 class="form-section-title">Personal Information</h3>
+
+                    <div class="form-row">
+                        <div class="field-group">
+                            <label class="field-label" for="first_name">First Name</label>
+                            <input class="field-input" type="text" id="first_name" name="first_name" 
+                                pattern="[A-Za-z\s]+" title="Letters only" placeholder="Juan" required>
+                        </div>
+                        <div class="field-group">
+                            <label class="field-label" for="middle_name">Middle Name</label>
+                            <input class="field-input" type="text" id="middle_name" name="middle_name" 
+                                pattern="[A-Za-z\s]*" title="Letters only" placeholder="Dela">
+                        </div>
+                    </div>
+
+                    <div class="field-group">
+                        <label class="field-label" for="last_name">Last Name</label>
+                        <input class="field-input" type="text" id="last_name" name="last_name" 
+                            pattern="[A-Za-z\s]+" title="Letters only" placeholder="Cruz" required>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="field-group">
+                            <label class="field-label" for="birthday">Birthday</label>
+                            <input class="field-input" type="date" id="birthday" name="birthday" required>
+                        </div>
+                        <div class="field-group">
+                            <label class="field-label" for="sex">Sex</label>
+                            <select class="field-input select-input" id="sex" name="sex" required>
+                                <option value="" disabled selected>Select...</option>
+                                <option value="male">Male</option>
+                                <option value="female">Female</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="field-group">
+                        <label class="field-label" for="email">Email Address</label>
+                        <input class="field-input" type="email" id="email" name="email" placeholder="e.g. health.officer@lhu.gov.ph" required>
+                    </div>
+                    <div class="field-group">
+                        <label class="field-label" for="phone">Phone Number</label>
+                        <div style="display: flex; align-items: center; background: var(--gray-50); border: 1px solid var(--border); border-radius: 8px; padding-left: 0.875rem;">
+                            <span style="color: var(--text-muted); font-size: 0.875rem; margin-right: 0.5rem;">+63</span>
+                            <input class="field-input" type="tel" id="phone" name="phone" 
+                                style="border: none; background: transparent; padding-left: 0;"
+                                placeholder="9XX XXX XXXX" 
+                                pattern="9\d{9}" title="Enter 10 digits starting with 9" 
+                                maxlength="10" oninput="this.value = this.value.replace(/[^0-9]/g, '')" required>
+                        </div>
+                    </div>
+
+                <h3 class="form-section-title">Role & Facility</h3>
+                <div class="field-group">
+                    <label class="field-label" for="role">Role / Position</label>
+                    <select class="field-input select-input" id="role" name="role" required>
+                        <option value="" disabled selected>Select your role</option>
+                        <option value="health_worker">Barangay Health Worker</option>
+                        <option value="medical_officer">Medical Officer</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <div class="field-group">
+                        <label class="field-label" for="facility">Health Facility</label>
+                        <select class="field-input select-input" id="facility" name="facility" required>
+                            <option value="" disabled selected>Select...</option>
+                            <option value="rhui">RHU I</option>
+                            <option value="rhuii">RHU II</option>
+                        </select>
+                    </div>
+                    <div class="field-group">
+                        <label class="field-label" for="barangay">Assigned Barangay</label>
+                        <select class="field-input select-input" id="barangay" name="barangay" required>
+                            <option value="" disabled selected>Select...</option>
+                            <option value="aplaya">Aplaya</option>
+                            <option value="balibago">Balibago</option>
+                            <option value="caingin">Caingin</option>
+                            <option value="dila">Dila</option>
+                            <option value="dita">Dita</option>
+                            <option value="don_jose">Don Jose</option>
+                            <option value="ibaba">Ibaba</option>
+                            <option value="kanluran">Kanluran (Poblacion Uno)</option>
+                            <option value="labas">Labas</option>
+                            <option value="macabling">Macabling</option>
+                            <option value="malitlit">Malitlit</option>
+                            <option value="malusak">Malusak (Poblacion Dos)</option>
+                            <option value="market_area">Market Area (Poblacion Tres)</option>
+                            <option value="pooc">Pooc</option>
+                            <option value="pulong_santa_cruz">Pulong Santa Cruz</option>
+                            <option value="santo_domingo">Santo Domingo</option>
+                            <option value="sinalhan">Sinalhan</option>
+                            <option value="tagapo">Tagapo</option>
+
+                        </select>
+                    </div>
+                </div>
+
+                <h3 class="form-section-title">Security</h3>
+                <div class="form-row">
+                    <div class="field-group">
+                        <label class="field-label" for="password">Password</label>
+                        
+                        <div class="password-wrapper" style="position: relative;">
+                            <input class="field-input" type="password" id="password" name="password" placeholder="••••••••" required maxlength="128">
+                            <button type="button" class="toggle-password" id="togglePassword">Show</button>
+                        </div>
+
+                        <ul class="password-checklist">
+                            <li id="rule-length" class="invalid">At least 12 characters</li>
+                        </ul>
+
+                        <div class="password-strength">
+                            <span class="strength-text">Password strength: <span id="strength-label" style="color: #ef4444;">Weak</span></span>
+                            <div class="strength-bar-bg">
+                                <div id="strength-bar-fill" class="strength-bar-fill" style="width: 0%; background: #ef4444;"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="field-group">
+                        <label class="field-label" for="confirm_password">Confirm Password</label>
+                        
+                        <div class="password-wrapper" style="position: relative;">
+                            <input class="field-input" type="password" id="confirm_password" name="confirm_password" placeholder="••••••••" required maxlength="128">
+                            <button type="button" class="toggle-password" id="toggleConfirmPassword">Show</button>
+                        </div>
+
+                        <ul class="password-checklist">
+                            <li id="rule-match" class="invalid">Passwords must match</li>
+                        </ul>
+                    </div>
+
+                </div> <div class="checkbox-group">
+                        <input type="checkbox" id="terms" name="terms" required>
+                        <label for="terms">I agree to the <a href="/terms" target="_blank" class="text-link">Terms of Use</a> and <a href="/privacy" target="_blank" class="text-link">Privacy Policy</a> of the LHU Health System</label>
+                </div>
+
+                <button type="submit" class="btn-signin" style="margin-top: 1rem;">Sign Up</button>
+            </form>
+
+            <p class="create-account-row" style="margin-top: 1.5rem;">
+                Already have an account?
+                <a href="{{ url_for('auth.login') }}">Sign In</a>
+            </p>
+
+        </div>
+        <div class="right-footer" style="margin-top: auto; padding-top: 2rem; padding-bottom: 2rem;">
+            © 2026 FBS Diabetes Risk Prediction System · LHU Sta Rosa
+        </div>
+    </div> <div id="legalModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h2 id="modal-title"></h2>
+            <div id="modal-body"></div>
+        </div>
+    </div>
+    
+    <script src="{{ url_for('static', filename='js/signup.js') }}"></script>
+</body>
+</html>
+

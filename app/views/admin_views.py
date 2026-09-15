@@ -1,11 +1,16 @@
-from flask import Blueprint, render_template, request, redirect, url_for, abort
+from flask import Blueprint, render_template, request, redirect, url_for, abort, flash
 from datetime import datetime
+import re
+
+from werkzeug.security import generate_password_hash
+
+from app.views.auth_views import login_required
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
-STAFF_ROLES = ["Admin", "Health Officer", "LHU Nurse", "Encoder"]
-STATIONS = ["Sta. Rosa", "Cabuyao", "Calamba", "Biñan", "San Pedro"]
-STAFF_STATUSES = ["Active", "Inactive", "On Leave"]
+STAFF_ROLES = ["Health Officer", "LHU Nurse"]
+STATIONS = ["RHU I", "RHU II"]
+STAFF_STATUSES = ["Approved", "Rejected", "Pending"]
 
 # ── TEMPORARY STUB ────────────────────────────────────────────────────────
 # In-memory only — resets whenever the app restarts. There is no Staff/User
@@ -43,6 +48,7 @@ EMPLOYEES = [
 
 
 @admin_bp.route("/dashboard")
+@login_required
 def dashboard():
     metrics = {
         "total_screened": 1392,
@@ -104,6 +110,7 @@ def dashboard():
 
 
 @admin_bp.route("/reliability")
+@login_required
 def reliability():
     benchmarks = [
         {"name": "Random Forest", "accuracy": 0.883, "precision": 0.871,
@@ -186,66 +193,82 @@ def reliability():
     )
 
 @admin_bp.route("/data-management")
+@login_required
 def data_management():
-    return render_template("dashboard/records.html", employees=EMPLOYEES)
+    from app.models import user as user_model
+    employees = user_model.get_staff_records()
+    return render_template("dashboard/records.html", employees=employees)
 
 
-# ── TEMPORARY STUB ────────────────────────────────────────────────────────
-# Appends to the in-memory EMPLOYEES list above — does NOT persist to a
-# database (there isn't one yet) and resets on app restart. The ID scheme
-# below (EMP-2025-{count+1}) is only safe because nothing ever removes an
-# employee; a real implementation should let the DB assign the ID instead.
 @admin_bp.route("/data-management/add", methods=["GET", "POST"])
+@login_required
 def add_staff():
+    from app.models import user as user_model
+
     if request.method == "POST":
         name = request.form.get("name", "").strip()
         email = request.form.get("email", "").strip()
         role = request.form.get("role", "").strip()
         station = request.form.get("station", "").strip()
         contact = request.form.get("contact", "").strip()
-        status = request.form.get("status", "").strip()
+        password = request.form.get("password", "")
 
         errors = []
-        if not name:
-            errors.append("Full name is required.")
-        if not email:
-            errors.append("Email is required.")
+        name_parts = name.split()
+        if len(name_parts) < 2:
+            errors.append("Enter the employee's first and last name.")
+        if not email or not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
+            errors.append("Enter a valid email address.")
+        elif user_model.email_exists(email):
+            errors.append("An account with this email already exists.")
         if role not in STAFF_ROLES:
             errors.append("Please select a valid role.")
         if station not in STATIONS:
             errors.append("Please select a valid station.")
-        if status not in STAFF_STATUSES:
-            errors.append("Please select a valid status.")
+        normalized_contact = contact.lstrip("+").lstrip("0")
+        if not re.match(r"^9\d{9}$", normalized_contact):
+            errors.append("Enter a valid 10-digit mobile number starting with 9.")
+        if len(password) < 12:
+            errors.append("Password must be at least 12 characters.")
 
         if errors:
             return render_template(
                 "admin/add_staff.html",
-                roles=STAFF_ROLES, stations=STATIONS, statuses=STAFF_STATUSES,
+                roles=STAFF_ROLES, stations=STATIONS,
                 errors=errors,
                 form_data={"name": name, "email": email, "role": role,
-                           "station": station, "contact": contact, "status": status},
+                           "station": station, "contact": contact},
             )
 
-        now = datetime.now()
-        new_employee = {
-            "id": f"EMP-2025-{len(EMPLOYEES) + 1:03d}",
-            "name": name,
-            "email": email,
-            "role": role,
-            "station": station,
-            "contact": contact,
-            "status": status,
-            "date_added": f"{now.strftime('%b')} {now.day}, {now.year}",
+        role_map = {
+            "Health Officer": "medical_officer",
+            "LHU Nurse": "health_worker",
         }
-        EMPLOYEES.append(new_employee)
-        return redirect(url_for("admin.staff_detail", employee_id=new_employee["id"]))
+        facility_map = {"RHU I": "rhui", "RHU II": "rhuii"}
+        user_id = user_model.create_user(
+            {
+                "first_name": name_parts[0],
+                "middle_name": " ".join(name_parts[1:-1]) or None,
+                "last_name": name_parts[-1],
+                "birthday": "1990-01-01",
+                "sex": "male",
+                "email": email,
+                "phone": normalized_contact,
+                "role": role_map[role],
+                "facility": facility_map[station],
+                "barangay": "aplaya",
+            },
+            generate_password_hash(password),
+            status="approved",
+        )
+        flash("Employee account created successfully.", "success")
+        return redirect(url_for("admin.staff_detail", employee_id=f"EMP-{user_id:05d}"))
 
     return render_template(
         "admin/add_staff.html",
-        roles=STAFF_ROLES, stations=STATIONS, statuses=STAFF_STATUSES,
+        roles=STAFF_ROLES, stations=STATIONS,
         errors=[], form_data={},
     )
-# ── END TEMPORARY STUB ───────────────────────────────────────────────────
 
 
 # ── TEMPORARY STUB ────────────────────────────────────────────────────────
@@ -256,29 +279,89 @@ def add_staff():
 # Staff/User model lands, replace the lookup/update below with actual
 # queries and delete this comment.
 @admin_bp.route("/data-management/<employee_id>")
+@login_required
 def staff_detail(employee_id):
-    employee = next((e for e in EMPLOYEES if e["id"] == employee_id), None)
+    from app.models import user as user_model
+
+    employee = user_model.get_employee_by_id(employee_id)
     if employee is None:
         abort(404)
     return render_template("admin/staff_detail.html", employee=employee, roles=STAFF_ROLES)
 
 
 @admin_bp.route("/data-management/<employee_id>/update-role", methods=["POST"])
+@login_required
 def staff_update_role(employee_id):
-    employee = next((e for e in EMPLOYEES if e["id"] == employee_id), None)
+    from app.models import user as user_model
+
+    employee = user_model.get_employee_by_id(employee_id)
     if employee is None:
         abort(404)
 
     new_role = request.form.get("role", "").strip()
-    if new_role in STAFF_ROLES:
-        employee["role"] = new_role
+    if user_model.update_user_role(employee_id, new_role):
+        flash("Employee role updated successfully.", "success")
+    else:
+        flash("Please select a valid role.", "error")
 
     return redirect(url_for("admin.staff_detail", employee_id=employee_id))
+
+
+@admin_bp.route("/data-management/<employee_id>/approve", methods=["POST"])
+@login_required
+def approve_staff(employee_id):
+    from app.models import user as user_model
+
+    employee = user_model.get_employee_by_id(employee_id)
+    if employee is None:
+        abort(404)
+
+    user = user_model.get_user_by_employee_id(employee_id)
+    if user is None:
+        abort(404)
+
+    user_model.set_status(user["id"], "approved")
+    flash("Account approved successfully. The user can now sign in.", "success")
+    return redirect(url_for("admin.staff_detail", employee_id=employee_id))
+
+
+@admin_bp.route("/data-management/<employee_id>/reject", methods=["POST"])
+@login_required
+def reject_staff(employee_id):
+    from app.models import user as user_model
+
+    employee = user_model.get_employee_by_id(employee_id)
+    if employee is None:
+        abort(404)
+
+    user = user_model.get_user_by_employee_id(employee_id)
+    if user is None:
+        abort(404)
+
+    user_model.set_status(user["id"], "rejected")
+    flash("Account rejected. The user cannot sign in.", "success")
+    return redirect(url_for("admin.staff_detail", employee_id=employee_id))
+
+
+@admin_bp.route("/data-management/<employee_id>/delete", methods=["POST"])
+@login_required
+def delete_staff(employee_id):
+    from app.models import user as user_model
+
+    if not user_model.delete_user_by_employee_id(employee_id):
+        abort(404)
+
+    flash("Employee account deleted successfully.", "success")
+    return redirect(url_for("admin.data_management"))
 # ── END TEMPORARY STUB ───────────────────────────────────────────────────
 
 
 @admin_bp.route("/privacy-security")
+@login_required
 def privacy_security():
+    from app.models import settings as settings_model
+
+    session_timeout_minutes = settings_model.get_session_timeout_minutes()
     roles = [
         {"name": "Patient",        "screen": True,  "view_records": "Own records", "export": "No",      "admin": "No"},
         {"name": "LHU Nurse",      "screen": True,  "view_records": "Yes",         "export": "Limited", "admin": "No"},
@@ -304,10 +387,27 @@ def privacy_security():
         roles=roles,
         lhu_agreements=lhu_agreements,
         retention_policy=retention_policy,
+        session_timeout_minutes=session_timeout_minutes,
     )
 
 
+@admin_bp.route("/privacy-security/session-timeout", methods=["POST"])
+@login_required
+def update_session_timeout():
+    from app.models import settings as settings_model
+
+    minutes = request.form.get("session_timeout_minutes", type=int)
+    if minutes not in settings_model.ALLOWED_SESSION_TIMEOUTS:
+        flash("Please choose a valid session timeout value.", "error")
+        return redirect(url_for("admin.privacy_security"))
+
+    settings_model.set_session_timeout_minutes(minutes)
+    flash(f"Session timeout updated to {minutes} minute(s).", "success")
+    return redirect(url_for("admin.privacy_security"))
+
+
 @admin_bp.route("/green-computing")
+@login_required
 def green_computing():
     gc = {
         "energy_kwh":    1.24,
@@ -373,6 +473,7 @@ def green_computing():
 
 
 @admin_bp.route("/audit-trails")
+@login_required
 def audit_trails():
     logs = [
         {"time": "09:47 AM", "date": "May 27", "user": "lhu.admin",     "role": "Admin",
