@@ -1,6 +1,4 @@
-# FBS Thesis
 
-Flask and SQLite application for the LHU diabetes risk screening system.
 
 ## Recent Work
 
