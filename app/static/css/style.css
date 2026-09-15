@@ -341,6 +341,18 @@
             padding: 0.65rem 0.875rem;
             font-size: 0.8rem;
             color: #991b1b;
+            margin-bottom: 0.5rem;
+        }
+
+        .flash-success {
+            background: var(--green-light);
+            border: 1px solid var(--green-accent);
+            border-left: 3px solid var(--green-accent);
+            border-radius: 8px;
+            padding: 0.65rem 0.875rem;
+            font-size: 0.8rem;
+            color: var(--green-darkest);
+            margin-bottom: 0.5rem;
         }
 
         .right-footer {

@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home — FBS-Based Diabetes Prediction System</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="left-panel">
+        <div class="circle circle-1"></div>
+        <div class="circle circle-2"></div>
+        <div class="circle circle-3"></div>
+
+        <div class="left-top">
+            <div class="brand-icon"></div>
+            <h1 class="brand-title">FBS-Based Diabetes<br>Prediction System</h1>
+            <p class="brand-subtitle">LHU Decision Support System</p>
+        </div>
+
+        <div class="left-bottom">
+            For authorized LHU personnel only
+        </div>
+    </div>
+
+    <div class="right-panel">
+        <div class="right-top"></div>
+
+        <div class="form-container">
+            <div class="form-header">
+                <h2 class="form-title">You're signed in</h2>
+                <div class="form-divider"></div>
+            </div>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+              {% if messages %}
+                <div class="flash-messages">
+                  {% for category, message in messages %}
+                    <div class="flash-{{ category }}">{{ message }}</div>
+                  {% endfor %}
+                </div>
+              {% endif %}
+            {% endwith %}
+
+            <p style="margin-bottom: 0.5rem;">Welcome, <strong>{{ name }}</strong>.</p>
+            <p style="color: var(--text-muted); margin-bottom: 1.5rem;">Role: {{ role }}</p>
+
+            <p style="color: var(--text-muted); font-size: 0.875rem; margin-bottom: 1.5rem;">
+                This is a placeholder landing page for the auth feature branch.
+                The dashboard, patient intake, and model views are built out separately.
+            </p>
+
+            <a class="btn-signin" style="display:inline-block; text-align:center; text-decoration:none;"
+               href="{{ url_for('auth.logout') }}">Sign out</a>
+        </div>
+
+        <div class="right-footer">
+            © 2026 FBS Diabetes Risk Prediction System · LHU Sta Rosa
+        </div>
+    </div>
+</body>
+</html>
