@@ -6,9 +6,11 @@
         <h1 class="page-title">Data Management</h1>
         <p class="page-subtitle">Import, export, and review patient screening records</p>
     </div>
+    <a href="{{ url_for('nurse.nurse_recycle_bin') }}" class="btn btn-secondary">
+        Recycle Bin
+    </a>
 </header>
 
-<!-- Hub Toggle -->
 <div class="hub-toggle-bar">
     <button type="button" id="toggleDataHubBtn" class="hub-toggle-btn collapsed">
         <span id="hubToggleLabel">Show Import / Export Tools</span>
@@ -25,17 +27,18 @@
                 <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:1rem;">
                     Ingest historical patient profiles from paper records converted into comma-separated text files (.csv).
                 </p>
-                <button id="downloadTemplateBtn" type="button" class="btn btn-secondary" style="width:100%; margin-bottom:1.25rem;">
+                <a href="{{ url_for('nurse.nurse_data_management_import_template') }}" class="btn btn-secondary" style="width:100%; margin-bottom:1.25rem; text-decoration:none; display:block; text-align:center;">
                     Download Blank CSV Template
-                </button>
-                <form method="POST" action="#" enctype="multipart/form-data" style="margin-bottom:1.25rem;">
+                </a>
+                <form id="csvImportForm" enctype="multipart/form-data" style="margin-bottom:1.25rem;">
                     <div class="field-group">
                         <label class="field-label">Select Source File (.csv)</label>
-                        <input type="file" class="field-input" name="csv_import" accept=".csv" required style="height:auto; padding:0.5rem 1rem;">
+                        <input type="file" class="field-input" name="csv_import" id="csvImportFile" accept=".csv" required style="height:auto; padding:0.5rem 1rem;">
                     </div>
                     <button type="submit" class="btn btn-primary" style="width:100%; margin-top:0.75rem; height:42px;">
                         Process and Validate File
                     </button>
+                    <div id="csvImportResult" style="margin-top:0.75rem; font-size:0.8rem;"></div>
                 </form>
                 <div class="accordion-item">
                     <button type="button" id="toggleSchemaBtn" class="accordion-toggle">
@@ -43,21 +46,39 @@
                         <span class="accordion-icon">▼</span>
                     </button>
                     <div id="schemaAccordionContent" class="accordion-content">
-                        <div class="schema-guide-box">
+                       <div class="schema-guide-box">
                             <div class="schema-guide-title">Required Column Headers:</div>
                             <ul class="schema-list">
-                                <li class="schema-item">patient_id <span>(Text)</span></li>
-                                <li class="schema-item">name <span>(Text)</span></li>
-                                <li class="schema-item">age <span>(Number)</span></li>
-                                <li class="schema-item">sex <span>(M/F)</span></li>
-                                <li class="schema-item">fbs <span>(mg/dL)</span></li>
-                                <li class="schema-item">diabetes_status <span>(Risk Class)</span></li>
-                                <li class="schema-item">bmi <span>(Value)</span></li>
-                                <li class="schema-item">blood_pressure <span>(mmHg)</span></li>
-                                <li class="schema-item">hypertension <span>(Yes/No)</span></li>
-                                <li class="schema-item">waist_circumference <span>(cm)</span></li>
-                                <li class="schema-item">smoking_status <span>(Category)</span></li>
-                                <li class="schema-item">family_history <span>(Yes/No)</span></li>
+                                <li class="schema-item">last_name <span>(required)</span></li>
+                                <li class="schema-item">first_name <span>(required)</span></li>
+                                <li class="schema-item">middle_name</li>
+                                <li class="schema-item">birthdate <span>(YYYY-MM-DD, required)</span></li>
+                                <li class="schema-item">sex <span>(Male/Female, required)</span></li>
+                                <li class="schema-item">civil_status</li>
+                                <li class="schema-item">religion</li>
+                                <li class="schema-item">occupation</li>
+                                <li class="schema-item">education</li>
+                                <li class="schema-item">barangay</li>
+                                <li class="schema-item">address</li>
+                                <li class="schema-item">contact_number</li>
+                                <li class="schema-item">phic_membership</li>
+                                <li class="schema-item">phic_type</li>
+                                <li class="schema-item">assessment_date <span>(YYYY-MM-DD)</span></li>
+                                <li class="schema-item">smoking_status</li>
+                                <li class="schema-item">alcohol_intake</li>
+                                <li class="schema-item">illicit_drug_use</li>
+                                <li class="schema-item">physical_activity</li>
+                                <li class="schema-item">diabetes_diagnosis</li>
+                                <li class="schema-item">past_surgical_history</li>
+                                <li class="schema-item">bp_systolic / bp_diastolic</li>
+                                <li class="schema-item">heart_rate / respiratory_rate</li>
+                                <li class="schema-item">height_cm / weight_kg / waist_cm</li>
+                                <li class="schema-item">pmh <span>(; separated)</span></li>
+                                <li class="schema-item">family_history <span>(; separated)</span></li>
+                                <li class="schema-item">diet <span>(; separated)</span></li>
+                                <li class="schema-item">immunization <span>(; separated)</span></li>
+                                <li class="schema-item">dm_symptom <span>(; separated)</span></li>
+                                <li class="schema-item">fbs_mg_dl</li>
                             </ul>
                         </div>
                     </div>
@@ -65,22 +86,33 @@
             </div>
         </div>
 
-        <div class="form-card" style="margin-bottom:0;">
-            <div class="card-header">Export Data Archives</div>
+       <div class="form-card" style="margin-bottom:0;">
+        <div class="card-header">Export Data Archives</div>
             <div class="card-body">
                 <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:1rem;">
                     Compile staging data records accumulated on this terminal into an encrypted, standardized file for transfer to the central health office.
                 </p>
                 <p style="font-size:0.8rem; color:var(--text-muted); line-height:1.5; margin-bottom:1.5rem;">
-                    Patient names and row identifiers are hashed before export to protect personal records.
+                    Patient names are excluded from export. Patient ID (e.g. CAB-2026-0003) is retained for internal cross-reference.
                 </p>
-                <form method="POST" action="#">
+                <form method="POST" action="{{ url_for('nurse.nurse_data_management_export') }}">
+                    <input type="hidden" name="barangay" value="{{ request.args.get('barangay', '') }}">
+                    <input type="hidden" name="risk" value="{{ request.args.get('risk', '') }}">
+                    <input type="hidden" name="date" value="{{ request.args.get('date', '') }}">
                     <div class="field-group">
                         <label class="field-label">Export Format</label>
                         <select class="field-input" name="export_format">
-                            <option value="standard_csv">Standardized Feature Matrix (.csv)</option>
+                            <option value="standard_csv">Comma-Separated Values (.csv)</option>
                         </select>
                     </div>
+
+                    <div class="field-group" style="margin-top:0.75rem;">
+                        <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.8rem; cursor:pointer;">
+                            <input type="checkbox" name="all_visits" value="true">
+                            Include full screening history (all visits, not just latest)
+                        </label>
+                    </div>
+
                     <button type="submit" class="btn btn-secondary" style="width:100%; height:42px; margin-top:1rem; background:var(--green-light); color:var(--green-sidebar); border-color:var(--green-accent);">
                         Compile and Download Data Ledger
                     </button>
@@ -91,7 +123,7 @@
     </div>
 </div>
 
-<!-- Records Table -->
+<!-- records table -->
 <div class="form-card" style="margin-top:1.5rem;">
     <div class="card-header">Patient Records — Filter and Manage</div>
     <div class="card-body">
@@ -145,30 +177,38 @@
                         <th>Action</th>
                     </tr>
                 </thead>
-                <tbody>
+                    <tbody>
                     {% for p in patients %}
                     <tr>
-                        <td style="font-size:0.8rem;">{{ p.id }}</td>
-                        <td style="font-weight:600;">{{ p.name }}</td>
+                        <td>{{ p.patient_code }}</td>
+                        <td>{{ p.last_name }}, {{ p.first_name }}</td>
                         <td>{{ p.age }}</td>
                         <td>{{ p.sex }}</td>
-                        <td style="font-weight:700;">{{ p.fbs }}</td>
+                        <td>{{ (p.fbs ~ " mg/dL") if p.fbs else "—" }}</td>
                         <td>
                             {% if p.risk == "High" %}
                                 <span class="risk-badge badge-danger">High</span>
                             {% elif p.risk == "Moderate" %}
                                 <span class="risk-badge badge-warning">Moderate</span>
-                            {% else %}
+                            {% elif p.risk == "Low" %}
                                 <span class="risk-badge badge-success">Low</span>
+                            {% else %}
+                                <span style="color:var(--text-muted);">Pending</span>
                             {% endif %}
                         </td>
-                        <td style="font-size:0.85rem;">{{ p.date }}</td>
-                        <td>
-                            <a href="#" class="btn btn-secondary" style="padding:0.35rem 0.75rem; font-size:0.75rem;">View</a>
-                        </td>
+                        <td>{{ p.date or "—" }}</td>
+                           <td>
+                                <a href="{{ url_for('nurse.nurse_patient_file_view', patient_id=p.patient_code) }}" class="btn btn-secondary" style="padding:0.35rem 0.75rem; font-size:0.75rem;">View</a>
+                                <a href="{{ url_for('nurse.nurse_new_record', patient_id=p.patient_code) }}" class="btn btn-secondary" style="padding:0.35rem 0.75rem; font-size:0.75rem;">+ Add Record</a>
+                                <form method="POST" action="{{ url_for('nurse.nurse_patient_delete', patient_id=p.patient_code) }}" style="display:inline;" onsubmit="return confirm('Move {{ p.first_name }} {{ p.last_name }} to Recycle Bin? This record will be permanently deleted after 15 days unless restored.');">
+                                    <button type="submit" class="btn btn-secondary" style="padding:0.35rem 0.75rem; font-size:0.75rem; color:#b91c1c; border-color:#fca5a5;">Delete</button>
+                                </form>
+                            </td>
                     </tr>
                     {% else %}
-                    <tr><td colspan="8" style="text-align:center; padding:2rem;">No records found.</td></tr>
+                    <tr>
+                        <td colspan="8" style="padding:1rem; color:var(--text-muted);">No patient records yet.</td>
+                    </tr>
                     {% endfor %}
                 </tbody>
             </table>
@@ -178,5 +218,9 @@
 {% endblock %}
 
 {% block scripts %}
+<script>
+    window.__csvImportUrl = "{{ url_for('nurse.nurse_data_management_import') }}";
+</script>
 <script src="{{ url_for('static', filename='js/nurse_dashboard.js') }}"></script>
+<script src="{{ url_for('static', filename='js/nurse_data_management.js') }}"></script>
 {% endblock %}

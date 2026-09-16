@@ -1,22 +1,16 @@
-﻿from flask import Flask
-from flask_sqlalchemy import SQLAlchemy
-
-db = SQLAlchemy()
+from flask import Flask, url_for
+from werkzeug.routing.exceptions import BuildError
 
 def create_app(config=None):
     app = Flask(__name__)
     app.config["SECRET_KEY"] = "change-me-in-production"
-    app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///fbs_thesis.db"
-    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
     if config:
         app.config.update(config)
 
-    db.init_app(app)
-
     from app.views.auth_views import auth_bp
     from app.views.admin_views import admin_bp
-    from app.views.nurse_views import nurse_bp
+    from app.controllers.nurse_controller import nurse_bp
     from app.views.patient_views import patient_bp
 
     app.register_blueprint(auth_bp)
@@ -31,7 +25,15 @@ def create_app(config=None):
         except (ValueError, TypeError):
             return value
 
-    with app.app_context():
-        db.create_all()
+    def safe_url_for(endpoint, fallback="#", **values):
+        try:
+            return url_for(endpoint, **values)
+        except BuildError:
+            return fallback
+
+    app.jinja_env.globals["safe_url_for"] = safe_url_for
+
+    from app.models.db import run_migrations
+    run_migrations()
 
     return app

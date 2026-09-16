@@ -8,16 +8,45 @@
 
     <div class="patient-info-header">
         <div>
-            <h2>Patient: Juan Dela Cruz</h2>
-            <p>CAB-2025-0165 • Male, 48 yrs • Barangay Poblacion • BMI: 27.4 (Overweight)</p>
-            <p style="font-size: 0.75rem; color: rgba(255,255,255,0.5); margin-top: 0.25rem;">Intake completed: May 27, 2025</p>
+            <h2>Patient: {{ patient.first_name }} {{ patient.last_name }}</h2>
+            <p>
+                {{ patient.patient_code }} •
+                {{ patient.sex }}, {{ patient.age }} yrs •
+                Barangay {{ patient.barangay or "—" }} •
+                BMI: {{ latest_visit.bmi if latest_visit and latest_visit.bmi else "—" }}
+                {% if latest_visit and latest_visit.obesity_class %}({{ latest_visit.obesity_class }}){% endif %}
+            </p>
+            <p style="font-size: 0.75rem; color: rgba(255,255,255,0.5); margin-top: 0.25rem;">
+                {% if latest_visit %}
+                    Last visit: {{ latest_visit.assessment_date }}
+                {% else %}
+                    No visits recorded yet
+                {% endif %}
+            </p>
         </div>
         <button class="btn btn-secondary" style="background:rgba(255,255,255,0.1); color:white; border:none;">✎ Edit Patient Info</button>
     </div>
 
-    <div class="screening-layout">
-        <div class="left-col">
+    <div style="background: var(--green-light); border: 1px solid var(--green-accent); border-radius: var(--radius); padding: 0.75rem 1.25rem; margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+        <span style="font-size: 0.85rem; color: var(--green-dark); font-weight: 600;">
+            Currently viewing: {{ latest_visit.date if latest_visit else "No visit selected" }}
+            {% if records and records[0].visit_id == latest_visit.visit_id %}
+                <span style="font-weight:400; color:var(--text-muted);">(most recent)</span>
+            {% endif %}
             
+        </span>
+    </div>
+
+    {% if not is_latest %}
+        <div style="background: var(--warning-light); border: 1px solid var(--warning); border-radius: var(--radius); padding: 0.75rem 1.25rem; margin-bottom: 1rem; font-size: 0.85rem; color: #92400e; font-weight: 600;">
+            ⚠ Viewing a past screening ({{ latest_visit.date }}). This record is read-only — switch to the current visit to make edits.
+        </div>
+    {% endif %}
+
+    <form method="POST" action="{{ url_for('nurse.nurse_screening_submit', patient_id=patient.patient_code, visit_id=latest_visit.visit_id if latest_visit else None) }}">        
+        <div class="screening-layout">
+        <div class="left-col">
+
             <div class="form-card">
                 <div class="card-header">FBS Measurement</div>
                 <div class="card-body">
@@ -25,34 +54,40 @@
                         <span>Fasting Blood Sugar (FBS)</span>
                         <span style="color:var(--text-muted); font-weight:normal; font-size:0.75rem;">* Patient must fast for at least 8 hours</span>
                     </label>
-                    <input type="number" class="field-input fbs-display" placeholder="— mg/dL">
-                    
+                    <input type="number" name="fbs_mg_dl" id="fbsInput" class="field-input fbs-display"
+                        placeholder="— mg/dL"
+                        value="{{ existing_screening.fbs_mg_dl if existing_screening else '' }}"
+                        {% if not is_latest %}disabled{% else %}required{% endif %}>
                     <div class="grid-3" style="margin-top:1rem;">
-                        <div class="field-group"><label class="field-label">Testing Method</label><select class="field-input"><option>Capillary (Fingerprick)</option></select></div>
-                        <div class="field-group"><label class="field-label">Glucometer ID / Lot No.</label><input type="text" class="field-input" placeholder="e.g. GLC-2025-042"></div>
-                        <div class="field-group"><label class="field-label">Test Date & Time</label><input type="datetime-local" class="field-input"></div>
+                        <div class="field-group">
+                            <label class="field-label">Testing Method</label>
+                            <select name="test_method" id="testMethod" class="field-input">
+                                <option {% if not existing_screening or existing_screening.test_method == "Capillary (Fingerprick)" %}selected{% endif %}>Capillary (Fingerprick)</option>
+                            </select>
+                        </div>
+                        <div class="field-group">
+                            <label class="field-label">Glucometer ID / Lot No.</label>
+                            <input type="text" name="glucometer_id" id="glucometerId" class="field-input"
+                                   placeholder="e.g. GLC-2025-042"
+                                   value="{{ existing_screening.glucometer_id if existing_screening else '' }}">
+                        </div>
+                        <div class="field-group">
+                            <label class="field-label">Test Date & Time</label>
+                            <input type="datetime-local" name="test_datetime" id="testDateTime" class="field-input" required
+                                value="{{ existing_screening.test_datetime if existing_screening else '' }}">
+                        </div>
                     </div>
-                </div>
-            </div>
-
-            <div class="form-card">
-                <div class="card-header">Risk Factor Summary</div>
-                <div class="card-body grid-4">
-                    <div class="risk-badge badge-warning">BMI 27.4<br><span style="font-weight:400">Overweight</span></div>
-                    <div class="risk-badge badge-warning">Waist 92cm<br><span style="font-weight:400">At threshold</span></div>
-                    <div class="risk-badge" style="background:var(--danger-light); color:var(--danger);">Family Hx<br><span style="font-weight:400">Parent diabetic</span></div>
-                    <div class="risk-badge badge-warning">Sedentary<br><span style="font-weight:400">Low activity</span></div>
-                    <div class="risk-badge badge-warning">High Fat Diet<br><span style="font-weight:400">Often</span></div>
-                    <div class="risk-badge badge-success">Non-smoker<br><span style="font-weight:400">No risk</span></div>
-                    <div class="risk-badge badge-success">No Alcohol<br><span style="font-weight:400">No risk</span></div>
-                    <div class="risk-badge badge-warning">Low Fiber<br><span style="font-weight:400">Sometimes</span></div>
+                    <div style="margin-top: 1.25rem; display:flex; justify-content:flex-end;">
+                        <button type="button" id="calculateRiskBtn" class="btn btn-primary" {% if not is_latest %}disabled style="opacity:0.5; cursor:not-allowed;"{% endif %}>Calculate Risk →</button>
+                    </div>
                 </div>
             </div>
 
             <div class="form-card">
                 <div class="card-header">Clinical Notes & Observations</div>
                 <div class="card-body">
-                    <textarea class="field-input" rows="4" style="resize:vertical;" placeholder="Enter clinical notes, patient complaints, physical observations, or referral notes..."></textarea>
+                    <textarea class="field-input" name="clinical_notes" rows="4" style="resize:vertical;"
+                              placeholder="Enter clinical notes, patient complaints, physical observations, or referral notes...">{{ latest_visit.clinical_notes if latest_visit else '' }}</textarea>
                 </div>
             </div>
 
@@ -61,16 +96,23 @@
                 <div class="card-body">
                     <div class="field-group">
                         <label class="field-label">Referral Action</label>
-                        <select class="field-input"><option>Select referral action</option></select>
+                        <select name="referral_action" class="field-input">
+                            <option value="">Select referral action</option>
+                            <option value="Refer for OGTT" {% if existing_screening and existing_screening.referral_action == "Refer for OGTT" %}selected{% endif %}>Refer for OGTT</option>
+                            <option value="Refer to physician" {% if existing_screening and existing_screening.referral_action == "Refer to physician" %}selected{% endif %}>Refer to physician</option>
+                            <option value="Lifestyle counseling only" {% if existing_screening and existing_screening.referral_action == "Lifestyle counseling only" %}selected{% endif %}>Lifestyle counseling only</option>
+                        </select>
                     </div>
                     <div class="grid-2">
                         <div class="field-group">
                             <label class="field-label">Follow-up Date</label>
-                            <input type="date" class="field-input">
+                            <input type="date" name="follow_up_date" class="field-input"
+                                   value="{{ existing_screening.follow_up_date if existing_screening else '' }}">
                         </div>
                         <div class="field-group">
                             <label class="field-label">Referred To</label>
-                            <select class="field-input"><option>Select facility / doctor</option></select>
+                            <input type="text" name="referred_to" class="field-input" placeholder="Facility / doctor"
+                                   value="{{ existing_screening.referred_to if existing_screening else '' }}">
                         </div>
                     </div>
                 </div>
@@ -80,12 +122,18 @@
                 <div class="card-header">Pre-Screening Checklist</div>
                 <div class="card-body">
                     <div class="grid-2" style="gap: 1rem; font-size: 0.85rem; color: var(--text-secondary);">
-                        <label style="display:flex; align-items:center; gap:0.5rem;"><input type="checkbox" checked> Patient fasted for ≥ 8 hours</label>
-                        <label style="display:flex; align-items:center; gap:0.5rem;"><input type="checkbox"> Patient identity verified against ID</label>
-                        <label style="display:flex; align-items:center; gap:0.5rem;"><input type="checkbox" checked> Glucometer calibrated and lot number recorded</label>
-                        <label style="display:flex; align-items:center; gap:0.5rem;"><input type="checkbox"> Blood sample taken from fingertip (capillary)</label>
-                        <label style="display:flex; align-items:center; gap:0.5rem;"><input type="checkbox" checked> Consent form signed by patient</label>
-                        <label style="display:flex; align-items:center; gap:0.5rem;"><input type="checkbox"> Result recorded within 5 minutes of test</label>
+                        <label style="display:flex; align-items:center; gap:0.5rem;">
+                            <input type="checkbox" name="fasted_ge_8h" {% if not existing_screening or existing_screening.fasted_ge_8h %}checked{% endif %}> Patient fasted for ≥ 8 hours</label>
+                        <label style="display:flex; align-items:center; gap:0.5rem;">
+                            <input type="checkbox" name="identity_verified" {% if existing_screening and existing_screening.identity_verified %}checked{% endif %}> Patient identity verified against ID</label>
+                        <label style="display:flex; align-items:center; gap:0.5rem;">
+                            <input type="checkbox" name="glucometer_calibrated" {% if not existing_screening or existing_screening.glucometer_calibrated %}checked{% endif %}> Glucometer calibrated and lot number recorded</label>
+                        <label style="display:flex; align-items:center; gap:0.5rem;">
+                            <input type="checkbox" name="capillary_sample_taken" {% if existing_screening and existing_screening.capillary_sample_taken %}checked{% endif %}> Blood sample taken from fingertip (capillary)</label>
+                        <label style="display:flex; align-items:center; gap:0.5rem;">
+                            <input type="checkbox" name="consent_signed" {% if not existing_screening or existing_screening.consent_signed %}checked{% endif %}> Consent form signed by patient</label>
+                        <label style="display:flex; align-items:center; gap:0.5rem;">
+                            <input type="checkbox" name="result_recorded_within_5min" {% if existing_screening and existing_screening.result_recorded_within_5min %}checked{% endif %}> Result recorded within 5 minutes of test</label>
                     </div>
                 </div>
             </div>
@@ -93,50 +141,55 @@
         </div>
 
         <div class="right-col">
-            
-            <div class="form-card">
-                <div class="card-header">Risk Prediction Result</div>
-                <div class="card-body">
-                    <div class="result-circle-wrapper">
-                        <div class="result-circle">
-                            <span style="font-size:0.8rem; color:var(--text-secondary);">MODERATE</span>
-                            RISK
-                        </div>
-                    </div>
 
-                    <div style="margin-bottom: 1.5rem;">
-                        <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:0.25rem;">
-                            <span style="color:var(--text-muted);">Prediction Score</span>
-                            <span style="font-weight:700; color:var(--warning);">67 / 100</span>
-                        </div>
-                        <div style="width:100%; height:8px; background:var(--bg-light); border-radius:4px; overflow:hidden;">
-                            <div style="width:67%; height:100%; background:var(--warning);"></div>
-                        </div>
-                    </div>
+            <!-- Shown immediately when the visit already has a screening; otherwise revealed by "Calculate Risk" -->
+            <div id="riskResultSection" style="{{ '' if existing_screening else 'display:none;' }}">
 
-                    <div style="margin-bottom: 1.5rem; border-top: 1px solid var(--border); padding-top: 1rem;">
-                        <div style="display:flex; justify-content:space-between; font-size:0.8rem;">
-                            <span style="color:var(--text-muted);">Model Confidence</span>
-                            <span style="font-weight:700; color:var(--green-accent);">89.3%</span>
+                <div class="form-card">
+                    <div class="card-header">Risk Prediction Result</div>
+                    <div class="card-body">
+                        <div class="result-circle-wrapper">
+                            <div class="result-circle" id="resultCircle">
+                                <span id="resultCircleLabel" style="font-size:0.8rem; color:var(--text-secondary);">
+                                    {{ existing_screening.preliminary_risk_level if existing_screening else "—" }}
+                                </span>
+                                <span id="resultCircleText">RISK</span>
+                            </div>
                         </div>
-                        <p style="font-size:0.75rem; color:var(--text-muted); margin-top:0.25rem;">Based on: FBS 124 mg/dL + 5 risk factors</p>
-                    </div>
 
-                    <p style="font-size:0.85rem; font-weight:600;">Recommendation:</p>
-                    <p style="font-size:0.8rem; background:var(--warning-light); padding:1rem; border-radius:6px; color:#b45309; border-left: 4px solid var(--warning);">Refer for confirmatory OGTT test. Schedule follow-up within 2 weeks. Advise lifestyle changes.</p>
-                </div>
-            </div>
+                        <div style="margin-bottom: 1.5rem;">
+                            <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:0.25rem;">
+                                <span style="color:var(--text-muted);">Prediction Score</span>
+                                <span id="predictionScoreText" style="font-weight:700; color:var(--warning);">
+                                    {{ existing_screening.preliminary_score if existing_screening else "—" }} / 100
+                                </span>
+                            </div>
+                            <div style="width:100%; height:8px; background:var(--bg-light); border-radius:4px; overflow:hidden;">
+                                <div id="predictionScoreBar" style="width:{{ existing_screening.preliminary_score if existing_screening else 0 }}%; height:100%; background:var(--warning);"></div>
+                            </div>
+                        </div>
 
-            <div class="form-card">
-                <div class="card-header">Final Risk Classification</div>
-                <div class="card-body">
-                    <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.75rem;">Override result (Health Officer decision):</p>
-                    <div class="grid-3" style="gap:0.5rem;">
-                        <button type="button" class="btn btn-secondary" style="padding:0.5rem; font-weight:normal; font-size:0.8rem;">Low</button>
-                        <button type="button" class="btn btn-secondary" style="padding:0.5rem; font-weight:bold; font-size:0.8rem; border-color:var(--warning); color:var(--warning); background:var(--warning-light);">Moderate</button>
-                        <button type="button" class="btn btn-secondary" style="padding:0.5rem; font-weight:normal; font-size:0.8rem;">High</button>
+                        <p style="font-size:0.85rem; font-weight:600;">Recommendation:</p>
+                        <p id="recommendationText" style="font-size:0.8rem; background:var(--warning-light); padding:1rem; border-radius:6px; color:#b45309; border-left: 4px solid var(--warning);"></p>
+
+                        <p style="font-size: 0.7rem; color: var(--text-muted); margin-top: 1rem;">⚠ Preliminary threshold-based estimate. Not yet connected to the trained prediction model.</p>
                     </div>
                 </div>
+
+                <div class="form-card">
+                    <div class="card-header">Final Risk Classification</div>
+                    <div class="card-body">
+                        <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.75rem;">Override result (Health Officer decision):</p>
+                        <div class="grid-3" style="gap:0.5rem;">
+                            <button type="button" class="override-btn btn btn-secondary" data-level="Low" style="padding:0.5rem; font-weight:normal; font-size:0.8rem;">Low</button>
+                            <button type="button" class="override-btn btn btn-secondary" data-level="Moderate" style="padding:0.5rem; font-weight:normal; font-size:0.8rem;">Moderate</button>
+                            <button type="button" class="override-btn btn btn-secondary" data-level="High" style="padding:0.5rem; font-weight:normal; font-size:0.8rem;">High</button>
+                        </div>
+                        <input type="hidden" name="final_risk_level" id="finalRiskLevelInput"
+                               value="{{ existing_screening.final_risk_level if existing_screening else '' }}">
+                    </div>
+                </div>
+
             </div>
 
             <div class="form-card">
@@ -149,24 +202,35 @@
                             <th style="padding: 1rem; text-align: left; font-weight: 500;">Result</th>
                             <th></th>
                         </tr>
-                        <tr style="border-bottom: 1px solid var(--border);">
-                            <td style="padding: 1rem;">Jan 15, 2025</td>
-                            <td style="padding: 1rem;">118 mg/dL</td>
-                            <td style="padding: 1rem;"><span style="background:var(--warning-light); color:#b45309; padding:0.25rem 0.5rem; border-radius:4px; font-size:0.7rem;">Moderate</span></td>
-                            <td style="padding: 1rem; text-align: right;"><a href="#" style="color:var(--green-accent); text-decoration:none;">View →</a></td>
+                        {% for v in visits %}
+                        <tr style="border-bottom: 1px solid var(--border); {% if latest_visit and v.visit_id == latest_visit.visit_id %}background: var(--green-light);{% endif %}">
+                            <td style="padding: 1rem;">
+                                {{ v.date }}
+                                {% if latest_visit and v.visit_id == latest_visit.visit_id %}
+                                    <span style="font-size:0.7rem; color:var(--green-accent); font-weight:600; margin-left:0.4rem;">● Viewing</span>
+                                {% endif %}
+                            </td>
+                            <td style="padding: 1rem;">{{ (v.fbs ~ " mg/dL") if v.fbs else "—" }}</td>
+                            <td style="padding: 1rem;">
+                                {% if v.risk %}
+                                <span style="background:var(--warning-light); color:#b45309; padding:0.25rem 0.5rem; border-radius:4px; font-size:0.7rem;">{{ v.risk }}</span>
+                                {% else %}
+                                <span style="color:var(--text-muted);">Pending</span>
+                                {% endif %}
+                            </td>
+                            <td style="padding: 1rem; text-align: right;">
+                                {% if latest_visit and v.visit_id == latest_visit.visit_id %}
+                                    <span style="color:var(--text-muted); font-size:0.75rem;">Current</span>
+                                {% else %}
+                                    <a href="{{ url_for('nurse.nurse_screening', patient_id=patient.patient_code, visit_id=v.visit_id) }}" style="color:var(--green-accent); text-decoration:none;">View →</a>
+                                {% endif %}
+                            </td>
                         </tr>
-                        <tr style="border-bottom: 1px solid var(--border);">
-                            <td style="padding: 1rem;">Aug 20, 2024</td>
-                            <td style="padding: 1rem;">105 mg/dL</td>
-                            <td style="padding: 1rem;"><span style="background:#ffedd5; color:#c2410c; padding:0.25rem 0.5rem; border-radius:4px; font-size:0.7rem;">Pre-diab.</span></td>
-                            <td style="padding: 1rem; text-align: right;"><a href="#" style="color:var(--green-accent); text-decoration:none;">View →</a></td>
-                        </tr>
+                        {% else %}
                         <tr>
-                            <td style="padding: 1rem;">Feb 10, 2024</td>
-                            <td style="padding: 1rem;">92 mg/dL</td>
-                            <td style="padding: 1rem;"><span style="background:var(--green-light); color:var(--green-active); padding:0.25rem 0.5rem; border-radius:4px; font-size:0.7rem;">Low</span></td>
-                            <td style="padding: 1rem; text-align: right;"><a href="#" style="color:var(--green-accent); text-decoration:none;">View →</a></td>
+                            <td colspan="4" style="padding: 1rem; color: var(--text-muted);">No prior screenings on record.</td>
                         </tr>
+                        {% endfor %}
                     </table>
                 </div>
             </div>
@@ -175,13 +239,98 @@
     </div>
 
     <div class="action-bar" style="margin-top: 2rem;">
-        <a href="{{ url_for('nurse.nurse_intake') }}" class="btn btn-secondary" style="text-decoration:none; display:inline-block; text-align:center;">← Back</a>
-        
+        <a href="{{ url_for('nurse.nurse_patient_file_view', patient_id=patient.patient_code) }}" class="btn btn-secondary" style="text-decoration:none; display:inline-block; text-align:center;">← Back to Records</a>
+
         <div style="display:flex; gap:1rem;">
-            <button type="button" class="btn btn-secondary">Print Form</button>
-            <button type="button" class="btn btn-secondary">Export PDF</button>
+           <button type="button" class="btn btn-secondary" onclick="window.print()">Print / Export PDF</button>
         </div>
 
-        <button type="button" class="btn btn-primary">✓ Save & Submit Screening</button>
+        {% if is_latest %}
+            <button type="submit" class="btn btn-primary">✓ Save & Submit Screening</button>
+        {% else %}
+            <span style="color:var(--text-muted); font-size:0.85rem; padding:0.6rem 1rem;">Read-only — this is a past record</span>
+        {% endif %}
     </div>
+    </form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const fbsInput = document.getElementById('fbsInput');
+    const calculateBtn = document.getElementById('calculateRiskBtn');
+    const resultSection = document.getElementById('riskResultSection');
+
+    const resultCircle = document.getElementById('resultCircle');
+    const resultCircleLabel = document.getElementById('resultCircleLabel');
+    const scoreText = document.getElementById('predictionScoreText');
+    const scoreBar = document.getElementById('predictionScoreBar');
+    const recommendationText = document.getElementById('recommendationText');
+    const finalRiskLevelInput = document.getElementById('finalRiskLevelInput');
+
+
+    function classifyFbs(fbs) {
+        if (fbs < 100) {
+            return { level: 'LOW', score: 20, color: 'var(--green-accent, #16a34a)',
+                      recommendation: 'FBS within normal range. Continue routine annual screening and healthy lifestyle counseling.' };
+        }
+        if (fbs < 126) {
+            return { level: 'MODERATE', score: 60, color: 'var(--warning, #d97706)',
+                      recommendation: 'FBS in the prediabetic range. Refer for confirmatory OGTT test. Schedule follow-up within 2 weeks. Advise lifestyle changes.' };
+        }
+        return { level: 'HIGH', score: 90, color: 'var(--danger, #dc2626)',
+                  recommendation: 'FBS in the diabetic range. Refer to physician promptly for confirmatory testing and management.' };
+    }
+
+    calculateBtn.addEventListener('click', () => {
+        const fbsValue = parseFloat(fbsInput.value);
+
+        if (!fbsInput.value || isNaN(fbsValue) || fbsValue <= 0) {
+            alert('Please enter a valid FBS value (mg/dL) before calculating risk.');
+            fbsInput.focus();
+            return;
+        }
+
+        const result = classifyFbs(fbsValue);
+
+        resultCircleLabel.textContent = result.level;
+        resultCircle.style.borderColor = result.color;
+        scoreText.textContent = `${result.score} / 100`;
+        scoreText.style.color = result.color;
+        scoreBar.style.width = result.score + '%';
+        scoreBar.style.background = result.color;
+        recommendationText.textContent = result.recommendation;
+        recommendationText.style.borderLeftColor = result.color;
+
+        resultSection.style.display = '';
+        resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+
+    document.querySelectorAll('.override-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.override-btn').forEach(b => {
+                b.style.fontWeight = 'normal';
+                b.style.borderColor = '';
+                b.style.color = '';
+                b.style.background = '';
+            });
+            btn.style.fontWeight = 'bold';
+            finalRiskLevelInput.value = btn.dataset.level;
+            if (btn.dataset.level === 'Low') {
+                btn.style.borderColor = 'var(--green-accent, #16a34a)';
+                btn.style.color = 'var(--green-accent, #16a34a)';
+                btn.style.background = 'var(--green-light, #dcfce7)';
+            } else if (btn.dataset.level === 'Moderate') {
+                btn.style.borderColor = 'var(--warning, #d97706)';
+                btn.style.color = 'var(--warning, #d97706)';
+                btn.style.background = 'var(--warning-light, #fef3c7)';
+            } else {
+                btn.style.borderColor = 'var(--danger, #dc2626)';
+                btn.style.color = 'var(--danger, #dc2626)';
+                btn.style.background = 'var(--danger-light, #fee2e2)';
+            }
+        });
+    });
+});
+</script>
 {% endblock %}
