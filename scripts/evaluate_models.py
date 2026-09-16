@@ -1,6 +1,6 @@
 """
 evaluate_models.py — Trains/evaluates Random Forest, XGBoost, and LightGBM,
-computes real performance metrics, and saves them to ModelPerformanceLog,
+computes real performance metrics, and saves them to model_performance_logs,
 replacing the placeholder rows from scripts/seed_model_performance.py.
 
 STATUS: STUB. Sections marked "TODO" need your actual training pipeline
@@ -27,8 +27,8 @@ from sklearn.metrics import (
 # from imblearn.over_sampling import SMOTE
 # from sklearn.feature_selection import RFE
 
-from app import create_app, db
-from app.models.model_performance import ModelPerformanceLog
+from app import create_app
+from app.models.model_performance_model import replace_all_models
 
 app = create_app()
 
@@ -113,13 +113,16 @@ def evaluate_one(name, path, X_test, y_test, X_train=None, y_train=None, feature
     tn, fp, fn, tp = confusion_matrix(y_test, y_pred).ravel()
     fpr, tpr, _ = roc_curve(y_test, y_proba)
 
+    precision_val = float(precision_score(y_test, y_pred))
+    recall_val = float(recall_score(y_test, y_pred))
+
     result = dict(
         model_name=name,
         is_best=False,           # decided after comparing all three, below
         is_placeholder=False,
         accuracy=float(accuracy_score(y_test, y_pred)),
-        precision=float(precision_score(y_test, y_pred)),
-        recall=float(recall_score(y_test, y_pred)),
+        precision_score=precision_val,
+        recall_score=recall_val,
         f1_score=float(f1_score(y_test, y_pred)),
         roc_auc=float(roc_auc_score(y_test, y_proba)),
         cm_tn=int(tn), cm_fp=int(fp), cm_fn=int(fn), cm_tp=int(tp),
@@ -179,10 +182,7 @@ def main():
         best = max(results, key=weighted_composite_score)
         best["is_best"] = True
 
-        ModelPerformanceLog.query.delete()
-        for r in results:
-            db.session.add(ModelPerformanceLog(**r))
-        db.session.commit()
+        replace_all_models(results)
 
         print(f"Saved {len(results)} real evaluation results. "
               f"Best model: {best['model_name']} (AUC={best['roc_auc']:.3f})")
