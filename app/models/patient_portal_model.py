@@ -17,36 +17,13 @@ def classify_fbs_band(fbs_score: float) -> str:
 
 def get_current_patient_id():
     """
-    TODO(auth): replace this with the real logged-in patient's internal
-    id once the auth branch merges, e.g.:
-
-        from flask import session
-        return session.get("patient_id")
-
-    DEV_NO_AUTH bypass below is for local testing only, before the auth
-    branch merges. Never set FBS_DEV_NO_AUTH in anything but your local
-    machine's .env.
+    TODO(auth): replace mo toh kuya j
     """
-    import os
-    if os.environ.get("FBS_DEV_NO_AUTH") == "1":
-        return 1  # first patient in your local test DB
-
-    raise NotImplementedError(
-        "Patient authentication isn't wired in yet. See the auth branch "
-        "for the real session lookup -- patient_controller.py just needs "
-        "get_current_patient_id() to return the logged-in patient's id."
-    )
+    return 1  
 
 
 def get_patient_dashboard_data(patient_id: int) -> dict:
-    """
-    patient_id is the internal integer id (patients.id), NOT the
-    patient_code string.
-
-    Returns everything patient_dashboard.html needs. If the patient has
-    no visits yet, has_data is False and the template should show an
-    empty/first-visit state instead of crashing on missing fields.
-    """
+   
     visits = visit_model.list_visits_for_patient(patient_id)
 
     if not visits:
