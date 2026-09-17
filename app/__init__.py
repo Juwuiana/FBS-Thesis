@@ -69,26 +69,103 @@ def create_app(config_class=Config):
 
     _register_cli(app)
 
-    # Idempotent: schema.sql uses CREATE TABLE IF NOT EXISTS, so this is
-    # safe to run on every startup.
+    # init_db() now runs pending migrations from app/models/migrations/ in
+    # filename order and records each one in schema_migrations, so this is a
+    # no-op once the schema is current -- safe on every startup.
     with app.app_context():
-        db.init_db()
-        from app.models import user as user_model
-        user_model.seed_demo_users()
+        if _auto_migrate_enabled():
+            applied = db.init_db()
+            if applied:
+                app.logger.info("Applied migrations: %s", ", ".join(applied))
+            # Seeding reads the `users` table, so it only makes sense once
+            # the schema is known to be current.
+            from app.models import user as user_model
+            user_model.seed_demo_users()
 
     return app
 
+
+
+def _auto_migrate_enabled():
+    """Whether create_app() should apply pending migrations on startup.
+
+    Normally yes. Set SKIP_AUTO_MIGRATE=1 to build the app without touching
+    the schema -- needed for `flask db-baseline`, and for recovering a
+    database where a migration failed partway and startup would just retry
+    the broken file.
+    """
+    return os.environ.get("SKIP_AUTO_MIGRATE", "").strip().lower() not in ("1", "true", "yes")
 
 def _register_cli(app):
     import click
 
     @app.cli.command("init-db")
     def init_db_command():
-        """flask init-db — (re)create tables from schema.sql."""
+        """flask init-db — apply any pending migrations, in order."""
         from app import db as db_module
 
-        db_module.init_db()
-        click.echo("Initialized the database.")
+        applied = db_module.init_db()
+        if applied:
+            for name in applied:
+                click.echo(f"applied {name}")
+        else:
+            click.echo("Database already up to date.")
+
+    @app.cli.command("db-status")
+    def db_status_command():
+        """flask db-status — show which migrations have run and which haven't."""
+        from app import db as db_module
+
+        conn = db_module.get_connection()
+        try:
+            applied = db_module.applied_migrations(conn)
+            click.echo(f"database: {db_module.database_path()}")
+            for path in db_module.migration_files():
+                mark = "x" if path.name in applied else " "
+                click.echo(f"  [{mark}] {path.name}")
+        finally:
+            conn.close()
+
+    @app.cli.command("db-check")
+    def db_check_command():
+        """flask db-check — verify every foreign key in the database resolves."""
+        from app import db as db_module
+
+        violations = db_module.foreign_key_violations()
+        if not violations:
+            click.echo("No foreign key violations.")
+            return
+        for v in violations:
+            click.echo(
+                f"  {v['table']} rowid={v['rowid']} -> {v['references']} (fk #{v['fk_index']})"
+            )
+        raise SystemExit(1)
+
+    @app.cli.command("db-baseline")
+    @click.argument("filenames", nargs=-1)
+    @click.option("--all", "all_", is_flag=True, help="Baseline every pending migration.")
+    def db_baseline_command(filenames, all_):
+        """flask db-baseline — mark migrations as applied WITHOUT running them.
+
+        For a database that already has the tables (e.g. one built by the old
+        schema.sql) so the runner doesn't try to create them again.
+        """
+        from app import db as db_module
+
+        conn = db_module.get_connection()
+        try:
+            if all_:
+                names = [p.name for p in db_module.pending_migrations(conn)]
+            else:
+                names = list(filenames)
+            if not names:
+                click.echo("Nothing to baseline.")
+                return
+            db_module.mark_applied(names, conn=conn)
+            for name in names:
+                click.echo(f"marked applied (not run): {name}")
+        finally:
+            conn.close()
 
     @app.cli.command("create-admin")
     @click.option("--email", prompt=True)

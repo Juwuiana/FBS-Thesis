@@ -1,4 +1,4 @@
-﻿# Virtual Environment 
+# Virtual Environment 
 venv/
 env/
 .venv/
@@ -14,6 +14,7 @@ __pycache__/
 
 # Database files (if SQLite ang gagamitin)
 *.sqlite3
+*.db
 instance/
 
 # VS Code settings / OS files
