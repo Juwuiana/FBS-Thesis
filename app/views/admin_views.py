@@ -1,7 +1,9 @@
 from flask import Blueprint, render_template, request, redirect, url_for, abort
+from sqlalchemy import func
 from datetime import datetime, timedelta
-from app.models.db import get_connection
-from app.models.model_performance_model import list_models, get_best_model
+from app import db
+from app.models.patient import Patient
+from app.models.screening import Screening
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -44,166 +46,117 @@ EMPLOYEES = [
 # ── END TEMPORARY STUB ───────────────────────────────────────────────────
 
 
+from sqlalchemy import func
+from app.models.patient import Patient
+from app.models.screening import Screening
+
 @admin_bp.route("/dashboard")
 def dashboard():
-    conn = get_connection()
-    try:
-        total_screened = conn.execute(
-            "SELECT COUNT(*) AS c FROM lab_screenings"
-        ).fetchone()["c"]
+    total_screened = Screening.query.count()
+    at_risk_count = Screening.query.filter(Screening.ml_risk_level.in_(["Moderate", "High"])).count()
+    high_risk_count = Screening.query.filter(Screening.ml_risk_level == "High").count()
+    at_risk_pct = round(100 * at_risk_count / total_screened, 1) if total_screened else 0
+    high_risk_pct = round(100 * high_risk_count / total_screened, 1) if total_screened else 0
 
-        risk_expr = "COALESCE(ls.final_risk_level, ls.preliminary_risk_level)"
+    avg_fbs_row = db.session.query(func.avg(Screening.fbs_value)).scalar()
+    avg_fbs = round(avg_fbs_row, 1) if avg_fbs_row else 0
 
-        at_risk_count = conn.execute(
-            f"SELECT COUNT(*) AS c FROM lab_screenings ls WHERE {risk_expr} IN ('Moderate', 'High')"
-        ).fetchone()["c"]
-
-        high_risk_count = conn.execute(
-            f"SELECT COUNT(*) AS c FROM lab_screenings ls WHERE {risk_expr} = 'High'"
-        ).fetchone()["c"]
-
-        at_risk_pct = round(100 * at_risk_count / total_screened, 1) if total_screened else 0
-        high_risk_pct = round(100 * high_risk_count / total_screened, 1) if total_screened else 0
-
-        avg_fbs_row = conn.execute(
-            "SELECT AVG(fbs_mg_dl) AS avg_fbs FROM lab_screenings"
-        ).fetchone()
-        avg_fbs = round(avg_fbs_row["avg_fbs"], 1) if avg_fbs_row["avg_fbs"] else 0
-
-        best = get_best_model()
-        model_accuracy = round(best["accuracy"] * 100, 1) if best else None
-
-        metrics = {
-            "total_screened": total_screened,
-            "at_risk": at_risk_count, "at_risk_pct": at_risk_pct,
-            "high_risk": high_risk_count, "high_risk_pct": high_risk_pct,
-            "avg_fbs": avg_fbs,
-            "model_accuracy": model_accuracy,
-        }
-
-        risk_rows = conn.execute(
-            f"SELECT {risk_expr} AS risk, COUNT(*) AS c FROM lab_screenings ls GROUP BY risk"
-        ).fetchall()
-        risk_counts = {r["risk"]: r["c"] for r in risk_rows if r["risk"] is not None}
-        low_count = risk_counts.get("Low", 0)
-        moderate_count = risk_counts.get("Moderate", 0)
-        high_count = risk_counts.get("High", 0)
-        risk_distribution = {
-            "low":      {"count": low_count,      "pct": round(100*low_count/total_screened,1) if total_screened else 0},
-            "moderate": {"count": moderate_count, "pct": round(100*moderate_count/total_screened,1) if total_screened else 0},
-            "high":     {"count": high_count,     "pct": round(100*high_count/total_screened,1) if total_screened else 0},
-        }
-
-        barangay_rows = conn.execute(
-            """
-            SELECT b.name AS name, COUNT(ls.id) AS cnt
-            FROM lab_screenings ls
-            JOIN visits v ON v.id = ls.visit_id
-            JOIN patients p ON p.id = v.patient_id
-            JOIN barangays b ON b.id = p.barangay_id
-            GROUP BY b.name
-            ORDER BY cnt DESC
-            LIMIT 5
-            """
-        ).fetchall()
-        barangay_list = [{"name": r["name"] or "Unknown", "count": r["cnt"]} for r in barangay_rows]
-
-        # ASSUMPTION: no screening_code column exists; using patient_code
-        # as the display id instead. ASSUMPTION: no ada_category column;
-        # using model_predicted_risk_level (Normal/Pre-Diabetic/Diabetic)
-        # as "category" instead. Confirm both with me if this isn't right.
-        recent_rows = conn.execute(
-            f"""
-            SELECT
-                p.patient_code, p.first_name, p.last_name, p.birthdate, p.sex,
-                ls.fbs_mg_dl, ls.model_predicted_risk_level, {risk_expr} AS risk,
-                ls.test_datetime
-            FROM lab_screenings ls
-            JOIN visits v ON v.id = ls.visit_id
-            JOIN patients p ON p.id = v.patient_id
-            ORDER BY ls.test_datetime DESC
-            LIMIT 10
-            """
-        ).fetchall()
-
-        def _age(birthdate_str):
-            if not birthdate_str:
-                return None
-            bday = datetime.strptime(birthdate_str, "%Y-%m-%d").date()
-            today = datetime.utcnow().date()
-            return today.year - bday.year - ((today.month, today.day) < (bday.month, bday.day))
-
-        def _fmt_date(dt_str):
-            if not dt_str:
-                return "—"
-            dt = datetime.fromisoformat(dt_str)
-            return dt.strftime("%b %d, %Y")
-
-        recent_screenings = [
-            {
-                "id": r["patient_code"],
-                "name": f"{r['first_name']} {r['last_name']}".strip(),
-                "age_sex": f"{_age(r['birthdate']) or '—'}/{r['sex'] or '—'}",
-                "fbs": r["fbs_mg_dl"],
-                "category": r["model_predicted_risk_level"],
-                "risk": r["risk"],
-                "date": _fmt_date(r["test_datetime"]),
-            }
-            for r in recent_rows
-        ]
-
-        today = datetime.utcnow().date()
-        start_day = today - timedelta(days=6)
-        period_rows = conn.execute(
-            f"""
-            SELECT ls.test_datetime AS dt, {risk_expr} AS risk
-            FROM lab_screenings ls
-            WHERE ls.test_datetime >= ?
-            """,
-            (start_day.isoformat(),),
-        ).fetchall()
-
-        day_totals, day_at_risk = {}, {}
-        for row in period_rows:
-            if not row["dt"]:
-                continue
-            d = datetime.fromisoformat(row["dt"]).date()
-            day_totals[d] = day_totals.get(d, 0) + 1
-            if row["risk"] in ("Moderate", "High"):
-                day_at_risk[d] = day_at_risk.get(d, 0) + 1
-
-        timeline_labels, timeline_total, timeline_at_risk = [], [], []
-        for i in range(7):
-            d = start_day + timedelta(days=i)
-            timeline_labels.append(d.strftime("%b %d"))
-            timeline_total.append(day_totals.get(d, 0))
-            timeline_at_risk.append(day_at_risk.get(d, 0))
-        timeline = {"labels": timeline_labels, "totalScreened": timeline_total, "atRisk": timeline_at_risk}
-
-        model_performance = None
-        if best:
-            model_performance = {
-                "accuracy": round(best["accuracy"] * 100, 1),
-                "precision": best["precision_score"], "recall": best["recall_score"],
-                "f1_score": best["f1_score"], "roc_auc": best["roc_auc"],
-            }
-
-        return render_template(
-            "dashboard/index.html",
-            metrics=metrics, risk_distribution=risk_distribution,
-            barangay_list=barangay_list, recent_screenings=recent_screenings,
-            model_performance=model_performance, timeline=timeline,
+    best = get_best_model()
+        model_accuracy = (
+            round(best["accuracy"] * 100, 1)
+            if best and best.get("accuracy") is not None
+            else None
         )
-    finally:
-        conn.close()
 
+    metrics = {
+        "total_screened": total_screened,
+        "at_risk": at_risk_count, "at_risk_pct": at_risk_pct,
+        "high_risk": high_risk_count, "high_risk_pct": high_risk_pct,
+        "avg_fbs": avg_fbs,
+        "model_accuracy": model_accuracy,
+    }
+
+    risk_counts = dict(
+        db.session.query(Screening.ml_risk_level, func.count(Screening.id))
+        .group_by(Screening.ml_risk_level).all()
+    )
+    low_count = risk_counts.get("Low", 0)
+    moderate_count = risk_counts.get("Moderate", 0)
+    high_count = risk_counts.get("High", 0)
+    risk_distribution = {
+        "low":      {"count": low_count,      "pct": round(100*low_count/total_screened,1) if total_screened else 0},
+        "moderate": {"count": moderate_count, "pct": round(100*moderate_count/total_screened,1) if total_screened else 0},
+        "high":     {"count": high_count,     "pct": round(100*high_count/total_screened,1) if total_screened else 0},
+    }
+
+    barangay_rows = (
+        db.session.query(Patient.barangay, func.count(Screening.id).label("cnt"))
+        .join(Screening, Screening.patient_id == Patient.id)
+        .group_by(Patient.barangay)
+        .order_by(func.count(Screening.id).desc())
+        .limit(5).all()
+    )
+    barangay_list = [{"name": b or "Unknown", "count": c} for b, c in barangay_rows]
+
+    recent_rows = (
+        db.session.query(Screening, Patient)
+        .join(Patient, Screening.patient_id == Patient.id)
+        .order_by(Screening.screened_at.desc())
+        .limit(10).all()
+    )
+    recent_screenings = [
+        {
+            "id": s.screening_code, "name": p.full_name,
+            "age_sex": f"{p.age or '—'}/{p.sex or '—'}",
+            "fbs": s.fbs_value, "category": s.ada_category,
+            "risk": s.ml_risk_level, "date": s.screened_at.strftime("%b %d, %Y"),
+        }
+        for s, p in recent_rows
+    ]
+
+    today = datetime.utcnow().date()
+    start_day = today - timedelta(days=6)
+    period_screenings = Screening.query.filter(
+        Screening.screened_at >= datetime.combine(start_day, datetime.min.time())
+    ).all()
+    day_totals, day_at_risk = {}, {}
+    for s in period_screenings:
+        d = s.screened_at.date()
+        day_totals[d] = day_totals.get(d, 0) + 1
+        if s.ml_risk_level in ("Moderate", "High"):
+            day_at_risk[d] = day_at_risk.get(d, 0) + 1
+    timeline_labels, timeline_total, timeline_at_risk = [], [], []
+    for i in range(7):
+        d = start_day + timedelta(days=i)
+        timeline_labels.append(d.strftime("%b %d"))
+        timeline_total.append(day_totals.get(d, 0))
+        timeline_at_risk.append(day_at_risk.get(d, 0))
+    timeline = {"labels": timeline_labels, "totalScreened": timeline_total, "atRisk": timeline_at_risk}
+
+    model_performance = None
+    if best_model:
+        model_performance = {
+            "accuracy": round(best_model.accuracy * 100, 1),
+            "precision": best_model.precision, "recall": best_model.recall,
+            "f1_score": best_model.f1_score, "roc_auc": best_model.roc_auc,
+        }
+
+    return render_template(
+        "dashboard/index.html",
+        metrics=metrics, risk_distribution=risk_distribution,
+        barangay_list=barangay_list, recent_screenings=recent_screenings,
+        model_performance=model_performance, timeline=timeline,
+    )
+
+
+from app.models.model_performance_model import list_models, get_best_model
 
 @admin_bp.route("/reliability")
 def reliability():
     logs = list_models()
     if not logs:
         abort(404, "No model performance data found. Run scripts/seed_model_performance.py first.")
-
+ 
     benchmarks = [
         {
             "name": log["model_name"],
@@ -212,13 +165,15 @@ def reliability():
             "recall": log["recall_score"],
             "f1": log["f1_score"],
             "auc": log["roc_auc"],
+            "cv_auc": log["cv_mean_auc"],
+            "composite_score": log["composite_score"],
             "best": log["is_best"],
         }
         for log in logs
     ]
-
+ 
     best = get_best_model() or logs[0]
-
+ 
     best_model = {
         "name": best["model_name"],
         "accuracy": best["accuracy"],
@@ -227,37 +182,49 @@ def reliability():
         "f1": best["f1_score"],
         "auc": best["roc_auc"],
         "test_n": best["test_set_size"],
-        "cm": {"tn": best["cm_tn"], "fp": best["cm_fp"], "fn": best["cm_fn"], "tp": best["cm_tp"]},
+        # {} until a raw NxN export exists; template should treat an empty
+        # dict as "not available yet" rather than assuming tn/fp/fn/tp keys.
+        "confusion_matrix": best["confusion_matrix"],
     }
-
+ 
     optimization = {
         "technique": best["optimization_technique"],
         "serialized_size_kb": best["serialized_model_size_kb"],
         "inference_time_ms": best["avg_inference_latency_ms"],
         "target_device": best["target_device"],
     }
-
+ 
     total = best["total_records"] or 0
+    class_counts = best["class_counts"]  # {} until known
+    class_breakdown = [
+        {
+            "label": label,
+            "count": count,
+            "pct": round(100 * count / total, 1) if total else None,
+        }
+        for label, count in class_counts.items()
+    ]
     training_set = {
         "source": best["training_source"],
         "total_records": total,
-        "diabetic_count": best["diabetic_count"],
-        "diabetic_pct": round(100 * best["diabetic_count"] / total, 1) if total else None,
-        "non_diabetic_count": best["non_diabetic_count"],
-        "non_diabetic_pct": round(100 * best["non_diabetic_count"] / total, 1) if total else None,
+        "class_breakdown": class_breakdown,  # list of {label, count, pct} -- N classes, not 2
         "train_split": best["train_split_pct"],
         "test_split": best["test_split_pct"],
         "primary_feature": best["primary_feature"],
     }
-
+ 
     cv = {
         "fold_scores": best["cv_fold_scores"],
         "mean_auc": best["cv_mean_auc"],
         "std_auc": best["cv_std_auc"],
         "min_auc": best["cv_min_auc"],
         "max_auc": best["cv_max_auc"],
+        "accuracy": best["cv_accuracy"],
+        "precision": best["cv_precision_score"],
+        "recall": best["cv_recall_score"],
+        "f1": best["cv_f1_score"],
     }
-
+ 
     return render_template(
         "model/reliability.html",
         benchmarks=benchmarks,
