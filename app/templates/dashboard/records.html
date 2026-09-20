@@ -13,24 +13,19 @@
     <div class="filter-bar">
       <select class="filter-select" id="filterRole">
         <option value="">All Roles</option>
-        <option value="admin">Admin</option>
         <option value="health officer">Health Officer</option>
         <option value="lhu nurse">LHU Nurse</option>
-        <option value="encoder">Encoder</option>
       </select>
       <select class="filter-select" id="filterStation">
         <option value="">All Stations</option>
-        <option value="sta. rosa">Sta. Rosa</option>
-        <option value="cabuyao">Cabuyao</option>
-        <option value="calamba">Calamba</option>
-        <option value="biñan">Biñan</option>
-        <option value="san pedro">San Pedro</option>
+        <option value="rhu i">RHU I</option>
+        <option value="rhu ii">RHU II</option>
       </select>
       <select class="filter-select" id="filterStatus">
         <option value="">All Status</option>
-        <option value="active">Active</option>
-        <option value="inactive">Inactive</option>
-        <option value="on leave">On Leave</option>
+        <option value="approved">Approved</option>
+        <option value="rejected">Rejected</option>
+        <option value="pending">Pending</option>
       </select>
       <button class="filter-btn" onclick="applyFilters()">Filter</button>
       <button class="export-btn" onclick="exportTable()">
@@ -71,12 +66,12 @@
             <td class="hide-mobile" style="font-size:13px">{{ e.station }}</td>
             <td class="hide-mobile" style="font-size:12px;color:var(--text-muted)">{{ e.contact }}</td>
             <td>
-              {% if e.status == 'Active' %}
-                <span class="risk-pill risk-low">Active</span>
-              {% elif e.status == 'Inactive' %}
-                <span class="risk-pill risk-high">Inactive</span>
+              {% if e.status == 'Approved' %}
+                <span class="risk-pill risk-low">Approved</span>
+              {% elif e.status == 'Rejected' %}
+                <span class="risk-pill risk-high">Rejected</span>
               {% else %}
-                <span class="risk-pill risk-moderate">On Leave</span>
+                <span class="risk-pill risk-moderate">Pending</span>
               {% endif %}
             </td>
             <td class="hide-mobile" style="font-size:12px;color:var(--text-muted);white-space:nowrap">{{ e.date_added }}</td>

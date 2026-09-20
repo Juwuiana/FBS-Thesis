@@ -1,15 +1,21 @@
-from flask import Blueprint, render_template, request, redirect, url_for, abort
-from sqlalchemy import func
+from flask import Blueprint, render_template, request, redirect, url_for, abort, flash
 from datetime import datetime, timedelta
-from app import db
-from app.models.patient import Patient
-from app.models.screening import Screening
+import re
+
+from werkzeug.security import generate_password_hash
+
+from app.views.auth_views import login_required
+from app.db import get_db
+from app.models.model_performance_model import list_models, get_best_model
+from app.models.patient_model import _compute_age
+
+
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
-STAFF_ROLES = ["Admin", "Health Officer", "LHU Nurse", "Encoder"]
-STATIONS = ["Sta. Rosa", "Cabuyao", "Calamba", "Biñan", "San Pedro"]
-STAFF_STATUSES = ["Active", "Inactive", "On Leave"]
+STAFF_ROLES = ["Health Officer", "LHU Nurse"]
+STATIONS = ["RHU I", "RHU II"]
+STAFF_STATUSES = ["Approved", "Rejected", "Pending"]
 
 # ── TEMPORARY STUB ────────────────────────────────────────────────────────
 # In-memory only — resets whenever the app restarts. There is no Staff/User
@@ -45,28 +51,30 @@ EMPLOYEES = [
 ]
 # ── END TEMPORARY STUB ───────────────────────────────────────────────────
 
-
-from sqlalchemy import func
-from app.models.patient import Patient
-from app.models.screening import Screening
-
 @admin_bp.route("/dashboard")
+@login_required
 def dashboard():
-    total_screened = Screening.query.count()
-    at_risk_count = Screening.query.filter(Screening.ml_risk_level.in_(["Moderate", "High"])).count()
-    high_risk_count = Screening.query.filter(Screening.ml_risk_level == "High").count()
+    conn = get_db()
+
+    total_screened = conn.execute("SELECT COUNT(*) FROM lab_screenings").fetchone()[0]
+    at_risk_count = conn.execute(
+        "SELECT COUNT(*) FROM lab_screenings WHERE final_risk_level IN ('Moderate', 'High')"
+    ).fetchone()[0]
+    high_risk_count = conn.execute(
+        "SELECT COUNT(*) FROM lab_screenings WHERE final_risk_level = 'High'"
+    ).fetchone()[0]
     at_risk_pct = round(100 * at_risk_count / total_screened, 1) if total_screened else 0
     high_risk_pct = round(100 * high_risk_count / total_screened, 1) if total_screened else 0
 
-    avg_fbs_row = db.session.query(func.avg(Screening.fbs_value)).scalar()
+    avg_fbs_row = conn.execute("SELECT AVG(fbs_mg_dl) FROM lab_screenings").fetchone()[0]
     avg_fbs = round(avg_fbs_row, 1) if avg_fbs_row else 0
 
     best = get_best_model()
-        model_accuracy = (
-            round(best["accuracy"] * 100, 1)
-            if best and best.get("accuracy") is not None
-            else None
-        )
+    model_accuracy = (
+        round(best["accuracy"] * 100, 1)
+        if best and best.get("accuracy") is not None
+        else None
+    )
 
     metrics = {
         "total_screened": total_screened,
@@ -76,10 +84,11 @@ def dashboard():
         "model_accuracy": model_accuracy,
     }
 
-    risk_counts = dict(
-        db.session.query(Screening.ml_risk_level, func.count(Screening.id))
-        .group_by(Screening.ml_risk_level).all()
-    )
+    risk_rows = conn.execute(
+        "SELECT final_risk_level, COUNT(*) FROM lab_screenings "
+        "WHERE final_risk_level IS NOT NULL GROUP BY final_risk_level"
+    ).fetchall()
+    risk_counts = {row[0]: row[1] for row in risk_rows}
     low_count = risk_counts.get("Low", 0)
     moderate_count = risk_counts.get("Moderate", 0)
     high_count = risk_counts.get("High", 0)
@@ -89,41 +98,65 @@ def dashboard():
         "high":     {"count": high_count,     "pct": round(100*high_count/total_screened,1) if total_screened else 0},
     }
 
-    barangay_rows = (
-        db.session.query(Patient.barangay, func.count(Screening.id).label("cnt"))
-        .join(Screening, Screening.patient_id == Patient.id)
-        .group_by(Patient.barangay)
-        .order_by(func.count(Screening.id).desc())
-        .limit(5).all()
-    )
-    barangay_list = [{"name": b or "Unknown", "count": c} for b, c in barangay_rows]
+    barangay_rows = conn.execute(
+        """
+        SELECT b.name, COUNT(ls.id) AS cnt
+        FROM lab_screenings ls
+        JOIN visits v ON v.id = ls.visit_id
+        JOIN patients p ON p.id = v.patient_id
+        LEFT JOIN barangays b ON b.id = p.barangay_id
+        GROUP BY b.name
+        ORDER BY cnt DESC
+        LIMIT 5
+        """
+    ).fetchall()
+    barangay_list = [{"name": row[0] or "Unknown", "count": row[1]} for row in barangay_rows]
 
-    recent_rows = (
-        db.session.query(Screening, Patient)
-        .join(Patient, Screening.patient_id == Patient.id)
-        .order_by(Screening.screened_at.desc())
-        .limit(10).all()
-    )
-    recent_screenings = [
-        {
-            "id": s.screening_code, "name": p.full_name,
-            "age_sex": f"{p.age or '—'}/{p.sex or '—'}",
-            "fbs": s.fbs_value, "category": s.ada_category,
-            "risk": s.ml_risk_level, "date": s.screened_at.strftime("%b %d, %Y"),
-        }
-        for s, p in recent_rows
-    ]
+    recent_rows = conn.execute(
+        """
+        SELECT ls.id, p.first_name, p.middle_name, p.last_name, p.birthdate, p.sex,
+               ls.fbs_mg_dl, ls.model_predicted_risk_level, ls.final_risk_level, ls.test_datetime
+        FROM lab_screenings ls
+        JOIN visits v ON v.id = ls.visit_id
+        JOIN patients p ON p.id = v.patient_id
+        ORDER BY ls.test_datetime DESC
+        LIMIT 10
+        """
+    ).fetchall()
+    recent_screenings = []
+    for row in recent_rows:
+        full_name = " ".join(
+            part for part in [row["first_name"], row["middle_name"], row["last_name"]] if part
+        )
+        age = _compute_age(row["birthdate"]) if row["birthdate"] else None
+        try:
+            date_display = datetime.fromisoformat(row["test_datetime"]).strftime("%b %d, %Y")
+        except (TypeError, ValueError):
+            date_display = row["test_datetime"]
+        recent_screenings.append({
+            "id": f"SCR-{row['id']:05d}",
+            "name": full_name,
+            "age_sex": f"{age if age is not None else '—'}/{row['sex'] or '—'}",
+            "fbs": row["fbs_mg_dl"],
+            "category": row["model_predicted_risk_level"],
+            "risk": row["final_risk_level"],
+            "date": date_display,
+        })
 
     today = datetime.utcnow().date()
     start_day = today - timedelta(days=6)
-    period_screenings = Screening.query.filter(
-        Screening.screened_at >= datetime.combine(start_day, datetime.min.time())
-    ).all()
+    period_rows = conn.execute(
+        "SELECT test_datetime, final_risk_level FROM lab_screenings WHERE date(test_datetime) >= date(?)",
+        (start_day.isoformat(),),
+    ).fetchall()
     day_totals, day_at_risk = {}, {}
-    for s in period_screenings:
-        d = s.screened_at.date()
+    for row in period_rows:
+        try:
+            d = datetime.fromisoformat(row["test_datetime"]).date()
+        except (TypeError, ValueError):
+            continue
         day_totals[d] = day_totals.get(d, 0) + 1
-        if s.ml_risk_level in ("Moderate", "High"):
+        if row["final_risk_level"] in ("Moderate", "High"):
             day_at_risk[d] = day_at_risk.get(d, 0) + 1
     timeline_labels, timeline_total, timeline_at_risk = [], [], []
     for i in range(7):
@@ -134,11 +167,13 @@ def dashboard():
     timeline = {"labels": timeline_labels, "totalScreened": timeline_total, "atRisk": timeline_at_risk}
 
     model_performance = None
-    if best_model:
+    if best:
         model_performance = {
-            "accuracy": round(best_model.accuracy * 100, 1),
-            "precision": best_model.precision, "recall": best_model.recall,
-            "f1_score": best_model.f1_score, "roc_auc": best_model.roc_auc,
+            "accuracy": round(best["accuracy"] * 100, 1) if best.get("accuracy") is not None else None,
+            "precision": best["precision_score"],
+            "recall": best["recall_score"],
+            "f1_score": best["f1_score"],
+            "roc_auc": best["roc_auc"],
         }
 
     return render_template(
@@ -148,10 +183,8 @@ def dashboard():
         model_performance=model_performance, timeline=timeline,
     )
 
-
-from app.models.model_performance_model import list_models, get_best_model
-
 @admin_bp.route("/reliability")
+@login_required
 def reliability():
     logs = list_models()
     if not logs:
@@ -238,66 +271,82 @@ def reliability():
     )
 
 @admin_bp.route("/data-management")
+@login_required
 def data_management():
-    return render_template("dashboard/records.html", employees=EMPLOYEES)
+    from app.models import user as user_model
+    employees = user_model.get_staff_records()
+    return render_template("dashboard/records.html", employees=employees)
 
 
-# ── TEMPORARY STUB ────────────────────────────────────────────────────────
-# Appends to the in-memory EMPLOYEES list above — does NOT persist to a
-# database (there isn't one yet) and resets on app restart. The ID scheme
-# below (EMP-2025-{count+1}) is only safe because nothing ever removes an
-# employee; a real implementation should let the DB assign the ID instead.
 @admin_bp.route("/data-management/add", methods=["GET", "POST"])
+@login_required
 def add_staff():
+    from app.models import user as user_model
+
     if request.method == "POST":
         name = request.form.get("name", "").strip()
         email = request.form.get("email", "").strip()
         role = request.form.get("role", "").strip()
         station = request.form.get("station", "").strip()
         contact = request.form.get("contact", "").strip()
-        status = request.form.get("status", "").strip()
+        password = request.form.get("password", "")
 
         errors = []
-        if not name:
-            errors.append("Full name is required.")
-        if not email:
-            errors.append("Email is required.")
+        name_parts = name.split()
+        if len(name_parts) < 2:
+            errors.append("Enter the employee's first and last name.")
+        if not email or not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
+            errors.append("Enter a valid email address.")
+        elif user_model.email_exists(email):
+            errors.append("An account with this email already exists.")
         if role not in STAFF_ROLES:
             errors.append("Please select a valid role.")
         if station not in STATIONS:
             errors.append("Please select a valid station.")
-        if status not in STAFF_STATUSES:
-            errors.append("Please select a valid status.")
+        normalized_contact = contact.lstrip("+").lstrip("0")
+        if not re.match(r"^9\d{9}$", normalized_contact):
+            errors.append("Enter a valid 10-digit mobile number starting with 9.")
+        if len(password) < 12:
+            errors.append("Password must be at least 12 characters.")
 
         if errors:
             return render_template(
                 "admin/add_staff.html",
-                roles=STAFF_ROLES, stations=STATIONS, statuses=STAFF_STATUSES,
+                roles=STAFF_ROLES, stations=STATIONS,
                 errors=errors,
                 form_data={"name": name, "email": email, "role": role,
-                           "station": station, "contact": contact, "status": status},
+                           "station": station, "contact": contact},
             )
 
-        now = datetime.now()
-        new_employee = {
-            "id": f"EMP-2025-{len(EMPLOYEES) + 1:03d}",
-            "name": name,
-            "email": email,
-            "role": role,
-            "station": station,
-            "contact": contact,
-            "status": status,
-            "date_added": f"{now.strftime('%b')} {now.day}, {now.year}",
+        role_map = {
+            "Health Officer": "medical_officer",
+            "LHU Nurse": "health_worker",
         }
-        EMPLOYEES.append(new_employee)
-        return redirect(url_for("admin.staff_detail", employee_id=new_employee["id"]))
+        facility_map = {"RHU I": "rhui", "RHU II": "rhuii"}
+        user_id = user_model.create_user(
+            {
+                "first_name": name_parts[0],
+                "middle_name": " ".join(name_parts[1:-1]) or None,
+                "last_name": name_parts[-1],
+                "birthday": "1990-01-01",
+                "sex": "male",
+                "email": email,
+                "phone": normalized_contact,
+                "role": role_map[role],
+                "facility": facility_map[station],
+                "barangay": "aplaya",
+            },
+            generate_password_hash(password),
+            status="approved",
+        )
+        flash("Employee account created successfully.", "success")
+        return redirect(url_for("admin.staff_detail", employee_id=f"EMP-{user_id:05d}"))
 
     return render_template(
         "admin/add_staff.html",
-        roles=STAFF_ROLES, stations=STATIONS, statuses=STAFF_STATUSES,
+        roles=STAFF_ROLES, stations=STATIONS,
         errors=[], form_data={},
     )
-# ── END TEMPORARY STUB ───────────────────────────────────────────────────
 
 
 # ── TEMPORARY STUB ────────────────────────────────────────────────────────
@@ -308,29 +357,89 @@ def add_staff():
 # Staff/User model lands, replace the lookup/update below with actual
 # queries and delete this comment.
 @admin_bp.route("/data-management/<employee_id>")
+@login_required
 def staff_detail(employee_id):
-    employee = next((e for e in EMPLOYEES if e["id"] == employee_id), None)
+    from app.models import user as user_model
+
+    employee = user_model.get_employee_by_id(employee_id)
     if employee is None:
         abort(404)
     return render_template("admin/staff_detail.html", employee=employee, roles=STAFF_ROLES)
 
 
 @admin_bp.route("/data-management/<employee_id>/update-role", methods=["POST"])
+@login_required
 def staff_update_role(employee_id):
-    employee = next((e for e in EMPLOYEES if e["id"] == employee_id), None)
+    from app.models import user as user_model
+
+    employee = user_model.get_employee_by_id(employee_id)
     if employee is None:
         abort(404)
 
     new_role = request.form.get("role", "").strip()
-    if new_role in STAFF_ROLES:
-        employee["role"] = new_role
+    if user_model.update_user_role(employee_id, new_role):
+        flash("Employee role updated successfully.", "success")
+    else:
+        flash("Please select a valid role.", "error")
 
     return redirect(url_for("admin.staff_detail", employee_id=employee_id))
+
+
+@admin_bp.route("/data-management/<employee_id>/approve", methods=["POST"])
+@login_required
+def approve_staff(employee_id):
+    from app.models import user as user_model
+
+    employee = user_model.get_employee_by_id(employee_id)
+    if employee is None:
+        abort(404)
+
+    user = user_model.get_user_by_employee_id(employee_id)
+    if user is None:
+        abort(404)
+
+    user_model.set_status(user["id"], "approved")
+    flash("Account approved successfully. The user can now sign in.", "success")
+    return redirect(url_for("admin.staff_detail", employee_id=employee_id))
+
+
+@admin_bp.route("/data-management/<employee_id>/reject", methods=["POST"])
+@login_required
+def reject_staff(employee_id):
+    from app.models import user as user_model
+
+    employee = user_model.get_employee_by_id(employee_id)
+    if employee is None:
+        abort(404)
+
+    user = user_model.get_user_by_employee_id(employee_id)
+    if user is None:
+        abort(404)
+
+    user_model.set_status(user["id"], "rejected")
+    flash("Account rejected. The user cannot sign in.", "success")
+    return redirect(url_for("admin.staff_detail", employee_id=employee_id))
+
+
+@admin_bp.route("/data-management/<employee_id>/delete", methods=["POST"])
+@login_required
+def delete_staff(employee_id):
+    from app.models import user as user_model
+
+    if not user_model.delete_user_by_employee_id(employee_id):
+        abort(404)
+
+    flash("Employee account deleted successfully.", "success")
+    return redirect(url_for("admin.data_management"))
 # ── END TEMPORARY STUB ───────────────────────────────────────────────────
 
 
 @admin_bp.route("/privacy-security")
+@login_required
 def privacy_security():
+    from app.models import settings as settings_model
+
+    session_timeout_minutes = settings_model.get_session_timeout_minutes()
     roles = [
         {"name": "Patient",        "screen": True,  "view_records": "Own records", "export": "No",      "admin": "No"},
         {"name": "LHU Nurse",      "screen": True,  "view_records": "Yes",         "export": "Limited", "admin": "No"},
@@ -356,10 +465,27 @@ def privacy_security():
         roles=roles,
         lhu_agreements=lhu_agreements,
         retention_policy=retention_policy,
+        session_timeout_minutes=session_timeout_minutes,
     )
 
 
+@admin_bp.route("/privacy-security/session-timeout", methods=["POST"])
+@login_required
+def update_session_timeout():
+    from app.models import settings as settings_model
+
+    minutes = request.form.get("session_timeout_minutes", type=int)
+    if minutes not in settings_model.ALLOWED_SESSION_TIMEOUTS:
+        flash("Please choose a valid session timeout value.", "error")
+        return redirect(url_for("admin.privacy_security"))
+
+    settings_model.set_session_timeout_minutes(minutes)
+    flash(f"Session timeout updated to {minutes} minute(s).", "success")
+    return redirect(url_for("admin.privacy_security"))
+
+
 @admin_bp.route("/green-computing")
+@login_required
 def green_computing():
     gc = {
         "energy_kwh":    1.24,
@@ -425,6 +551,7 @@ def green_computing():
 
 
 @admin_bp.route("/audit-trails")
+@login_required
 def audit_trails():
     logs = [
         {"time": "09:47 AM", "date": "May 27", "user": "lhu.admin",     "role": "Admin",

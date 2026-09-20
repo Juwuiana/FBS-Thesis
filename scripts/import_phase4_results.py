@@ -30,14 +30,12 @@ AUC_BENCHMARK = 0.80
 UNAVAILABLE_FIELDS = {
     "test_set_size": None,          # not logged by the pipeline yet
     "roc_curve_points": None,       # no raw ROC points exported
-    "feature_importance": None,     # no raw importances exported
     "cv_fold_scores": None,         # cv_results is per-model mean, not per-fold
     "cv_std_auc": None,
     "cv_min_auc": None,
     "cv_max_auc": None,
     "optimization_technique": None, # GridSearchCV/RFE used per project decisions,
                                      # but not recorded per-run in this JSON
-    "confusion_matrix": None,       # only exists as fig_confusion_matrix.png today
     "class_counts": None,           # per-class record counts not in this JSON
     "total_records": None,
     "train_split_pct": None,
@@ -52,6 +50,8 @@ def build_records(summary: dict) -> list[dict]:
     composite_scores = summary["composite_scores"]
     test_metrics = summary["test_metrics"]
     edge = summary["edge_readiness"]
+    confusion_matrix = summary.get("confusion_matrix")
+    feature_importance = summary.get("feature_importance")
 
     records = []
     for model_name, cv in cv_results.items():
@@ -84,7 +84,8 @@ def build_records(summary: dict) -> list[dict]:
             "serialized_model_size_kb": round(edge["size_mb"] * 1024, 2) if is_best else None,
             "avg_inference_latency_ms": round(edge["latency_s"] * 1000, 3) if is_best else None,
             "target_device": TARGET_DEVICE if is_best else None,
-
+            "confusion_matrix": confusion_matrix if is_best else None,
+            "feature_importance": feature_importance if is_best else None,
             "training_source": TRAINING_SOURCE,
         }
         record.update(UNAVAILABLE_FIELDS)

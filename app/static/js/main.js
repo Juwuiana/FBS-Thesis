@@ -138,6 +138,96 @@ function initSidebarToggle() {
   });
 }
 
+function initSessionTimeout() {
+  const body = document.body;
+  if (!body) return;
+
+  const timeoutMinutes = Number(body.dataset.sessionTimeoutMinutes || 30);
+  if (!Number.isFinite(timeoutMinutes) || timeoutMinutes <= 0) return;
+
+  const timeoutMs = timeoutMinutes * 60 * 1000;
+  const warningMs = 20 * 1000;
+  const logoutUrl = body.dataset.logoutUrl || '/logout';
+  let inactivityTimer = null;
+  let warningTimer = null;
+  let warningInterval = null;
+  let warningEl = null;
+
+  const logoutUser = () => {
+    if (document.visibilityState === 'hidden') {
+      window.location.replace(logoutUrl);
+      return;
+    }
+    window.location.href = logoutUrl;
+  };
+
+  const clearWarning = () => {
+    if (warningInterval) clearInterval(warningInterval);
+    warningInterval = null;
+    if (warningEl) {
+      warningEl.remove();
+      warningEl = null;
+    }
+  };
+
+  const showWarning = deadline => {
+    clearWarning();
+
+    warningEl = document.createElement('div');
+    warningEl.style.position = 'fixed';
+    warningEl.style.top = '16px';
+    warningEl.style.left = '50%';
+    warningEl.style.transform = 'translateX(-50%)';
+    warningEl.style.zIndex = '99999';
+    warningEl.style.background = '#fff3cd';
+    warningEl.style.border = '1px solid #f0c36d';
+    warningEl.style.color = '#7a4a00';
+    warningEl.style.padding = '10px 18px';
+    warningEl.style.borderRadius = '999px';
+    warningEl.style.boxShadow = '0 8px 20px rgba(0,0,0,0.12)';
+    warningEl.style.fontSize = '14px';
+    warningEl.style.fontWeight = '600';
+    warningEl.style.lineHeight = '1.3';
+    warningEl.style.textAlign = 'center';
+
+    const countdownLabel = document.createElement('span');
+    warningEl.appendChild(countdownLabel);
+    document.body.appendChild(warningEl);
+
+    const updateWarning = () => {
+      const remainingMs = Math.max(0, deadline - Date.now());
+      const remainingSeconds = Math.ceil(remainingMs / 1000);
+      countdownLabel.textContent = `Your session will expire in ${remainingSeconds} second${remainingSeconds === 1 ? '' : 's'}.`;
+      if (remainingMs <= 0) {
+        clearWarning();
+      }
+    };
+
+    updateWarning();
+    warningInterval = setInterval(updateWarning, 1000);
+  };
+
+  const resetTimer = () => {
+    if (inactivityTimer) clearTimeout(inactivityTimer);
+    if (warningTimer) clearTimeout(warningTimer);
+    clearWarning();
+
+    const deadline = Date.now() + timeoutMs;
+    inactivityTimer = setTimeout(logoutUser, timeoutMs);
+
+    const warningDelay = Math.max(0, timeoutMs - warningMs);
+    warningTimer = setTimeout(() => showWarning(deadline), warningDelay);
+  };
+
+  const activityEvents = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart', 'touchmove', 'pointerdown'];
+  activityEvents.forEach(eventName => {
+    document.addEventListener(eventName, resetTimer, { passive: true });
+  });
+
+  resetTimer();
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   initSidebarToggle();
+  initSessionTimeout();
 });
