@@ -21,7 +21,7 @@ from app.models.model_performance_model import replace_all_models
 
 # Fixed for this project -- Android edge device via Termux (see system architecture doc)
 TARGET_DEVICE = "Android (Termux)"
-TRAINING_SOURCE = "phase4_summary.json (CRISP-DM Phase 4 evaluation)"
+TRAINING_SOURCE = "enns_only_phase5_summary.json (ENNS-only, unrestricted-attribute pipeline)"
 AUC_BENCHMARK = 0.80
 
 # Fields we know we can't populate from phase4_summary.json today -- kept
@@ -96,7 +96,7 @@ def build_records(summary: dict) -> list[dict]:
 
 def main():
     if len(sys.argv) != 2:
-        print("Usage: python scripts/import_phase4_results.py path/to/phase4_summary.json")
+        print("Usage: python scripts/import_phase4_results.py path/to/enns_only_phase5_summary.json")
         sys.exit(1)
 
     json_path = Path(sys.argv[1])
