@@ -271,6 +271,29 @@ canvas {
 }
 .export-btn:hover { background: var(--accent-green); color: #fff; }
 
+.csv-drop-zone {
+  border: 2px dashed var(--accent-green);
+  border-radius: 8px;
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+.csv-drop-zone:hover, .csv-drop-zone.dragover {
+  background: #e8f5e9;
+  border-color: var(--accent-green-light);
+  color: var(--text-primary);
+}
+.csv-selected-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.csv-selected-file span:first-child { font-weight: 600; overflow-wrap: anywhere; }
+.csv-selected-file span:nth-child(2) { margin-right: auto; }
+
 /* ==========================================================
    GREEN COMPUTING PAGE
    ========================================================== */

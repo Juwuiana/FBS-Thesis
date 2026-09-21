@@ -24,7 +24,27 @@ def _clean(form, key):
     return (form.get(key) or "").strip()
 
 
-def validate_signup(form):
+def normalize_phone(phone):
+    normalized = (phone or "").strip().replace(" ", "").replace("-", "")
+    for prefix in ("+63", "63", "0"):
+        if normalized.startswith(prefix):
+            normalized = normalized[len(prefix):]
+            break
+    return normalized
+
+
+def normalize_import_birthday(birthday):
+    """Convert common spreadsheet date output to the stored ISO format."""
+    value = (birthday or "").strip()
+    for date_format in ("%Y-%m-%d", "%m-%d-%Y", "%m/%d/%Y"):
+        try:
+            return datetime.strptime(value, date_format).date().isoformat()
+        except ValueError:
+            continue
+    return value
+
+
+def validate_profile_fields(form, require_terms=False, normalize_phone_input=False):
     """
     Validate the sign-up form. Returns (errors, cleaned_fields, password).
     `errors` is a list of user-facing strings; empty list means valid.
@@ -36,6 +56,8 @@ def validate_signup(form):
     last_name = _clean(form, "last_name")
     email = _clean(form, "email").lower()
     phone = _clean(form, "phone")
+    if normalize_phone_input:
+        phone = normalize_phone(phone)
     birthday = _clean(form, "birthday")
     sex = _clean(form, "sex")
     role = _clean(form, "role")
@@ -84,7 +106,7 @@ def validate_signup(form):
         errors.append(f"Password must be at least {MIN_PASSWORD_LENGTH} characters.")
     if password != confirm_password:
         errors.append("Passwords do not match.")
-    if not terms:
+    if require_terms and not terms:
         errors.append("You must agree to the Terms of Use and Privacy Policy.")
 
     # Only hit the DB for a duplicate-email check once the email itself is
@@ -105,6 +127,10 @@ def validate_signup(form):
         "barangay": barangay,
     }
     return errors, cleaned, password
+
+
+def validate_signup(form):
+    return validate_profile_fields(form, require_terms=True)
 
 
 def register_user(form):

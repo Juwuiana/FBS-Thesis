@@ -11,11 +11,13 @@ The following account-management features were implemented:
 - Pending accounts cannot log in until an admin approves them.
 - Rejected accounts cannot log in.
 - Added status labels and filters for `Approved`, `Rejected`, and `Pending`.
-- Updated station filtering to use `RHU I` and `RHU II`.
+- Updated station filtering to use `LHU I` and `LHU II`.
 - Added a database-backed Add Employee flow.
 - Add Employee creates an account with an approved status and a hashed password.
 - Add Employee supports the `Health Officer` and `LHU Nurse` roles.
 - Added a database-backed Delete Employee action.
+- Added CSV template download and all-or-nothing employee import in Data Management.
+- Split employee View and Edit pages so read-only details cannot change account data.
 - Restored the existing login behavior where nurse accounts redirect to the admin dashboard until the nurse branch is merged.
 - Added browser-side inactivity timeout handling with a countdown warning.
 
@@ -33,7 +35,8 @@ The following account-management features were implemented:
 - `app/views/admin_views.py` - dashboard and Data Management routes
 - `app/templates/dashboard/records.html` - staff records table and filters
 - `app/templates/admin/add_staff.html` - Add Employee form
-- `app/templates/admin/staff_detail.html` - employee view/edit/approval/delete page
+- `app/templates/admin/staff_view.html` - read-only employee details page
+- `app/templates/admin/staff_detail.html` - employee edit/approval/delete page
 - `instance/fbs_thesis.sqlite3` - local SQLite database
 
 ## Requirements
@@ -99,12 +102,20 @@ Supported roles:
 
 Supported stations:
 
-- RHU I
-- RHU II
+- LHU I
+- LHU II
 
 ### Delete Employee
 
 The Delete Employee action is available on the employee detail page. It uses a POST request, asks for browser confirmation, deletes the matching user from SQLite, and returns to Data Management.
+
+### Import format
+
+Employee imports are UTF-8 CSV files with these columns:
+
+`first_name`, `middle_name`, `last_name`, `birthday`, `sex`, `email`, `phone`, `role`, `station`, `barangay`, `temporary_password`
+
+Accepted values are `male`/`female` for sex, `Health Officer`/`LHU Nurse` for role, `LHU I`/`LHU II` for station, and a signup-list barangay name or slug. Birthday values should be `YYYY-MM-DD`; the importer also accepts common spreadsheet rewrites such as `MM-DD-YYYY` and `MM/DD/YYYY`, storing them as ISO dates. Phone values must be 10 digits starting with `9`; a leading `0` or `+63` is accepted. Files are limited to 1 MB and 500 data rows. Temporary-password files should be deleted after import.
 
 ## Status Values
 
@@ -141,7 +152,6 @@ The Add Employee flow was also tested against an isolated temporary SQLite datab
 - Do not commit real passwords, secret keys, or personal user data.
 - The local SQLite database is environment-specific and should be backed up before destructive testing.
 - The nurse branch is not yet merged. Nurse accounts currently follow the existing dashboard redirect until that branch is integrated.
-- The Add Employee route uses placeholder birthday, sex, and barangay values because the current form does not collect those fields. These should be replaced when the employee form is expanded.
 
 ## Database migrations
 

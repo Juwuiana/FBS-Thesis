@@ -30,10 +30,12 @@
     </div>
 
     <div class="user-dropdown" id="userDropdown">
-      <label class="user-dropdown-item" for="avatarFileInput">
-        Change Profile Photo
-        <input type="file" id="avatarFileInput" accept="image/*" style="display:none;">
-      </label>
+      {% if not read_only_employee_view %}
+        <label class="user-dropdown-item" for="avatarFileInput">
+          Change Profile Photo
+          <input type="file" id="avatarFileInput" accept="image/*" style="display:none;">
+        </label>
+      {% endif %}
       <a href="#" class="user-dropdown-item">
         Change Password
       </a>

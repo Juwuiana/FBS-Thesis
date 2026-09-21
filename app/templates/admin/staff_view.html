@@ -1,0 +1,81 @@
+{% extends "admin/admin_base.html" %}
+{% set active_page = "data_management" %}
+
+{% block title %}{{ employee.name }} - Staff Record{% endblock %}
+{% block page_title %}Staff Record{% endblock %}
+
+{% block content %}
+<main class="page-content">
+  <div class="dm-card">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <div class="dm-card-title mb-0">{{ employee.name }}</div>
+      <a href="{{ url_for('admin.data_management') }}" class="filter-btn" style="text-decoration:none;">
+        <i class="bi bi-arrow-left me-1"></i> Back to Data Management
+      </a>
+    </div>
+
+    <div class="row g-3 mb-4">
+      <div class="col-md-6 col-12">
+        <div class="ps-field-label">Employee ID</div>
+        <div class="ps-input">{{ employee.id }}</div>
+      </div>
+      <div class="col-md-6 col-12">
+        <div class="ps-field-label">First Name</div>
+        <div class="ps-input">{{ employee.first_name }}</div>
+      </div>
+      <div class="col-md-6 col-12">
+        <div class="ps-field-label">Middle Name</div>
+        <div class="ps-input">{{ employee.middle_name or 'None' }}</div>
+      </div>
+      <div class="col-md-6 col-12">
+        <div class="ps-field-label">Last Name</div>
+        <div class="ps-input">{{ employee.last_name }}</div>
+      </div>
+      <div class="col-md-6 col-12">
+        <div class="ps-field-label">Birthday</div>
+        <div class="ps-input">{{ employee.birthday }} ({{ age }} years old)</div>
+      </div>
+      <div class="col-md-6 col-12">
+        <div class="ps-field-label">Sex</div>
+        <div class="ps-input">{{ employee.sex }}</div>
+      </div>
+      <div class="col-md-6 col-12">
+        <div class="ps-field-label">Email</div>
+        <div class="ps-input">{{ employee.email }}</div>
+      </div>
+      <div class="col-md-6 col-12">
+        <div class="ps-field-label">Contact Number</div>
+        <div class="ps-input">{{ formatted_phone }}</div>
+      </div>
+      <div class="col-md-6 col-12">
+        <div class="ps-field-label">Role</div>
+        <div class="ps-input">{{ employee.role }}</div>
+      </div>
+      <div class="col-md-6 col-12">
+        <div class="ps-field-label">Station / LHU</div>
+        <div class="ps-input">{{ employee.station }}</div>
+      </div>
+      <div class="col-md-6 col-12">
+        <div class="ps-field-label">Assigned Barangay</div>
+        <div class="ps-input">{{ employee.barangay }}</div>
+      </div>
+      <div class="col-md-6 col-12">
+        <div class="ps-field-label">Account Status</div>
+        <div class="ps-input">{{ employee.status }}</div>
+      </div>
+      <div class="col-md-6 col-12">
+        <div class="ps-field-label">Date Added</div>
+        <div class="ps-input">{{ employee.date_added }}</div>
+      </div>
+      <div class="col-md-6 col-12">
+        <div class="ps-field-label">Last Login</div>
+        <div class="ps-input">{{ last_login }}</div>
+      </div>
+    </div>
+
+    <a href="{{ url_for('admin.staff_detail', employee_id=employee.id) }}" class="filter-btn" style="text-decoration:none;padding:8px 20px;">
+      <i class="bi bi-pencil me-1"></i> Edit Employee
+    </a>
+  </div>
+</main>
+{% endblock %}
