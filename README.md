@@ -42,8 +42,8 @@ Do not delete either side unless a blueprint was intentionally removed.
 
 ## Authentication is not implemented on this branch
 
-This is intentional, not an oversight. Patient login/session handling is
-being built on a separate branch. In the meantime:
+This is intentional. Patient login/session handling is
+being built on a separate branch. 
 
 `patient_portal_model.get_current_patient_id()` is hardcoded:
 
