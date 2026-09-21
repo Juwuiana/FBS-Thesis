@@ -1,87 +1,4 @@
-
-
-## Contents
-
-1. [Who owns what](#1-who-owns-what)
-2. [How to connect this branch to the nurse and patient branch](#2-how-to-connect-this-branch-to-the-nurse-and-patient-branch)
-3. [Roles are wrong in this branch — what to change](#3-roles-are-wrong-in-this-branch--what-to-change)
-4. [Not finished in this branch](#4-not-finished-in-this-branch)
-5. [Recent work](#5-recent-work)
-6. [Project structure](#6-project-structure)
-7. [Setup and run](#7-setup-and-run)
-8. [Account workflow](#8-account-workflow)
-9. [Database migrations](#9-database-migrations)
-
-
----
-
-## 1. Who owns what
-
-| Area | Branch | Where it lives |
-|---|---|---|
-| Login, signup, logout, sessions, session timeout | admin | `app/views/auth_views.py`, `app/controllers/auth_controller.py` |
-| `users` table, approval, Data Management, admin pages | admin | `app/models/user.py`, `app/views/admin_views.py`, `app/templates/admin/`, `app/templates/dashboard/` |
-| Database connection + migration runner | admin | `app/db.py` |
-| Nurse pages and `/api/...` endpoints | nurse-patient | `app/controllers/nurse_controller.py`, `app/templates/nurse/` |
-| Patient portal | nurse-patient | `app/controllers/patient_controller.py`, `app/templates/patient/` |
-| Patient / visit / lab / analytics queries | nurse-patient | `app/models/patient_model.py`, `visit_model.py`, `lab_model.py`, `health_analytics_model.py`, `patient_portal_model.py`, `lookup_model.py` |
-
-How the pieces should fit together after the merge:
-
-```
-Browser ──► auth_bp   /login  /signup  /logout
-              │   session: user_id, user_name, user_role
-              │
-              │   role decides where the user lands and what they may open
-              ├── admin            ──► admin_bp    /admin/*
-              ├── medical_officer ┐
-              ├── health_worker   ┴──► nurse_bp    /nurse_*  and  /api/*
-              └── patient (future) ──► patient_bp  /patient_*
-
-All blueprints ──► app/db.py ──► ONE SQLite file ──► migrations 0001 … 00NN
-```
-
----
-
-## 2. How to connect this branch to the nurse and patient branch
-
-> Checked by comparing the two branch snapshots and by doing a trial merge in a
-> scratch copy: the merged app started on an empty database and on a copy of the
-> nurse branch's `fbs_thesis.db`, applied every migration, and served the nurse,
-> patient, and admin pages. Git itself may report conflicts slightly differently
-> because the snapshots were compared, not the commit history.
-
-### 2.1 Before you start
-
-- Back up your local database file. Migration `0011` rebuilds the `patients`,
-  `visits` and `lab_screenings` tables.
-- Merge into a throwaway branch first:
-
-```powershell
-git checkout feature/admin-data-management
-git pull
-git checkout -b merge/admin-nurse-patient
-git merge feature/nurse-patient-combine
-```
-
-### 2.2 Files that will conflict
-
-| File | Resolution |
-|---|---|
-| `app/__init__.py` | Keep **this branch's** app factory (it has `Config`, `db.init_app`, the CLI commands and the session-timeout hook). Then add the nurse and patient blueprints and `safe_url_for` — see 2.3 step 2. Drop the nurse branch's `run_migrations()` call and its `@app.route('/')`. |
-| `run.py` | Keep this branch's (`load_dotenv()` runs before `create_app`). |
-| `requirements.txt` | Keep this branch's. The nurse branch's file is saved as UTF-16, so Git treats it as binary and cannot merge it. The only difference is `Flask-SQLAlchemy` and `SQLAlchemy`, and nothing in either branch imports them, so leave them out. |
-| `.gitignore` | Keep this branch's (it also ignores `*.db`). |
-| `README.md` | Keep this file. Move anything from the nurse README that is still true into section 1 or 2. |
-
-Everything else that exists on both sides is an empty placeholder on one side
-(`auth_controller.py`, `auth_views.py`, `login.html`, `signup.html`,
-`dashboard/index.html`, `dashboard/records.html`, `metrics/green.html`,
-`style.css`, `main.js`, `config.py`, `patient_controller.py`, and so on), so
-Git should take the side that has the content. `0001`–`0008` are byte-identical
-on both branches; `0009`–`0011` exist only here and come across in the merge.
-
-### 2.3 Required changes after the merge (in this order)
+Required changes after the merge (in this order)
 
 **Step 1 — Make the nurse models use this branch's database layer.**
 This is the step that is easiest to miss because Git will not flag it. The
@@ -173,7 +90,7 @@ flask db-check       # "No foreign key violations."
 | `/admin/dashboard` | redirects to `/login` when signed out |
 | Sign out from a nurse page | works (`nurse_base.html` already calls `auth.logout`) |
 
-### 2.4 Wiring login into the nurse and patient side
+ Wiring login into the nurse and patient side
 
 The nurse and patient branch has **no authentication at all** today: those pages
 open without signing in, and every "who did this" value is `None`. This branch
@@ -261,7 +178,7 @@ the nurse branch's `app/models/health_analytics_model.py`, for example
 
 ---
 
-## 3. Roles are wrong in this branch — what to change
+Roles are wrong in this branch — what to change
 
 ### What is wrong
 
@@ -283,7 +200,7 @@ the UI. But a Medical Officer is a **doctor**. As it stands:
 | `admin` | LHU system administrator | **`flask create-admin` only.** Never through signup, Add Employee, CSV import, or the role-edit page. | `/admin/*` only |
 | `medical_officer` | Doctor | Signup (needs approval) or admin Add Employee / import | **Nurse side only** |
 | `health_worker` | Barangay Health Worker / LHU Nurse | Signup (needs approval) or admin Add Employee / import | **Nurse side only** |
-| `patient` (proposed) | Patient | To be decided (see 2.4e) | Patient side only |
+| `patient`  Patient side only |
 
 `medical_officer` and `health_worker` must not be able to open anything under
 `/admin`.
@@ -398,7 +315,7 @@ nurse branch has the real one); `views/dashboard_views.py`, `metrics_views.py`,
 
 ---
 
-## 5. Recent work
+Recent work
 
 The following account-management features were implemented:
 
@@ -419,7 +336,7 @@ The following account-management features were implemented:
 - Login still sends every account to the admin dashboard. This is temporary until the merge (section 2.4b).
 - Added browser-side inactivity timeout handling with a countdown warning.
 
-## 6. Project structure
+ Project structure
 
 - `run.py` - application entry point
 - `config.py` - application configuration
@@ -441,7 +358,7 @@ The following account-management features were implemented:
 After the merge, the nurse and patient files listed in section 1 are added
 alongside these.
 
-## 7. Setup and run
+ Setup and run
 
 Requirements: Windows, Python 3, and the project virtual environment in `venv/`.
 Dependencies are listed in `requirements.txt`.
@@ -477,7 +394,7 @@ Run:
 
 Then open `http://127.0.0.1:5000`.
 
-## 8. Account workflow
+Account workflow
 
 ### Public signup
 
@@ -553,7 +470,7 @@ The Add Employee flow was tested against an isolated temporary SQLite database:
 the record, role, RHU assignment, approved status and hashed password were saved
 correctly.
 
-## 9. Database migrations
+Database migrations
 
 The schema is built by numbered migrations in `app/models/migrations/`, applied
 in filename order and recorded once each in the `schema_migrations` table.
@@ -569,7 +486,7 @@ the merge there is one migration folder, so add every new migration there once.
 | `0009_create_users.sql` | the accounts table that login/signup read and write |
 | `0010_create_app_settings.sql` | key/value store behind the Privacy & Security page |
 | `0011_unify_accounts_on_users.sql` | makes `users` the single accounts table (see below) |
-| `0012` *(to be written)* | adds the `admin` role (section 3) |
+| `0012` *(to be written)* | adds the `admin` role 
 
 ### `users` is the only accounts table
 
