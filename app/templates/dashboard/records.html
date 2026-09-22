@@ -18,8 +18,8 @@
       </select>
       <select class="filter-select" id="filterStation">
         <option value="">All Stations</option>
-        <option value="rhu i">RHU I</option>
-        <option value="rhu ii">RHU II</option>
+        <option value="lhu i">LHU I</option>
+        <option value="lhu ii">LHU II</option>
       </select>
       <select class="filter-select" id="filterStatus">
         <option value="">All Status</option>
@@ -30,6 +30,9 @@
       <button class="filter-btn" onclick="applyFilters()">Filter</button>
       <button class="export-btn" onclick="exportTable()">
         <i class="bi bi-download me-1"></i> Export
+      </button>
+      <button class="export-btn" data-bs-toggle="modal" data-bs-target="#importEmployeesModal">
+        <i class="bi bi-upload me-1"></i> Import
       </button>
     </div>
 
@@ -77,7 +80,7 @@
             <td class="hide-mobile" style="font-size:12px;color:var(--text-muted);white-space:nowrap">{{ e.date_added }}</td>
             <td>
               <div class="d-flex gap-1">
-                <a href="{{ url_for('admin.staff_detail', employee_id=e.id) }}" class="view-btn" style="text-decoration:none;">View</a>
+                <a href="{{ url_for('admin.staff_view', employee_id=e.id) }}" class="view-btn" style="text-decoration:none;">View</a>
                 <a href="{{ url_for('admin.staff_detail', employee_id=e.id) }}" class="view-btn" style="text-decoration:none;background:transparent;color:var(--accent-green);border:1.5px solid var(--accent-green)">Edit</a>
               </div>
             </td>
@@ -98,6 +101,47 @@
     </div>
   </div>
 </main>
+
+<div class="modal fade" id="importEmployeesModal" tabindex="-1" aria-labelledby="importEmployeesModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="importEmployeesModalLabel">Import Employees</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted">Upload a CSV file to add approved employee accounts in one operation.</p>
+        <a href="{{ url_for('admin.staff_import_template') }}" class="export-btn d-inline-block text-decoration-none mb-3">
+          <i class="bi bi-download me-1"></i> Download CSV Template
+        </a>
+        <div id="importFileError" class="alert alert-danger d-none py-2" role="alert"></div>
+        <div id="csvDropZone" class="csv-drop-zone" tabindex="0">
+          <i class="bi bi-cloud-arrow-up fs-3 d-block mb-2"></i>
+          <span>Drag &amp; drop your CSV here, or click to browse</span>
+          <input type="file" id="csvFileInput" accept=".csv,text/csv" hidden>
+        </div>
+        <div id="selectedCsvFile" class="csv-selected-file d-none mt-2">
+          <span id="selectedCsvFileName"></span>
+          <span id="selectedCsvFileSize" class="text-muted"></span>
+          <button type="button" id="removeCsvFile" class="btn btn-sm btn-link text-danger p-0" aria-label="Remove selected file">
+            <i class="bi bi-x-lg"></i>
+          </button>
+        </div>
+        <div class="small text-muted mt-3">
+          Accepted values: sex = male/female; role = Health Officer / LHU Nurse; station = LHU I / LHU II; birthday = YYYY-MM-DD; phone = 10 digits starting with 9 (leading 0 or +63 accepted); barangay = name from the signup list.
+        </div>
+        <div class="small text-warning mt-2">The file contains temporary passwords. Delete it after importing.</div>
+        <div id="importResult" class="mt-3"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" id="startCsvImport" class="filter-btn" disabled>
+          <i class="bi bi-upload me-1"></i> Import
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -110,9 +154,9 @@
     let visible   = 0;
 
     rows.forEach(row => {
-      const matchRole    = !role    || row.dataset.role.includes(role);
-      const matchStation = !station || row.dataset.station.includes(station);
-      const matchStatus  = !status  || row.dataset.status.includes(status);
+      const matchRole    = !role    || row.dataset.role === role;
+      const matchStation = !station || row.dataset.station === station;
+      const matchStatus  = !status  || row.dataset.status === status;
       const show = matchRole && matchStation && matchStatus;
       row.style.display = show ? '' : 'none';
       if (show) visible++;
@@ -125,6 +169,11 @@
   function exportTable() {
     const rows  = document.querySelectorAll('#dmTableBody tr');
     const lines = ['Employee ID,Name,Email,Role,Station,Contact,Status,Date Added'];
+    const csvCell = value => {
+      const text = String(value || '').trim();
+      const safeText = /^[=+\-@]/.test(text) ? `'${text}` : text;
+      return `"${safeText.replace(/"/g, '""')}"`;
+    };
     rows.forEach(row => {
       if (row.style.display === 'none') return;
       const cells = row.querySelectorAll('td');
@@ -137,7 +186,7 @@
       const contact = cells[4].textContent.trim();
       const status  = cells[5].textContent.trim();
       const date    = cells[6].textContent.trim();
-      lines.push(`"${id}","${name}","${email}","${role}","${station}","${contact}","${status}","${date}"`);
+      lines.push([id, name, email, role, station, contact, status, date].map(csvCell).join(','));
     });
 
     const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
@@ -146,5 +195,92 @@
     a.href = url; a.download = 'staff_records.csv'; a.click();
     URL.revokeObjectURL(url);
   }
+
+  (() => {
+    const dropZone = document.getElementById('csvDropZone');
+    const fileInput = document.getElementById('csvFileInput');
+    const selectedFile = document.getElementById('selectedCsvFile');
+    const fileName = document.getElementById('selectedCsvFileName');
+    const fileSize = document.getElementById('selectedCsvFileSize');
+    const fileError = document.getElementById('importFileError');
+    const result = document.getElementById('importResult');
+    const importButton = document.getElementById('startCsvImport');
+    let chosenFile = null;
+
+    function formatSize(bytes) {
+      if (bytes < 1024) return `${bytes} B`;
+      return `${(bytes / 1024).toFixed(1)} KB`;
+    }
+
+    function showError(message) {
+      fileError.textContent = message;
+      fileError.classList.remove('d-none');
+    }
+
+    function clearFile() {
+      chosenFile = null;
+      fileInput.value = '';
+      selectedFile.classList.add('d-none');
+      importButton.disabled = true;
+    }
+
+    function selectFile(file) {
+      fileError.classList.add('d-none');
+      if (!file || !file.name.toLowerCase().endsWith('.csv')) {
+        clearFile();
+        showError('Only .csv files are accepted.');
+        return;
+      }
+      chosenFile = file;
+      fileName.textContent = file.name;
+      fileSize.textContent = ` (${formatSize(file.size)})`;
+      selectedFile.classList.remove('d-none');
+      importButton.disabled = false;
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>'"]/g, character => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+      }[character]));
+    }
+
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('keydown', event => {
+      if (event.key === 'Enter' || event.key === ' ') fileInput.click();
+    });
+    fileInput.addEventListener('change', () => selectFile(fileInput.files[0]));
+    document.getElementById('removeCsvFile').addEventListener('click', clearFile);
+    ['dragenter', 'dragover'].forEach(eventName => dropZone.addEventListener(eventName, event => {
+      event.preventDefault();
+      dropZone.classList.add('dragover');
+    }));
+    ['dragleave', 'drop'].forEach(eventName => dropZone.addEventListener(eventName, event => {
+      event.preventDefault();
+      dropZone.classList.remove('dragover');
+    }));
+    dropZone.addEventListener('drop', event => selectFile(event.dataTransfer.files[0]));
+
+    importButton.addEventListener('click', async () => {
+      if (!chosenFile) return;
+      importButton.disabled = true;
+      result.innerHTML = '<div class="small text-muted">Importing...</div>';
+      const formData = new FormData();
+      formData.append('file', chosenFile);
+      try {
+        const response = await fetch('{{ url_for("admin.staff_import") }}', { method: 'POST', body: formData });
+        const payload = await response.json();
+        if (payload.ok) {
+          result.innerHTML = `<div class="alert alert-success py-2">Imported ${payload.imported} employee${payload.imported === 1 ? '' : 's'}.</div>`;
+          setTimeout(() => window.location.reload(), 700);
+          return;
+        }
+        result.innerHTML = `<div class="alert alert-danger py-2"><ul class="mb-0">${payload.errors.map(error => `<li>Row ${escapeHtml(error.row)}: ${escapeHtml(error.message)}</li>`).join('')}</ul></div>`;
+        importButton.disabled = false;
+      } catch (error) {
+        result.innerHTML = '<div class="alert alert-danger py-2">The import could not be completed.</div>';
+        importButton.disabled = false;
+      }
+    });
+  })();
 </script>
 {% endblock %}

@@ -1,9 +1,12 @@
-from flask import Blueprint, render_template, request, redirect, url_for, abort, flash
+from flask import Blueprint, jsonify, make_response, render_template, request, redirect, url_for, abort, flash
 import sqlite3
+import csv
+import io
 from datetime import datetime
 from werkzeug.security import generate_password_hash
 
 from app.controllers import auth_controller, metrics_controller
+from app.constants import BARANGAYS, CSV_IMPORT_COLUMNS, ROLE_MAP, STATION_MAP
 from app.db import get_db
 from app.views.auth_views import login_required, require_role_for_blueprint, role_required
 
@@ -13,8 +16,20 @@ admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 # blueprints for the other roles). Applied once here instead of on every view.
 require_role_for_blueprint(admin_bp, "medical_officer")
 
-STAFF_ROLES = ["Health Officer", "LHU Nurse"]
-STATIONS = ["RHU I", "RHU II"]
+STAFF_ROLES = list(ROLE_MAP)
+STATIONS = list(STATION_MAP)
+MAX_IMPORT_BYTES = 1_048_576
+MAX_IMPORT_ROWS = 500
+_ROLE_BY_LABEL = {label.casefold(): value for label, value in ROLE_MAP.items()}
+_STATION_BY_LABEL = {**{label.casefold(): value for label, value in STATION_MAP.items()}, "rhu i": "rhui", "rhu ii": "rhuii"}
+_BARANGAY_BY_VALUE = {value.casefold(): value for value, label in BARANGAYS}
+_BARANGAY_BY_LABEL = {label.casefold(): value for value, label in BARANGAYS}
+
+def _csv_value(value): return (value or "").strip()
+def _normalize_csv_header(header): return "_".join((header or "").strip().lower().split())
+def _csv_row_form(row):
+    return {"first_name":_csv_value(row.get("first_name")),"middle_name":_csv_value(row.get("middle_name")),"last_name":_csv_value(row.get("last_name")),"birthday":auth_controller.normalize_import_birthday(_csv_value(row.get("birthday"))),"sex":_csv_value(row.get("sex")).lower(),"email":_csv_value(row.get("email")),"phone":_csv_value(row.get("phone")),"role":_ROLE_BY_LABEL.get(_csv_value(row.get("role")).casefold(),""),"facility":_STATION_BY_LABEL.get(_csv_value(row.get("station")).casefold(),""),"barangay":_BARANGAY_BY_VALUE.get(_csv_value(row.get("barangay")).casefold(),_BARANGAY_BY_LABEL.get(_csv_value(row.get("barangay")).casefold(),"")),"password":row.get("temporary_password") or "","confirm_password":row.get("temporary_password") or ""}
+def _import_error(errors,row_number,message): errors.append({"row":row_number,"message":message})
 STAFF_STATUSES = ["Approved", "Rejected", "Pending"]
 
 @admin_bp.route("/dashboard")
@@ -168,6 +183,113 @@ def data_management():
     from app.models import user as user_model
     employees = user_model.get_staff_records()
     return render_template("dashboard/records.html", employees=employees)
+
+
+@admin_bp.route("/data-management/import-template")
+@login_required
+def staff_import_template():
+    output = io.StringIO(newline="")
+    writer = csv.writer(output, lineterminator="\r\n")
+    writer.writerow(CSV_IMPORT_COLUMNS)
+    writer.writerow([
+        "Fake",
+        "Example",
+        "Employee",
+        "1990-01-01",
+        "female",
+        "fake.employee@example.invalid",
+        "9170000000",
+        "LHU Nurse",
+        "LHU I",
+        "Aplaya",
+        "NotARealPassword123",
+    ])
+    response = make_response(output.getvalue())
+    response.headers["Content-Type"] = "text/csv; charset=utf-8"
+    response.headers["Content-Disposition"] = "attachment; filename=employee_import_template.csv"
+    return response
+
+
+@admin_bp.route("/data-management/import", methods=["POST"])
+@login_required
+def staff_import():
+    from app.models import user as user_model
+
+    uploaded = request.files.get("file")
+    if uploaded is None or not uploaded.filename:
+        return jsonify({"ok": False, "imported": 0, "errors": [{"row": 1, "message": "Please choose a CSV file."}]}), 400
+    if not uploaded.filename.lower().endswith(".csv"):
+        return jsonify({"ok": False, "imported": 0, "errors": [{"row": 1, "message": "Only .csv files are accepted."}]}), 400
+
+    content = uploaded.read(MAX_IMPORT_BYTES + 1)
+    if len(content) > MAX_IMPORT_BYTES:
+        return jsonify({"ok": False, "imported": 0, "errors": [{"row": 1, "message": "The CSV file must be 1 MB or smaller."}]}), 400
+    try:
+        text = content.decode("utf-8-sig")
+        reader = csv.reader(io.StringIO(text), strict=True)
+        headers = next(reader, None)
+    except (UnicodeDecodeError, csv.Error, StopIteration):
+        return jsonify({"ok": False, "imported": 0, "errors": [{"row": 1, "message": "The CSV file is not valid UTF-8 CSV."}]}), 400
+
+    if not headers:
+        return jsonify({"ok": False, "imported": 0, "errors": [{"row": 1, "message": "The CSV file must include a header row."}]}), 400
+    normalized_headers = [_normalize_csv_header(header) for header in headers]
+    missing = [column for column in CSV_IMPORT_COLUMNS if column not in normalized_headers]
+    if missing:
+        return jsonify({
+            "ok": False,
+            "imported": 0,
+            "errors": [{"row": 1, "message": "Missing required column(s): " + ", ".join(missing)}],
+        }), 400
+
+    rows = []
+    errors = []
+    seen_emails = set()
+    try:
+        for values in reader:
+            row_number = reader.line_num
+            if not any(_csv_value(value) for value in values):
+                continue
+            row = {
+                header: values[index] if index < len(values) else ""
+                for index, header in enumerate(normalized_headers)
+                if header in CSV_IMPORT_COLUMNS
+            }
+            if len(rows) >= MAX_IMPORT_ROWS:
+                _import_error(errors, row_number, "The CSV file cannot contain more than 500 data rows.")
+                break
+
+            form = _csv_row_form(row)
+            email = form["email"].casefold()
+            if email in seen_emails:
+                _import_error(errors, row_number, "email already exists in this file")
+            else:
+                seen_emails.add(email)
+
+            validation_errors, cleaned, password = auth_controller.validate_profile_fields(
+                form, normalize_phone_input=True
+            )
+            if form["barangay"] == "":
+                validation_errors.append("Please select an assigned barangay.")
+            for message in validation_errors:
+                _import_error(errors, row_number, message)
+            if not validation_errors:
+                cleaned["role"] = form["role"]
+                cleaned["facility"] = form["facility"]
+                cleaned["password_hash"] = generate_password_hash(password)
+                rows.append(cleaned)
+    except csv.Error:
+        _import_error(errors, reader.line_num or 1, "The CSV file contains invalid CSV data.")
+
+    if errors:
+        return jsonify({"ok": False, "imported": 0, "errors": errors}), 400
+
+    try:
+        user_model.create_users_bulk(rows)
+    except sqlite3.IntegrityError:
+        return jsonify({"ok": False, "imported": 0, "errors": [{"row": 2, "message": "email already exists"}]}), 400
+    return jsonify({"ok": True, "imported": len(rows), "errors": []})
+
 
 
 @admin_bp.route("/data-management/add", methods=["GET", "POST"])
