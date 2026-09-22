@@ -1,6 +1,7 @@
-from flask import Blueprint, render_template, request, jsonify, abort, redirect, url_for, Response
-from app.models import patient_model, visit_model, lab_model, lookup_model, health_analytics_model, ml_model
-from app.models.db import get_connection
+from flask import Blueprint, render_template, request, jsonify, abort, redirect, url_for, Response, current_app
+from app.models import patient_model, visit_model, lab_model, lookup_model, health_analytics_model
+from app.db import get_db
+from app.controllers import metrics_controller
 from datetime import date as date_cls
 from app.rate_limit import rate_limit
 
@@ -179,16 +180,27 @@ def nurse_screening_submit(patient_id, visit_id):
         "referred_to": request.form.get("referred_to"),
     }
 
-    lab_model.create_lab_screening(visit_id, data)
+    lab_screening_id = lab_model.create_lab_screening(visit_id, data)
 
-    # ML PREDICTION 
-    visit = visit_model.get_visit_by_id(visit_id)
-    conditions = visit_model.get_conditions_for_visit(visit_id)
-    try:
-        risk_level, confidence = ml_model.predict_risk(visit, patient, conditions)
-        lab_model.set_model_prediction(visit_id, risk_level, confidence)
-    except FileNotFoundError:
-        pass  # no model file 
+    # ML + GREEN COMPUTING
+    # Keep the nurse workflow on the same measured prediction path as the
+    # dedicated Green API. This records one green_computing_log row per
+    # inference and links it to the lab screening that triggered it.
+    # The Predictor falls back to the clearly-labelled stub when no trained
+    # model is installed, so the GREEN pipeline can still be exercised on
+    # Android/Termux.
+    prediction = metrics_controller.run_measured_prediction(
+        get_db(),
+        current_app.extensions["predictor"],
+        current_app.extensions["battery"],
+        {"fbs_mg_dl": data["fbs_mg_dl"]},
+        lab_screening_id=lab_screening_id,
+    )
+    lab_model.set_model_prediction(
+        visit_id,
+        prediction["model_predicted_risk_level"],
+        prediction["model_confidence"],
+    )
 
     return redirect(url_for('nurse.nurse_screening', patient_id=patient_id, visit_id=visit_id))
 

@@ -1,3 +1,11 @@
+# Green integration fix — nurse screening
+
+- **Fixed:** `nurse_screening_submit()` now routes its model inference through `metrics_controller.run_measured_prediction()` instead of the legacy `app.models.ml_model.predict_risk()` path.
+- **Fixed:** each nurse screening inference now creates a `green_computing_log` row and links it to the saved `lab_screenings.id`.
+- **Preserved:** the existing nurse screening workflow, preliminary/final risk handling, and lab-screening persistence remain unchanged.
+- **Added:** `tests/test_nurse_green_integration.py` verifies that a nurse screening submission creates a linked GREEN inference log and persists the stub prediction on Termux-compatible configurations without a battery sensor.
+- **Validation note:** full pytest execution requires Flask/pytest dependencies in the validation environment; this build was statically compiled and inspected here. The existing phone environment already has the required runtime dependencies from `requirements-phone.txt`.
+
 ## Model-energy benchmark script (thesis Objective 3)
 - **Added** `scripts/benchmark_models.py`: trains Random Forest / LightGBM / XGBoost plus a
   smaller "_optimized" variant of each, then benchmarks every candidate through the exact same
