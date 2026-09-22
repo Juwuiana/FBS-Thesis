@@ -1,0 +1,144 @@
+{% extends "nurse/nurse_base.html" %}
+
+{% block content %}
+<header class="topbar">
+    <div>
+        <h1 class="page-title">Privacy & Security</h1>
+        <p class="page-subtitle">Manage your password, session, and activity log</p>
+    </div>
+</header>
+
+<div class="security-grid">
+
+    <!-- LEFT COLUMN -->
+    <div class="left-column" style="display:flex; flex-direction:column; gap:1.5rem;">
+
+        <div class="form-card" style="margin-bottom:0;">
+            <div class="card-header">Change Password</div>
+            <div class="card-body">
+                <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:1.5rem;">
+                    Update your password regularly to keep your account secure.
+                </p>
+                <div class="field-group">
+                    <label class="field-label">Current Password</label>
+                    <input type="password" class="field-input" name="current_password" placeholder="••••••••">
+                </div>
+                <div class="grid-2">
+                    <div class="field-group">
+                        <label class="field-label">New Password</label>
+                        <input type="password" class="field-input" name="new_password" placeholder="••••••••">
+                    </div>
+                    <div class="field-group">
+                        <label class="field-label">Confirm New Password</label>
+                        <input type="password" class="field-input" name="confirm_password" placeholder="••••••••">
+                    </div>
+                </div>
+                <div style="margin-top:1rem;">
+                    <button type="button" class="btn btn-primary">Update Password</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-card" style="margin-bottom:0;">
+            <div class="card-header">Recent Account Activity</div>
+            <div class="card-body">
+                <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:1rem;">
+                    Successful login history and connection verifications on this terminal.
+                </p>
+                <table class="data-table security-table">
+                    <thead>
+                        <tr>
+                            <th style="width:30%;">Date</th>
+                            <th>Event</th>
+                            <th style="width:22%;">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="log-timestamp">Jun 10, 08:12</td>
+                            <td>Session login verified</td>
+                            <td><span class="risk-badge badge-success">Success</span></td>
+                        </tr>
+                        <tr>
+                            <td class="log-timestamp">Jun 9, 07:54</td>
+                            <td>Session login verified</td>
+                            <td><span class="risk-badge badge-success">Success</span></td>
+                        </tr>
+                        <tr>
+                            <td class="log-timestamp">Jun 8, 08:02</td>
+                            <td>Session login verified</td>
+                            <td><span class="risk-badge badge-success">Success</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="form-card" style="margin-bottom:0;">
+            <div class="card-header">Operational Audit Trail</div>
+            <div class="card-body">
+                <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:1rem;">
+                    Tracks report downloads, patient record printing, intake entries, and credential updates made by your account.
+                </p>
+                <table class="data-table security-table">
+                    <thead>
+                        <tr>
+                            <th style="width:30%;">Date</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="log-timestamp">Jun 10, 14:32</td>
+                            <td>Downloaded clinical summary PDF<br><span style="font-size:0.75rem;color:var(--text-muted);">Barangay Risk Statistics</span></td>
+                        </tr>
+                        <tr>
+                            <td class="log-timestamp">Jun 10, 11:15</td>
+                            <td>Printed screening result<br><span style="font-size:0.75rem;color:var(--text-muted);">Patient ID: CAB-2026-0391</span></td>
+                        </tr>
+                        <tr>
+                            <td class="log-timestamp">Jun 9, 13:45</td>
+                            <td>Password updated<br><span style="font-size:0.75rem;color:var(--text-muted);">User Security Record</span></td>
+                        </tr>
+                        <tr>
+                            <td class="log-timestamp">Jun 9, 10:22</td>
+                            <td>New patient registered<br><span style="font-size:0.75rem;color:var(--text-muted);">Patient Intake Form</span></td>
+                        </tr>
+                        <tr>
+                            <td class="log-timestamp">Jun 8, 15:40</td>
+                            <td>Exported data ledger (.csv)<br><span style="font-size:0.75rem;color:var(--text-muted);">Health Registry Ledger</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- RIGHT COLUMN -->
+    <div class="right-column" style="display:flex; flex-direction:column; gap:1.5rem;">
+
+        <div class="form-card" style="margin-bottom:0;">
+            <div class="card-header">Session Settings</div>
+            <div class="card-body">
+                <div class="status-indicator" style="margin-bottom:1.5rem;">
+                    Your account session is verified and active.
+                </div>
+                <div class="field-group">
+                    <label class="field-label">Auto-lock screen after</label>
+                    <select class="field-input" name="session_timeout">
+                        <option value="15">15 minutes of inactivity</option>
+                        <option value="30">30 minutes of inactivity</option>
+                        <option value="60">1 hour of inactivity</option>
+                    </select>
+                </div>
+                <div style="margin-top:1rem;">
+                    <button type="button" class="btn btn-primary" style="width:100%;">Save Session Rules</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+{% endblock %}

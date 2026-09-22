@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FBS Diabetes Risk Prediction</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/fontawesome/all.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/nurse_base.css') }}">
+</head>
+<body>
+    <div class="mobile-overlay" id="mobileOverlay"></div>
+    <aside class="sidebar" id="sidebar">
+        <div class="user-menu-wrapper">
+            <div class="sidebar-user" id="userMenuToggle" role="button" tabindex="0" title="Account options">
+                <div class="user-avatar-wrap">
+                    <img id="userAvatarPreview" src="" alt="" style="display:none; width:38px; height:38px; border-radius:50%; object-fit:cover;">
+                    <div class="user-avatar" id="userAvatarFallback"></div>
+                </div>
+                <div style="flex:1; min-width:0;">
+                    <div style="font-weight:700; font-size:0.85rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Health Officer</div>
+                    <div style="font-size:0.75rem; opacity:0.7;">LHU Santa Rosa</div>
+                </div>
+                <span class="user-menu-caret" id="userMenuCaret">▲</span>
+            </div>
+            <div class="user-dropdown" id="userDropdown">
+                <label class="user-dropdown-item" for="avatarFileInput">
+                    <span class="udd-icon">🖼</span> Change Profile Photo
+                    <input type="file" id="avatarFileInput" accept="image/*" style="display:none;">
+                </label>
+            </div>
+        </div>
+
+        <nav class="sidebar-nav">
+            <a href="{{ url_for('nurse.nurse_dashboard') }}" class="nav-item {{ 'active' if active_page == 'dashboard' else '' }}">Dashboard</a>
+            <a href="{{ url_for('nurse.nurse_intake') }}" class="nav-item {{ 'active' if active_page == 'intake' else '' }}">Patients Screening</a>
+            <a href="{{ url_for('nurse.nurse_health_results') }}" class="nav-item {{ 'active' if active_page == 'health_results' else '' }}">Health Result</a>
+            <a href="{{ url_for('nurse.nurse_data_management') }}" class="nav-item {{ 'active' if active_page == 'data_management' else '' }}">Data Management</a>
+            <a href="{{ url_for('nurse.nurse_privacy_security') }}" class="nav-item {{ 'active' if active_page == 'privacy' else '' }}">Privacy and Security</a>
+        </nav>
+
+        <div class="sidebar-footer">
+            <a href="{{ safe_url_for('auth.logout') }}" class="user-dropdown-item user-dropdown-signout">
+                 Sign Out
+            </a>
+        </div>
+    </aside>
+
+    <button id="backToTop" class="back-to-top">↑</button>
+    <main class="main-wrapper">
+        <div class="mobile-header">
+            <button id="menuToggle" class="menu-toggle">☰</button>
+            <div class="mobile-brand">FBS Diabetes Risk Prediction</div>
+        </div>
+
+        {% block content %}
+        {% endblock %}
+    </main>
+
+    <script src="{{ url_for('static', filename='js/nurse_base.js') }}"></script>
+
+    {% block scripts %}
+    {% endblock %}
+</body>
+</html>

@@ -1,0 +1,150 @@
+{% extends "admin/admin_base.html" %}
+{% set active_page = "data_management" %}
+
+{% block title %}Data Management – FBS Diabetes Risk{% endblock %}
+{% block page_title %}Data Management{% endblock %}
+
+{% block content %}
+<main class="page-content">
+  <div class="dm-card">
+    <div class="dm-card-title">Staff &amp; Employee Records – filter &amp; manage</div>
+
+    <!-- Filter Bar -->
+    <div class="filter-bar">
+      <select class="filter-select" id="filterRole">
+        <option value="">All Roles</option>
+        <option value="health officer">Health Officer</option>
+        <option value="lhu nurse">LHU Nurse</option>
+      </select>
+      <select class="filter-select" id="filterStation">
+        <option value="">All Stations</option>
+        <option value="rhu i">RHU I</option>
+        <option value="rhu ii">RHU II</option>
+      </select>
+      <select class="filter-select" id="filterStatus">
+        <option value="">All Status</option>
+        <option value="approved">Approved</option>
+        <option value="rejected">Rejected</option>
+        <option value="pending">Pending</option>
+      </select>
+      <button class="filter-btn" onclick="applyFilters()">Filter</button>
+      <button class="export-btn" onclick="exportTable()">
+        <i class="bi bi-download me-1"></i> Export
+      </button>
+    </div>
+
+    <!-- Table -->
+    <div class="dm-table-wrap">
+      <table class="table table-borderless dm-table mb-0">
+        <thead>
+          <tr>
+            <th>Employee ID</th>
+            <th>Full Name</th>
+            <th class="hide-mobile">Role</th>
+            <th class="hide-mobile">Station / LHU</th>
+            <th class="hide-mobile">Contact</th>
+            <th>Status</th>
+            <th class="hide-mobile">Date Added</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="dmTableBody">
+          {% for e in employees %}
+          <tr
+            data-role="{{ e.role | lower }}"
+            data-station="{{ e.station | lower }}"
+            data-status="{{ e.status | lower }}"
+          >
+            <td><span class="patient-id">{{ e.id }}</span></td>
+            <td>
+              <div style="font-weight:600;font-size:13px">{{ e.name }}</div>
+              <div style="font-size:11px;color:var(--text-muted)">{{ e.email }}</div>
+            </td>
+            <td class="hide-mobile">
+              <span class="badge-category">{{ e.role }}</span>
+            </td>
+            <td class="hide-mobile" style="font-size:13px">{{ e.station }}</td>
+            <td class="hide-mobile" style="font-size:12px;color:var(--text-muted)">{{ e.contact }}</td>
+            <td>
+              {% if e.status == 'Approved' %}
+                <span class="risk-pill risk-low">Approved</span>
+              {% elif e.status == 'Rejected' %}
+                <span class="risk-pill risk-high">Rejected</span>
+              {% else %}
+                <span class="risk-pill risk-moderate">Pending</span>
+              {% endif %}
+            </td>
+            <td class="hide-mobile" style="font-size:12px;color:var(--text-muted);white-space:nowrap">{{ e.date_added }}</td>
+            <td>
+              <div class="d-flex gap-1">
+                <a href="{{ url_for('admin.staff_detail', employee_id=e.id) }}" class="view-btn" style="text-decoration:none;">View</a>
+                <a href="{{ url_for('admin.staff_detail', employee_id=e.id) }}" class="view-btn" style="text-decoration:none;background:transparent;color:var(--accent-green);border:1.5px solid var(--accent-green)">Edit</a>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Footer -->
+    <div class="d-flex justify-content-between align-items-center mt-3 flex-wrap gap-2">
+      <span id="recordCount" style="font-size:12px;color:var(--text-muted)">
+        Showing {{ employees | length }} employees
+      </span>
+      <a href="{{ url_for('admin.add_staff') }}" class="filter-btn" style="padding:6px 16px;font-size:12px;text-decoration:none;">
+        <i class="bi bi-person-plus me-1"></i> Add Employee
+      </a>
+    </div>
+  </div>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function applyFilters() {
+    const role    = document.getElementById('filterRole').value.toLowerCase();
+    const station = document.getElementById('filterStation').value.toLowerCase();
+    const status  = document.getElementById('filterStatus').value.toLowerCase();
+    const rows    = document.querySelectorAll('#dmTableBody tr');
+    let visible   = 0;
+
+    rows.forEach(row => {
+      const matchRole    = !role    || row.dataset.role.includes(role);
+      const matchStation = !station || row.dataset.station.includes(station);
+      const matchStatus  = !status  || row.dataset.status.includes(status);
+      const show = matchRole && matchStation && matchStatus;
+      row.style.display = show ? '' : 'none';
+      if (show) visible++;
+    });
+
+    document.getElementById('recordCount').textContent =
+      `Showing ${visible} employee${visible !== 1 ? 's' : ''}`;
+  }
+
+  function exportTable() {
+    const rows  = document.querySelectorAll('#dmTableBody tr');
+    const lines = ['Employee ID,Name,Email,Role,Station,Contact,Status,Date Added'];
+    rows.forEach(row => {
+      if (row.style.display === 'none') return;
+      const cells = row.querySelectorAll('td');
+      const id      = cells[0].textContent.trim();
+      const nameEl  = cells[1].querySelectorAll('div');
+      const name    = nameEl[0] ? nameEl[0].textContent.trim() : '';
+      const email   = nameEl[1] ? nameEl[1].textContent.trim() : '';
+      const role    = cells[2].textContent.trim();
+      const station = cells[3].textContent.trim();
+      const contact = cells[4].textContent.trim();
+      const status  = cells[5].textContent.trim();
+      const date    = cells[6].textContent.trim();
+      lines.push(`"${id}","${name}","${email}","${role}","${station}","${contact}","${status}","${date}"`);
+    });
+
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = 'staff_records.csv'; a.click();
+    URL.revokeObjectURL(url);
+  }
+</script>
+{% endblock %}

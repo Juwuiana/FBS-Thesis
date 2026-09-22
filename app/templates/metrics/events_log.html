@@ -1,0 +1,48 @@
+{% extends "admin/admin_base.html" %}
+{% set active_page = "green_computing" %}
+
+{% block title %}Events Log – FBS Diabetes Risk{% endblock %}
+{% block page_title %}Energy &amp; Green Metrics{% endblock %}
+
+{% block content %}
+<main class="page-content">
+  <div class="mb-3"><a href="{{ url_for('admin.green_computing') }}" class="view-all-link">← Back to Green Computing</a></div>
+
+  <div class="dm-card">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+      <div>
+        <div class="dm-card-title mb-1">Events Log</div>
+        <div style="font-size:12px;color:var(--text-muted)">Connection losses, restorations and sync runs. Times shown in {{ timezone }}.</div>
+      </div>
+      <form method="get" class="d-flex align-items-center gap-2">
+        <label for="type" style="font-size:12px;color:var(--text-muted)">Event type</label>
+        <select id="type" name="type" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
+          <option value="">All</option>
+          {% for key, label in event_types %}<option value="{{ key }}" {{ 'selected' if key == event_type else '' }}>{{ label }}</option>{% endfor %}
+        </select>
+        <noscript><button class="demo-btn" type="submit">Filter</button></noscript>
+      </form>
+    </div>
+
+    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+      <table class="table table-borderless dm-table mb-0">
+        <thead><tr><th>Time</th><th>Event</th><th>Duration</th><th>Records queued</th><th>Gap</th><th>Detail</th></tr></thead>
+        <tbody>
+          {% if not events %}<tr><td colspan="6" style="color:var(--text-muted)">No events recorded{{ ' for this filter' if event_type }}.</td></tr>{% endif %}
+          {% for e in events %}
+          <tr>
+            <td style="white-space:nowrap">{{ e.time }}</td>
+            <td><span class="ev-pill ev-{{ e.tone }}">{{ e.label }}</span></td>
+            <td>{{ e.duration }}</td>
+            <td>{{ e.records }}</td>
+            <td style="font-family:monospace;font-size:12px">{{ e.gap }}</td>
+            <td>{{ e.detail }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% include "metrics/_pagination.html" %}
+  </div>
+</main>
+{% endblock %}

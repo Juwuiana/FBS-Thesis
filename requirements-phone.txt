@@ -1,0 +1,6 @@
+# Minimal, pure-Python runtime for Termux (no compiling). Enough to run the whole web app and the
+# Green Computing page. The ML libraries are only needed once model.joblib exists; install those
+# with Termux's own packages (pkg install python-numpy python-scipy ...) rather than pip.
+Flask==3.1.2
+python-dotenv
+tzdata

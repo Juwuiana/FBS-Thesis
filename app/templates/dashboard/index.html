@@ -1,0 +1,204 @@
+{% extends "admin/admin_base.html" %}
+{% set active_page = "dashboard" %}
+
+{% block title %}Dashboard – FBS Diabetes Risk{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<main class="page-content">
+
+  <!-- ── ROW 1: STAT CARDS ── -->
+  <div class="row g-3 mb-3">
+    <div class="col-6 col-md col-lg">
+      <div class="stat-card">
+        <div class="stat-label">Total Screened</div>
+        <div class="stat-value">{{ metrics.total_screened | default('1,392') }}</div>
+        <div class="stat-change up">
+          <i class="bi bi-arrow-up-short"></i>{{ metrics.total_screened_change | default('+1.2% vs last week') }}
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md col-lg">
+      <div class="stat-card">
+        <div class="stat-label">At Risk (Predicted)</div>
+        <div class="stat-value">
+          {{ metrics.at_risk | default(276) }}
+          <span style="font-size:14px;font-weight:500;color:var(--text-muted)">({{ metrics.at_risk_pct | default(19.8) }}%)</span>
+        </div>
+        <div class="stat-change up">
+          <i class="bi bi-arrow-up-short"></i>{{ metrics.at_risk_change | default('+8% vs last week') }}
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md col-lg">
+      <div class="stat-card">
+        <div class="stat-label">High Risk</div>
+        <div class="stat-value">
+          {{ metrics.high_risk | default(82) }}
+          <span style="font-size:14px;font-weight:500;color:var(--text-muted)">({{ metrics.high_risk_pct | default(5.9) }}%)</span>
+        </div>
+        <div class="stat-change up">
+          <i class="bi bi-arrow-up-short"></i>{{ metrics.high_risk_change | default('+3% vs last week') }}
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md col-lg">
+      <div class="stat-card">
+        <div class="stat-label">Average FBS (mg/dL)</div>
+        <div class="stat-value">{{ metrics.avg_fbs | default(111.4) }}</div>
+        <div class="stat-change up">
+          <i class="bi bi-arrow-up-short"></i>{{ metrics.avg_fbs_change | default('+2.6 vs last week') }}
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md col-lg">
+      <div class="stat-card">
+        <div class="stat-label">Model Accuracy</div>
+        <div class="stat-value">{{ metrics.model_accuracy | default(89.3) }}%</div>
+        <div class="stat-change neutral">Validation Set</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── ROW 2: DONUT / LINE CHART / BARANGAY ── -->
+  <div class="row g-3 mb-3">
+
+    <!-- Donut -->
+    <div class="col-lg-3 col-md-6 col-12">
+      <div class="chart-card h-100">
+        <div class="chart-card-title">Risk Distribution</div>
+        <canvas id="donutChart" height="180"></canvas>
+        <div class="donut-legend mt-3">
+          <div class="donut-legend-item">
+            <span class="legend-dot" style="background:var(--risk-low)"></span>
+            <span>Low Risk – <strong>72.1%</strong> (1,073)</span>
+          </div>
+          <div class="donut-legend-item">
+            <span class="legend-dot" style="background:var(--risk-moderate)"></span>
+            <span>Moderate Risk – <strong>17.0%</strong> (237)</span>
+          </div>
+          <div class="donut-legend-item">
+            <span class="legend-dot" style="background:var(--risk-high)"></span>
+            <span>High Risk – <strong>5.9%</strong> (82)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Line Chart -->
+    <div class="col-lg-6 col-md-12 col-12">
+      <div class="chart-card h-100">
+        <div class="chart-card-title">Screenings Over Time</div>
+        <canvas id="lineChart" height="200"></canvas>
+      </div>
+    </div>
+
+    <!-- Barangay -->
+    <div class="col-lg-3 col-md-6 col-12">
+      <div class="chart-card h-100">
+        <div class="chart-card-title">Barangay List by At-Risk Count</div>
+        {% set barangays = barangay_list if barangay_list is defined else [
+          {"name":"Kanluran","count":58},
+          {"name":"Market Area","count":47},
+          {"name":"Dila","count":41},
+          {"name":"Dita","count":33},
+          {"name":"Malitlit","count":29}
+        ] %}
+        {% for b in barangays %}
+        <div class="barangay-item">
+          <div class="d-flex justify-content-between">
+            <span class="barangay-name">{{ b.name }}</span>
+            <span class="barangay-count">{{ b.count }}</span>
+          </div>
+          <div class="barangay-bar-track">
+            <div class="barangay-bar-fill" style="width:{{ (b.count / 60 * 100)|int }}%"></div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- ── ROW 3: RECENT SCREENINGS / MODEL PERFORMANCE ── -->
+  <div class="row g-3">
+
+    <!-- Recent Screenings Table -->
+    <div class="col-lg-8 col-12">
+      <div class="chart-card">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <div class="chart-card-title mb-0">Recent Screenings</div>
+          <a href="#" class="view-all-link">View All</a>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-borderless screening-table mb-0">
+            <thead>
+              <tr>
+                <th>Patient ID</th>
+                <th>Name</th>
+                <th>FBS (mg/dL)</th>
+                <th>Category</th>
+                <th>Risk Level</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% set rows = recent_screenings if recent_screenings is defined else [
+                {"id":"CAB-2025-0156","name":"Juan Dela Cruz","fbs":142,"category":"Diabetic","risk":"High","date":"May 27, 2025"},
+                {"id":"CAB-2025-0155","name":"Maria Santos","fbs":118,"category":"Prediabetic","risk":"Low","date":"May 27, 2025"},
+                {"id":"CAB-2025-0154","name":"Pedro Reyes","fbs":96,"category":"Normal","risk":"Moderate","date":"May 27, 2025"},
+                {"id":"CAB-2025-0153","name":"Ana Garcia","fbs":134,"category":"Prediabetic","risk":"High","date":"May 27, 2025"},
+                {"id":"CAB-2025-0152","name":"Lisa Perez","fbs":155,"category":"Diabetic","risk":"High","date":"May 26, 2025"}
+              ] %}
+              {% for r in rows %}
+              <tr>
+                <td style="font-size:12px;color:var(--text-muted)">{{ r.id }}</td>
+                <td>{{ r.name }}</td>
+                <td><strong>{{ r.fbs }}</strong></td>
+                <td><span class="badge-category">{{ r.category }}</span></td>
+                <td>
+                  <span class="risk-pill risk-{{ r.risk | lower }}">{{ r.risk }}</span>
+                </td>
+                <td style="font-size:12px;color:var(--text-muted)">{{ r.date }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Model Performance -->
+    <div class="col-lg-4 col-12">
+      <div class="chart-card h-100">
+        <div class="chart-card-title">Model Performance (Current Model)</div>
+        <canvas id="radarChart" height="200"></canvas>
+        <div class="mt-3">
+          {% set perf = model_performance if model_performance is defined else
+            {"accuracy":89.3,"precision":0.87,"recall":0.88,"f1_score":0.87,"roc_auc":0.93} %}
+          <div class="perf-row">
+            <span class="perf-label">Accuracy</span>
+            <span class="perf-value">{{ perf.accuracy }}%</span>
+          </div>
+          <div class="perf-row">
+            <span class="perf-label">Precision</span>
+            <span class="perf-value">{{ perf.precision }}</span>
+          </div>
+          <div class="perf-row">
+            <span class="perf-label">Recall</span>
+            <span class="perf-value">{{ perf.recall }}</span>
+          </div>
+          <div class="perf-row">
+            <span class="perf-label">F1-Score</span>
+            <span class="perf-value">{{ perf.f1_score }}</span>
+          </div>
+          <div class="perf-row">
+            <span class="perf-label">ROC-AUC</span>
+            <span class="perf-value">{{ perf.roc_auc }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</main>
+{% endblock %}

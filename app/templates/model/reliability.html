@@ -1,0 +1,282 @@
+{% extends "admin/admin_base.html" %}
+{% set active_page = "reliability" %}
+
+{% block title %}Model Reliability – FBS Diabetes Risk{% endblock %}
+{% block page_title %}Model Reliability{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/reliability.css') }}" />
+{% endblock %}
+
+{% block content %}
+<main class="page-content">
+
+  <!-- ── ROW 1: BENCHMARK TABLE + DETAILED METRICS ── -->
+  <div class="row g-3 mb-3">
+
+    <!-- Algorithm Benchmarking Table -->
+    <div class="col-lg-7 col-12">
+      <div class="rel-card h-100">
+        <div class="rel-card-title">Algorithm benchmarking — all models</div>
+        <div class="table-responsive">
+          <table class="table table-borderless bench-table mb-0">
+            <thead>
+              <tr>
+                <th>Algorithm</th>
+                <th>Accuracy</th>
+                <th>Precision</th>
+                <th>Recall</th>
+                <th>F1</th>
+                <th>AUC</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for m in benchmarks %}
+              <tr class="{{ 'best-row' if m.best else '' }}">
+                <td>
+                  {{ m.name }}
+                  {% if m.best %}<span class="best-dot"></span>{% endif %}
+                </td>
+                <td>{{ "%.3f"|format(m.accuracy) }}</td>
+                <td>{{ "%.3f"|format(m.precision) }}</td>
+                <td>{{ "%.3f"|format(m.recall) }}</td>
+                <td>{{ "%.3f"|format(m.f1) }}</td>
+                <td>{{ "%.3f"|format(m.auc) }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Best Model Detailed Metrics -->
+    <div class="col-lg-5 col-12">
+      <div class="rel-card h-100">
+        <div class="rel-card-title">{{ best_model.name }} — Detailed Metrics</div>
+        <p class="best-model-subtitle">Best performing model — selected for embedded deployment</p>
+
+        {% set metric_bars = [
+          ("Accuracy",  best_model.accuracy),
+          ("Precision", best_model.precision),
+          ("Recall",    best_model.recall),
+          ("F1",        best_model.f1),
+          ("AUC",       best_model.auc)
+        ] %}
+        {% for label, val in metric_bars %}
+        <div class="metric-bar-row">
+          <div class="d-flex justify-content-between mb-1">
+            <span class="metric-bar-label">{{ label }}</span>
+            <span class="metric-bar-value">{{ "%.3f"|format(val) }}</span>
+          </div>
+          <div class="metric-bar-track">
+            <div class="metric-bar-fill" style="width:{{ (val * 100)|int }}%"></div>
+          </div>
+        </div>
+        {% endfor %}
+
+        <div class="confusion-label mt-3">
+          Confusion Matrix (TEST SET N = {{ best_model.test_n }})
+        </div>
+        <div class="confusion-grid mt-2">
+          <div></div>
+          <div class="cm-header">Pred: Negative</div>
+          <div class="cm-header">Pred: Positive</div>
+
+          <div class="cm-header">Actual: Negative</div>
+          <div class="cm-cell cm-tn">{{ best_model.cm.tn }}<span class="cm-tag">TN</span></div>
+          <div class="cm-cell cm-fp">{{ best_model.cm.fp }}<span class="cm-tag">FP</span></div>
+
+          <div class="cm-header">Actual: Positive</div>
+          <div class="cm-cell cm-fn">{{ best_model.cm.fn }}<span class="cm-tag">FN</span></div>
+          <div class="cm-cell cm-tp">{{ best_model.cm.tp }}<span class="cm-tag">TP</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── ROW 2: OPTIMIZATION / TRAINING SET / THRESHOLDS ── -->
+  <div class="row g-3 mb-3">
+
+    <!-- Model Optimization Details -->
+    <div class="col-lg-4 col-md-6 col-12">
+      <div class="rel-card h-100">
+        <div class="rel-card-title">Model Optimization Details</div>
+        {% set opt = optimization %}
+        <div class="detail-row">
+          <span class="detail-label">Technique</span>
+          <span class="detail-value">{{ opt.technique }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Original Size</span>
+          <span class="detail-value">{{ opt.original_size }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Optimized Size</span>
+          <span class="detail-value">
+            {{ opt.optimized_size }}
+            <span class="reduction-badge">{{ opt.reduction }}</span>
+          </span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Accuracy loss</span>
+          <span class="detail-value">{{ opt.accuracy_loss }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Inference time</span>
+          <span class="detail-value">{{ opt.inference_time }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Target Device</span>
+          <span class="detail-value">{{ opt.target_device }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Training Set Details -->
+    <div class="col-lg-4 col-md-6 col-12">
+      <div class="rel-card h-100">
+        <div class="rel-card-title">Training Set Details</div>
+        {% set ts = training_set %}
+        <div class="detail-row">
+          <span class="detail-label">Source</span>
+          <span class="detail-value">{{ ts.source }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Total Records</span>
+          <span class="detail-value">{{ ts.total_records | number_format }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Diabetic</span>
+          <span class="detail-value">{{ ts.diabetic_count | number_format }} <span class="text-muted-sm">({{ ts.diabetic_pct }}%)</span></span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Non-diabetic</span>
+          <span class="detail-value">{{ ts.non_diabetic_count | number_format }} <span class="text-muted-sm">({{ ts.non_diabetic_pct }}%)</span></span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Train / Test Split</span>
+          <span class="detail-value">{{ ts.train_split }} / {{ ts.test_split }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Primary Feature</span>
+          <span class="detail-value">{{ ts.primary_feature }}</span>
+        </div>
+
+        <!-- Class balance mini bar -->
+        <div class="mt-3">
+          <div class="d-flex justify-content-between mb-1" style="font-size:11px;color:var(--text-muted)">
+            <span>Class Balance</span>
+          </div>
+          <div class="balance-bar">
+            <div class="balance-diabetic" style="width:{{ ts.diabetic_pct }}%">
+              <span>{{ ts.diabetic_pct }}%</span>
+            </div>
+            <div class="balance-non-diabetic" style="width:{{ ts.non_diabetic_pct }}%">
+              <span>{{ ts.non_diabetic_pct }}%</span>
+            </div>
+          </div>
+          <div class="d-flex justify-content-between mt-1" style="font-size:10px;color:var(--text-muted)">
+            <span>■ Diabetic</span>
+            <span>Non-Diabetic ■</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Risk Prediction Thresholds -->
+    <div class="col-lg-4 col-md-12 col-12">
+      <div class="rel-card h-100">
+        <div class="rel-card-title">Risk Prediction Thresholds</div>
+
+        <div class="threshold-item">
+          <span class="threshold-pill thresh-low">Low</span>
+          <span class="threshold-rule">Prob &lt; 0.40</span>
+        </div>
+        <div class="threshold-item">
+          <span class="threshold-pill thresh-moderate">Moderate</span>
+          <span class="threshold-rule">Prob 0.40 – 0.69</span>
+        </div>
+        <div class="threshold-item">
+          <span class="threshold-pill thresh-high">High</span>
+          <span class="threshold-rule">Prob &gt; 0.70</span>
+        </div>
+
+        <p class="threshold-note mt-3">
+          Thresholds calibrated for high sensitivity to minimize missed
+          diabetic cases in the Filipino LHU community context.
+        </p>
+
+        <hr class="rel-divider" />
+
+        <div class="rel-card-title mt-3">ROC Curve</div>
+        <canvas id="rocChart" height="160"></canvas>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:6px;text-align:center">
+          AUC = {{ "%.3f"|format(best_model.auc) }}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── ROW 3: FEATURE IMPORTANCE + CV RESULTS ── -->
+  <div class="row g-3">
+
+    <!-- Feature Importance -->
+    <div class="col-lg-6 col-12">
+      <div class="rel-card h-100">
+        <div class="rel-card-title">Feature Importance</div>
+        <canvas id="featureChart" height="200"></canvas>
+      </div>
+    </div>
+
+    <!-- Cross-Validation Results -->
+    <div class="col-lg-6 col-12">
+      <div class="rel-card h-100">
+        <div class="rel-card-title">Cross-Validation Results (10-Fold)</div>
+        <canvas id="cvChart" height="200"></canvas>
+        <div class="cv-summary mt-3">
+          <div class="cv-stat">
+            <span class="cv-stat-label">Mean AUC</span>
+            <span class="cv-stat-value">{{ cv.mean_auc }}</span>
+          </div>
+          <div class="cv-stat">
+            <span class="cv-stat-label">Std Dev</span>
+            <span class="cv-stat-value">± {{ cv.std_auc }}</span>
+          </div>
+          <div class="cv-stat">
+            <span class="cv-stat-label">Min</span>
+            <span class="cv-stat-value">{{ cv.min_auc }}</span>
+          </div>
+          <div class="cv-stat">
+            <span class="cv-stat-label">Max</span>
+            <span class="cv-stat-value">{{ cv.max_auc }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/reliability.js') }}"></script>
+<script>
+  window.RELIABILITY_DATA = {
+    bestModel: {
+      name: "{{ best_model.name }}",
+      metrics: {
+        accuracy:  {{ best_model.accuracy }},
+        precision: {{ best_model.precision }},
+        recall:    {{ best_model.recall }},
+        f1:        {{ best_model.f1 }},
+        auc:       {{ best_model.auc }}
+      }
+    },
+    features: {{ feature_importance | tojson }},
+    cvScores:  {{ cv.fold_scores | tojson }},
+    rocPoints: {{ roc_points | tojson }}
+  };
+  initReliabilityCharts(window.RELIABILITY_DATA);
+</script>
+{% endblock %}

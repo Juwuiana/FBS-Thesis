@@ -1,0 +1,117 @@
+{% extends "nurse/nurse_base.html" %}
+
+{% block content %}
+<header class="topbar">
+    <div>
+        <h1 class="page-title">Dashboard</h1>
+        <p class="page-subtitle">Santa Rosa City Health Office — Diabetes Risk Overview</p>
+    </div>
+</header>
+
+<div class="dash-grid-top">
+    <div class="stat-card">
+        <div class="stat-title">Total Screened</div>
+        <div class="stat-value">{{ summary.total_screened }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-title">At Risk (Moderate + High)</div>
+        <div class="stat-value">{{ summary.at_risk }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-title">High Risk</div>
+        <div class="stat-value">{{ summary.high_risk }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-title">Avg. FBS (mg/dL)</div>
+        <div class="stat-value">{{ summary.avg_fbs }}</div>
+    </div>
+</div>
+
+<div class="dash-grid-mid">
+    <div class="form-card">
+    <div class="card-header">Risk Profile Distribution</div>
+        <div class="card-body">
+            <div class="chart-container">
+                <canvas id="riskDonutChart"></canvas>
+            </div>
+            <p style="font-size:0.72rem; color:var(--text-muted); text-align:center; margin-top:0.5rem;">
+                Based on {{ risk_total }} completed screening{{ 's' if risk_total != 1 else '' }}
+                (Low: {{ risk_counts.Low }}, Moderate: {{ risk_counts.Moderate }}, High: {{ risk_counts.High }})
+            </p>
+        </div>
+    </div>
+    <div class="form-card">
+        <div class="card-header">Screening Volume Timeline</div>
+        <div class="card-body">
+            <div class="chart-container">
+                <canvas id="screeningsLineChart"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="form-card">
+        <div class="card-header">Regional Burden — Top Barangays</div>
+        <div class="card-body">
+            <div class="chart-container">
+                <canvas id="barangayBarChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bottom Row: Recent Screenings Table | Model Radar -->
+<div class="dash-grid-bot">
+    <div class="form-card">
+        <div class="card-header">Recent Patient Registries</div>
+        <div class="card-body" style="padding:0; overflow-x:auto; -webkit-overflow-scrolling:touch;">
+            <table class="data-table" style="min-width:560px;">
+                <thead>
+                    <tr>
+                        <th>Patient ID</th>
+                        <th>Name</th>
+                        <th>Age / Sex</th>
+                        <th>FBS (mg/dL)</th>
+                        <th>Risk Level</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in recent %}
+                    <tr>
+                        <td>{{ r.patient_code }}</td>
+                        <td>{{ r.last_name }}, {{ r.first_name }}</td>
+                        <td>{{ r.age }} / {{ r.sex }}</td>
+                        <td>{{ r.fbs_mg_dl if r.fbs_mg_dl is not none else "—" }}</td>
+                        <td>
+                            {% if r.risk == 'High' %}
+                                <span class="risk-badge badge-danger">High</span>
+                            {% elif r.risk == 'Moderate' %}
+                                <span class="risk-badge badge-warning">Moderate</span>
+                            {% elif r.risk == 'Low' %}
+                                <span class="risk-badge badge-success">Low</span>
+                            {% else %}
+                                <span style="color:var(--text-muted);">Pending</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ r.assessment_date or "—" }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="6" style="padding:1rem; color:var(--text-muted);">No screenings recorded yet.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='vendor/chartjs/chart.umd.min.js') }}"></script>
+<script>
+    window.__dashboardData = {
+        riskData: {{ risk_data | tojson }},
+        timeline: {{ timeline | tojson }},
+        topBarangays: {{ top_barangays | tojson }},
+    };
+</script>
+<script src="{{ url_for('static', filename='js/nurse_dashboard.js') }}"></script>
+{% endblock %}

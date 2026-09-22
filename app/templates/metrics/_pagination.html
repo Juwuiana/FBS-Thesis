@@ -1,0 +1,15 @@
+{# Server-side pagination. Expects `pg` from metrics_controller.paginate (links keep the filters). #}
+<div class="audit-pagination mt-3">
+  <div class="audit-pagination-info">
+    {% if pg.total %}Showing {{ pg.start }}–{{ pg.end }} of {{ pg.total }}{% else %}No records{% endif %}
+  </div>
+  {% if pg.pages > 1 %}
+  <nav class="page-btns" aria-label="Pagination">
+    {% if pg.prev_url %}<a class="page-btn page-btn-arrow" aria-label="Previous page" href="{{ pg.prev_url }}">‹</a>{% endif %}
+    {% for n, href in pg.links %}
+    <a class="page-btn {{ 'active' if n == pg.page else '' }}" {% if n == pg.page %}aria-current="page"{% endif %} href="{{ href }}">{{ n }}</a>
+    {% endfor %}
+    {% if pg.next_url %}<a class="page-btn page-btn-arrow" aria-label="Next page" href="{{ pg.next_url }}">›</a>{% endif %}
+  </nav>
+  {% endif %}
+</div>

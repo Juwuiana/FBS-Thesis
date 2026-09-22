@@ -1,0 +1,58 @@
+{% extends "admin/admin_base.html" %}
+{% set active_page = "green_computing" %}
+
+{% block title %}Offline-Logged Records – FBS Diabetes Risk{% endblock %}
+{% block page_title %}Energy &amp; Green Metrics{% endblock %}
+
+{% block content %}
+<main class="page-content">
+  <div class="mb-3"><a href="{{ url_for('admin.green_computing') }}" class="view-all-link">← Back to Green Computing</a></div>
+
+  {% if monitor.status != 'running' and not config.DEMO_MODE %}
+  <div class="py-2 px-3 mb-3" style="font-size:12px;background:#fff8e1;border:1px solid #ffe0a3;border-radius:8px;color:#8a5a00">
+    The connectivity monitor is not running, so this list may be out of date.
+  </div>
+  {% endif %}
+
+  <div class="dm-card">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+      <div>
+        <div class="dm-card-title mb-1">Offline-Logged Screening Records</div>
+        <div style="font-size:12px;color:var(--text-muted)">
+          {{ summary.queued }} queued · {{ summary.synced }} synced · {{ summary.failed }} failed. Times shown in {{ timezone }}.
+        </div>
+      </div>
+      <div class="page-btns" role="group" aria-label="Filter by status">
+        {% for key, label in (('pending', 'Pending'), ('synced', 'Synced'), ('all', 'All')) %}
+        <a class="demo-btn {{ 'demo-btn-primary' if status == key else '' }}" href="?status={{ key }}">{{ label }}</a>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+      <table class="table table-borderless dm-table mb-0">
+        <thead><tr><th>Patient ID</th><th>FBS</th><th>Risk</th><th>Status</th><th>Logged</th><th>Synced</th><th>Gap</th><th>Attempts</th></tr></thead>
+        <tbody>
+          {% if not records %}<tr><td colspan="8" style="color:var(--text-muted)">Nothing here{{ ' – all caught up' if status == 'pending' }}.</td></tr>{% endif %}
+          {% for r in records %}
+          <tr>
+            <td style="font-family:monospace;font-size:12px">{{ r.id }}</td>
+            <td><b>{{ r.fbs }}</b></td>
+            <td><span class="risk-pill risk-{{ r.risk | lower }}">{{ r.risk }}</span></td>
+            <td>
+              <span class="ev-pill ev-{{ 'success' if r.status_key == 'SYNCED' else 'danger' if r.status_key == 'FAILED' else 'warn' }}">{{ r.status }}</span>
+              {% if r.error %}<div style="font-size:11px;color:var(--text-muted)">{{ r.error }}</div>{% endif %}
+            </td>
+            <td style="white-space:nowrap">{{ r.queued_at }}</td>
+            <td style="white-space:nowrap">{{ r.synced_at }}</td>
+            <td style="font-family:monospace;font-size:12px">{{ r.gap }}</td>
+            <td>{{ r.attempts }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% include "metrics/_pagination.html" %}
+  </div>
+</main>
+{% endblock %}

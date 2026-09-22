@@ -1,0 +1,291 @@
+{% extends "nurse/nurse_base.html" %}
+
+{% block content %}
+    <header class="topbar">
+        <div>
+            <h1 class="page-title">Patient Assessment Form</h1>
+            <p class="page-subtitle">Individual Health Profile &amp; CVD/NCD Risk Assessment (Annex A1 — Santa Rosa City Health Office I)</p>
+        </div>
+        <div class="breadcrumbs">Risk Screening / <span style="color:var(--text-primary); font-weight:600;">Patient Intake Form</span></div>
+    </header>
+
+    <form id="intakeForm">
+        <div class="form-card">
+            <div class="card-header">1. Patient Demographics <span id="patientIdBadge" style="font-weight:600; text-transform:none;"></span></div>
+            <div class="card-body">
+                <div class="grid-4">
+                    <div class="field-group"><label class="field-label">Patient ID No.</label><input type="text" id="patientId" class="field-input" placeholder="Auto-generated" disabled></div>
+                    <div class="field-group"><label class="field-label">Last Name</label><input type="text" id="lastName" class="field-input" required></div>
+                    <div class="field-group"><label class="field-label">First Name</label><input type="text" id="firstName" class="field-input" required></div>
+                    <div class="field-group"><label class="field-label">Middle Name</label><input type="text" id="middleName" class="field-input"></div>
+                </div>
+
+                <div class="grid-4">
+                    <div class="field-group"><label class="field-label">Father's First Name</label><input type="text" id="fatherFirstName" class="field-input"></div>
+                    <div class="field-group"><label class="field-label">Father's Last Name</label><input type="text" id="fatherLastName" class="field-input"></div>
+                    <div class="field-group"><label class="field-label">Mother's First Name</label><input type="text" id="motherFirstName" class="field-input"></div>
+                    <div class="field-group"><label class="field-label">Mother's Last Name</label><input type="text" id="motherLastName" class="field-input"></div>
+                </div>
+
+                <div class="grid-4">
+                    <div class="field-group"><label class="field-label">Spouse's First Name</label><input type="text" id="spouseFirstName" class="field-input"></div>
+                    <div class="field-group"><label class="field-label">Spouse's Last Name</label><input type="text" id="spouseLastName" class="field-input"></div>
+                    <div class="field-group"><label class="field-label">Contact Number</label><input type="text" id="contactNumber" class="field-input"></div>
+                    <div class="field-group"><label class="field-label">Date of Assessment</label><input type="date" id="dateAssessment" class="field-input"></div>
+                </div>
+
+                <div class="grid-5">
+                    <div class="field-group"><label class="field-label">Date of Birth</label><input type="date" id="birthdate" class="field-input" required></div>
+                    <div class="field-group"><label class="field-label">Age</label><input type="text" id="age" class="field-input" placeholder="yrs" readonly></div>
+                    <div class="field-group">
+                        <label class="field-label">Sex</label>
+                        <select id="sex" class="field-input" required>
+                            <option value="">Select</option><option>Male</option><option>Female</option>
+                        </select>
+                    </div>
+                    <div class="field-group">
+                        <label class="field-label">Civil Status</label>
+                        <select id="civilStatus" class="field-input">
+                            <option value="">Select</option><option>Single</option><option>Married</option>
+                            <option>Annulled</option><option>Widow/Widower</option><option>Separated</option>
+                        </select>
+                    </div>
+                    <div class="field-group"><label class="field-label">Religion</label><input type="text" id="religion" class="field-input"></div>
+                </div>
+
+                <div class="grid-4">
+                    <div class="field-group"><label class="field-label">Occupation</label><input type="text" id="occupation" class="field-input"></div>
+                    <div class="field-group">
+                        <label class="field-label">Educational Attainment</label>
+                        <select id="education" class="field-input">
+                            <option value="">Select Education</option>
+                            <option>No Schooling</option><option>Elementary</option>
+                            <option>High School</option><option>Vocational</option>
+                            <option>College degree, post graduate</option>
+                        </select>
+                    </div>
+                    <div class="field-group">
+                        <label class="field-label">Barangay</label>
+                        <select id="barangay" class="field-input">
+                            <option value="">Select Barangay</option>
+                            {% for b in barangays %}<option>{{ b }}</option>{% endfor %}
+                        </select>
+                    </div>
+                    <div class="field-group"><label class="field-label">Complete Address</label><input type="text" id="address" class="field-input"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-card">
+            <div class="card-header">2. PHIC Membership</div>
+            <div class="card-body">
+                <div class="grid-2">
+                    <div class="field-group">
+                        <label class="field-label">Membership Type</label>
+                        <select id="phicMembership" class="field-input">
+                            <option value="">Select</option><option>Member</option><option>Dependent</option><option>Non-Member</option>
+                        </select>
+                    </div>
+                    <div class="field-group">
+                        <label class="field-label">Category</label>
+                        <select id="phicType" class="field-input">
+                            <option value="">Select</option>
+                            <option>Sponsored - NHTS</option><option>Sponsored - LGU</option><option>Sponsored - NGA</option>
+                            <option>IPP - Organized Group</option><option>IPP - OFW</option><option>IPP - Private</option>
+                            <option>Employed - Government</option><option>Employed - Private</option><option>Lifetime</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-card">
+            <div class="card-header">3. Past Medical History</div>
+            <div class="card-body">
+                <div class="radio-card-wrapper">
+                    <div class="radio-card"><input type="checkbox" class="pmh" id="pmh1" value="Allergy"><label for="pmh1">Allergy</label></div>
+                    <div class="radio-card"><input type="checkbox" class="pmh" id="pmh2" value="Asthma"><label for="pmh2">Asthma</label></div>
+                    <div class="radio-card"><input type="checkbox" class="pmh" id="pmh3" value="Cancer"><label for="pmh3">Cancer</label></div>
+                    <div class="radio-card"><input type="checkbox" class="pmh" id="pmh4" value="Cerebrovascular Disease"><label for="pmh4">Cerebrovascular Disease</label></div>
+                    <div class="radio-card"><input type="checkbox" class="pmh" id="pmh5" value="Coronary Artery Disease"><label for="pmh5">Coronary Artery Disease</label></div>
+                    <div class="radio-card"><input type="checkbox" class="pmh" id="pmh6" value="Diabetes Mellitus"><label for="pmh6">Diabetes Mellitus</label></div>
+                    <div class="radio-card"><input type="checkbox" class="pmh" id="pmh7" value="Emphysema"><label for="pmh7">Emphysema</label></div>
+                    <div class="radio-card"><input type="checkbox" class="pmh" id="pmh8" value="Epilepsy/Seizure Disease"><label for="pmh8">Epilepsy/Seizure Disease</label></div>
+                    <div class="radio-card"><input type="checkbox" class="pmh" id="pmh9" value="Hepatitis"><label for="pmh9">Hepatitis</label></div>
+                    <div class="radio-card"><input type="checkbox" class="pmh" id="pmh10" value="Hyperlipidemia"><label for="pmh10">Hyperlipidemia</label></div>
+                    <div class="radio-card"><input type="checkbox" class="pmh" id="pmh11" value="Hypertension"><label for="pmh11">Hypertension</label></div>
+                    <div class="radio-card"><input type="checkbox" class="pmh" id="pmh12" value="Peptic Ulcer Disease"><label for="pmh12">Peptic Ulcer Disease</label></div>
+                    <div class="radio-card"><input type="checkbox" class="pmh" id="pmh13" value="Pneumonia"><label for="pmh13">Pneumonia</label></div>
+                    <div class="radio-card"><input type="checkbox" class="pmh" id="pmh14" value="Thyroid Disease"><label for="pmh14">Thyroid Disease</label></div>
+                    <div class="radio-card"><input type="checkbox" class="pmh" id="pmh15" value="Tuberculosis"><label for="pmh15">Tuberculosis</label></div>
+                    <div class="radio-card"><input type="checkbox" class="pmh" id="pmh16" value="Urinary Tract Infection"><label for="pmh16">Urinary Tract Infection</label></div>
+                </div>
+                <div class="field-group" style="margin-top:1rem;"><label class="field-label">Past Surgical History (Operation / Date)</label><input type="text" id="pastSurgical" class="field-input" placeholder="e.g. Appendectomy - 2019"></div>
+            </div>
+        </div>
+
+        <div class="form-card">
+            <div class="card-header">4. Family History (1st Degree Relative)</div>
+            <div class="card-body">
+                <div class="radio-card-wrapper">
+                    <div class="radio-card"><input type="checkbox" class="fh" id="fh1" value="Hypertension"><label for="fh1">Hypertension</label></div>
+                    <div class="radio-card"><input type="checkbox" class="fh" id="fh2" value="Stroke/Cerebrovascular Disease"><label for="fh2">Stroke</label></div>
+                    <div class="radio-card"><input type="checkbox" class="fh" id="fh3" value="Coronary Artery Disease"><label for="fh3">Heart Attack / CAD</label></div>
+                    <div class="radio-card"><input type="checkbox" class="fh" id="fh4" value="Diabetes Mellitus"><label for="fh4">Diabetes</label></div>
+                    <div class="radio-card"><input type="checkbox" class="fh" id="fh5" value="Asthma"><label for="fh5">Asthma</label></div>
+                    <div class="radio-card"><input type="checkbox" class="fh" id="fh6" value="Cancer"><label for="fh6">Cancer</label></div>
+                    <div class="radio-card"><input type="checkbox" class="fh" id="fh7" value="Kidney Disease"><label for="fh7">Kidney Disease</label></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-card">
+            <div class="card-header">5. CVD Questionnaire (Probable Angina, Heart Attack, Stroke)</div>
+            <div class="card-body">
+                <div class="grid-2">
+                    <div class="field-group"><label class="field-label">1. Pain/discomfort/pressure in chest?</label><select class="field-input cvd-q"><option>No</option><option>Yes</option></select></div>
+                    <div class="field-group"><label class="field-label">2. Pain in center/left chest or left arm?</label><select class="field-input cvd-q"><option>No</option><option>Yes</option></select></div>
+                    <div class="field-group"><label class="field-label">3. Occurs when walking uphill or hurrying?</label><select class="field-input cvd-q"><option>No</option><option>Yes</option></select></div>
+                    <div class="field-group"><label class="field-label">4. Do you slow down if you get it while walking?</label><select class="field-input cvd-q"><option>No</option><option>Yes</option></select></div>
+                    <div class="field-group"><label class="field-label">5. Does pain go away if you stand still or take under-tongue tablet?</label><select class="field-input cvd-q"><option>No</option><option>Yes</option></select></div>
+                    <div class="field-group"><label class="field-label">6. Does pain go away in less than 10 minutes?</label><select class="field-input cvd-q"><option>No</option><option>Yes</option></select></div>
+                    <div class="field-group"><label class="field-label">7. Severe chest pain lasting half an hour or more?</label><select class="field-input cvd-q"><option>No</option><option>Yes</option></select></div>
+                    <div class="field-group" style="background: var(--danger-light); padding: 10px; border-radius: 6px;">
+                        <label class="field-label" style="color: var(--danger);">8. TIA/Stroke: Difficulty talking, weakness or numbness of arm/leg on one side?</label>
+                        <select class="field-input cvd-q"><option>No</option><option>Yes (Refer to Doctor)</option></select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-card">
+            <div class="card-header">6. Personal / Social History &amp; Lifestyle Factors</div>
+            <div class="card-body">
+                <label class="field-label">Smoking (Tobacco/Cigarette)</label>
+                <div class="radio-card-wrapper" style="margin-bottom: 1.5rem;">
+                    <div class="radio-card"><input type="radio" name="smoke" id="sm1" value="Never smoked"><label for="sm1">Never smoked</label></div>
+                    <div class="radio-card"><input type="radio" name="smoke" id="sm2" value="Stopped > 1 year"><label for="sm2">Stopped &gt; 1 year</label></div>
+                    <div class="radio-card"><input type="radio" name="smoke" id="sm3" value="Current Smoker"><label for="sm3">Current Smoker</label></div>
+                    <div class="radio-card"><input type="radio" name="smoke" id="sm4" value="Stopped < 1 year"><label for="sm4">Stopped &lt; 1 year</label></div>
+                    <div class="radio-card"><input type="radio" name="smoke" id="sm5" value="Passive Smoker"><label for="sm5">Passive Smoker</label></div>
+                </div>
+
+                <div class="grid-3">
+                    <div class="field-group">
+                        <label class="field-label">Alcohol Intake</label>
+                        <select id="alcohol" class="field-input">
+                            <option>Never Consumed</option><option>Yes</option><option>Yes (Binge: 5+ drinks in one occasion past month)</option>
+                        </select>
+                    </div>
+                    <div class="field-group">
+                        <label class="field-label">Illicit Drug Use</label>
+                        <select id="illicitDrugs" class="field-input"><option>No</option><option>Yes</option></select>
+                    </div>
+                    <div class="field-group">
+                        <label class="field-label">Physical Activity</label>
+                        <select id="physicalActivity" class="field-input">
+                            <option>Does NOT meet 2.5 hours/week</option><option>Meets at least 2.5 hours/week moderate activity</option>
+                        </select>
+                    </div>
+                </div>
+
+                <label class="field-label" style="margin-top: 1rem;">Dietary Factors</label>
+                <div class="grid-3">
+                    <div class="radio-card"><input type="checkbox" class="diet" id="diet1" value="High Fat/Salt"><label for="diet1">High Fat/Salt (Eats processed/fast foods weekly)</label></div>
+                    <div class="radio-card"><input type="checkbox" class="diet" id="diet2" value="3+ servings vegetables daily"><label for="diet2">Eats 3 servings of vegetables daily</label></div>
+                    <div class="radio-card"><input type="checkbox" class="diet" id="diet3" value="2-3 servings fruits daily"><label for="diet3">Eats 2-3 servings of fruits daily</label></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-card">
+            <div class="card-header">7. Diabetes History</div>
+            <div class="card-body">
+                <div class="grid-2">
+                    <div class="field-group">
+                        <label class="field-label">Was patient diagnosed as having diabetes?</label>
+                        <select id="diabetesDiagnosis" class="field-input">
+                            <option>No / Do not know</option><option>Yes (with medications)</option><option>Yes (without medications)</option>
+                        </select>
+                    </div>
+                    <div class="field-group">
+                        <label class="field-label">Does patient have these symptoms?</label>
+                        <div class="radio-card-wrapper">
+                            <div class="radio-card"><input type="checkbox" class="dm-sym" id="sym1" value="Polyphagia"><label for="sym1">Polyphagia (Excessive eating)</label></div>
+                            <div class="radio-card"><input type="checkbox" class="dm-sym" id="sym2" value="Polydipsia"><label for="sym2">Polydipsia (Excessive thirst)</label></div>
+                            <div class="radio-card"><input type="checkbox" class="dm-sym" id="sym3" value="Polyuria"><label for="sym3">Polyuria (Excessive urination)</label></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-card">
+            <div class="card-header">8. Immunizations</div>
+            <div class="card-body">
+                <div class="radio-card-wrapper">
+                    <div class="radio-card"><input type="checkbox" class="immu" id="im1" value="BCG"><label for="im1">BCG</label></div>
+                    <div class="radio-card"><input type="checkbox" class="immu" id="im2" value="OPV/IPV Series"><label for="im2">OPV/IPV Series</label></div>
+                    <div class="radio-card"><input type="checkbox" class="immu" id="im3" value="DPT Series"><label for="im3">DPT Series</label></div>
+                    <div class="radio-card"><input type="checkbox" class="immu" id="im4" value="Measles"><label for="im4">Measles</label></div>
+                    <div class="radio-card"><input type="checkbox" class="immu" id="im5" value="Hepatitis A/B Series"><label for="im5">Hepatitis A/B Series</label></div>
+                    <div class="radio-card"><input type="checkbox" class="immu" id="im6" value="HPV"><label for="im6">HPV</label></div>
+                    <div class="radio-card"><input type="checkbox" class="immu" id="im7" value="MMR"><label for="im7">MMR</label></div>
+                    <div class="radio-card"><input type="checkbox" class="immu" id="im8" value="Tetanus Toxoid"><label for="im8">Tetanus Toxoid</label></div>
+                    <div class="radio-card"><input type="checkbox" class="immu" id="im9" value="Pneumococcal Vaccine"><label for="im9">Pneumococcal Vaccine</label></div>
+                    <div class="radio-card"><input type="checkbox" class="immu" id="im10" value="Flu Vaccine"><label for="im10">Flu Vaccine</label></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-card" id="obGyneCard">
+            <div class="card-header">9. Menstrual &amp; Pregnancy History <span style="font-weight:600; text-transform:none;">(for female patients)</span></div>
+            <div class="card-body">
+                <div class="grid-4">
+                    <div class="field-group"><label class="field-label">Age at Menarche</label><input type="number" id="menarcheAge" class="field-input"></div>
+                    <div class="field-group"><label class="field-label">Last Menstrual Period</label><input type="date" id="lmp" class="field-input"></div>
+                    <div class="field-group"><label class="field-label">Gravida (no. of pregnancy)</label><input type="number" id="gravida" class="field-input"></div>
+                    <div class="field-group"><label class="field-label">Para (no. of delivery)</label><input type="number" id="para" class="field-input"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-card">
+            <div class="card-header">10. Anthropometric Measurements, Vitals &amp; Physical Exam</div>
+            <div class="card-body">
+                <div class="grid-5">
+                    <div class="field-group"><label class="field-label">Systolic BP (mmHg)</label><input type="number" id="bpSystolic" class="field-input" placeholder="e.g. 120"></div>
+                    <div class="field-group"><label class="field-label">Diastolic BP (mmHg)</label><input type="number" id="bpDiastolic" class="field-input" placeholder="e.g. 80"></div>
+                    <div class="field-group"><label class="field-label">Heart Rate</label><input type="text" id="hr" class="field-input" placeholder="bpm"></div>
+                    <div class="field-group"><label class="field-label">Respiratory Rate</label><input type="text" id="rr" class="field-input" placeholder="cpm"></div>
+                    <div class="field-group"><label class="field-label">Height (cm)</label><input type="number" id="height" class="field-input"></div>
+                </div>
+                <div class="grid-3">
+                    <div class="field-group"><label class="field-label">Weight (kg)</label><input type="number" id="weight" class="field-input"></div>
+                    <div class="field-group"><label class="field-label">Waist Circ. (cm)</label><input type="number" id="waist" class="field-input" placeholder="Central Adiposity"></div>
+                    <div class="field-group"><label class="field-label">BMI (Auto-calculated)</label><input type="text" id="bmi" class="field-input" readonly placeholder="— kg/m²"></div>
+                </div>
+                <div class="field-group"><label class="field-label">Obesity Classification</label><input type="text" id="obesityClass" class="field-input" readonly></div>
+
+                <label class="field-label" style="margin-top:1rem;">Pertinent PE Findings</label>
+                <div class="grid-3">
+                    <div class="field-group"><label class="field-label">Skin</label><input type="text" id="peSkin" class="field-input" placeholder="e.g. Pallor, Jaundice"></div>
+                    <div class="field-group"><label class="field-label">HEENT</label><input type="text" id="peHeent" class="field-input"></div>
+                    <div class="field-group"><label class="field-label">Chest/Lungs</label><input type="text" id="peChest" class="field-input"></div>
+                    <div class="field-group"><label class="field-label">Heart</label><input type="text" id="peHeart" class="field-input"></div>
+                    <div class="field-group"><label class="field-label">Abdomen</label><input type="text" id="peAbdomen" class="field-input"></div>
+                    <div class="field-group"><label class="field-label">Extremities</label><input type="text" id="peExtremities" class="field-input"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="action-bar">
+            <button type="button" id="saveDraftBtn" class="btn btn-secondary">← Save as Draft</button>
+            <button type="button" id="submitIntakeBtn" class="btn btn-primary">Save Intake &amp; Proceed to Lab Screening →</button>
+        </div>
+    </form>
+{% endblock %}
+
+{% block scripts %}
+    <script src="{{ url_for('static', filename='js/nurse_intake.js') }}"></script>
+{% endblock %}

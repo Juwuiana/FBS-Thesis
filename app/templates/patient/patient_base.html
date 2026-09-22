@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+    <title>Patient Portal – LHU</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/patient_style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/fontawesome/all.min.css') }}">
+</head>
+<body>
+
+    <div class="mobile-header" id="mobileHeader">
+        <button id="menuBtn" class="menu-btn"><i class="fas fa-bars"></i></button>
+        <h2>LHU Patient Portal</h2>
+    </div>
+
+    <div class="mobile-overlay" id="mobileOverlay"></div>
+
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-profile">
+            <div class="profile-icon">
+                <i class="fas fa-user"></i>
+            </div>
+            <div>
+                <div class="profile-name">{{ patient.first_name }} {{ patient.last_name }}</div>
+                <div class="profile-sub">{{ patient.patient_code }} · LHU Santa Rosa</div>
+            </div>
+        </div>
+
+        <nav class="sidebar-nav">
+            <a href="{{ url_for('patient.patient_dashboard') }}" class="nav-link {% if request.endpoint == 'patient.patient_dashboard' %}active{% endif %}">
+                <i class="fas fa-home"></i> Home
+            </a>
+            <a href="{{ url_for('patient.patient_health_results') }}" class="nav-link {% if request.endpoint == 'patient.patient_health_results' %}active{% endif %}">
+                <i class="fas fa-file-medical-alt"></i> My Result
+            </a>
+            <a href="{{ url_for('patient.patient_settings') }}" class="nav-link {% if request.endpoint == 'patient.patient_settings' %}active{% endif %}">
+                <i class="fas fa-cog"></i> Settings
+            </a>
+        </nav>
+
+       <div class="sidebar-footer">
+            <form action="{{ safe_url_for('auth.patient_logout', fallback='#') }}" method="POST" style="margin:0;">
+                <button type="submit" class="nav-link sign-out" style="width:100%; text-align:left; background:none; border:none;">
+                    <i class="fas fa-sign-out-alt"></i> Sign Out
+                </button>
+            </form>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        {% block content %}
+        {% endblock %}
+    </main>
+
+    <!-- Scroll to top -->
+    <button class="scroll-top-btn" id="scrollTopBtn" aria-label="Back to top">↑</button>
+
+    <script src="{{ url_for('static', filename='js/patient_scripts.js') }}"></script>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

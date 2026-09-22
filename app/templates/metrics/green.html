@@ -1,0 +1,438 @@
+{% extends "admin/admin_base.html" %}
+{% set active_page = "green_computing" %}
+
+{% block title %}Green Computing – FBS Diabetes Risk{% endblock %}
+{% block page_title %}Energy &amp; Green Metrics{% endblock %}
+
+{% block content %}
+<main class="page-content">
+
+  <!-- Page intro -->
+  <div class="mb-3">
+    <div style="font-size:15px;font-weight:700;color:var(--text-primary)">Energy &amp; Green Metrics</div>
+    <div style="font-size:12px;color:var(--text-muted)">Monitor system energy usage, carbon footprint, and connectivity status in real time.</div>
+  </div>
+
+  {% if gc.seeded %}
+  <div class="py-2 px-3 mb-3" style="font-size:12px;background:#fff8e1;border:1px solid #ffe0a3;border-radius:8px;color:#8a5a00">This page includes seeded demo data (scripts/seed_green_demo.py), not only real measurements.</div>
+  {% endif %}
+
+  {% if gc.monitor.status != 'running' and not gc.demo_mode %}
+  <div class="py-2 px-3 mb-3" style="font-size:12px;background:#fff8e1;border:1px solid #ffe0a3;border-radius:8px;color:#8a5a00">
+    <b>Connectivity monitor {{ 'is not running' if gc.monitor.status == 'stale' else 'has never run' }}.</b>
+    The Online/Offline status and the sync queue may be out of date. Start it with <code>flask --app run connectivity-monitor</code>.
+  </div>
+  {% endif %}
+
+  {% if gc.demo_mode %}
+  <div class="gc-card mb-3" style="height:auto;padding:14px 18px;border-style:dashed">
+    <div class="d-flex flex-wrap align-items-center gap-2">
+      <span style="font-size:12px;font-weight:700;color:var(--text-primary)"><i class="bi bi-play-circle me-1"></i>Demo controls</span>
+      <button class="demo-btn demo-btn-primary" onclick="demo('screening',{count:1})">Run screening</button>
+      <button class="demo-btn" onclick="demo('screening',{count:10})">Run 10</button>
+      <button class="demo-btn demo-btn-danger" onclick="demo('disconnect')"><i class="bi bi-wifi-off me-1"></i>Simulate connection loss</button>
+      <button class="demo-btn demo-btn-info" onclick="demo('reconnect')"><i class="bi bi-wifi me-1"></i>Restore connection &amp; sync</button>
+      <button class="demo-btn demo-btn-muted" onclick="demo('seed')">Load 3-day history</button>
+      <button class="demo-btn demo-btn-muted" onclick="demo('clear')">Clear demo data</button>
+      <span id="demoStatus" style="font-size:12px;color:var(--text-muted)"></span>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- ── ROW 1: STAT CARDS ── -->
+  <div class="row g-3 mb-3">
+    <div class="col-6 col-md">
+      <div class="gc-stat-card">
+        <div class="gc-stat-label">Energy Today</div>
+        <div class="gc-stat-value">{{ gc.energy_kwh }} kWh</div>
+        <div class="gc-stat-change {{ gc.energy_change_cls }}">{{ gc.energy_change }}</div>
+        <div class="gc-stat-change neutral">{{ 'whole phone (telemetry)' if gc.energy_basis == 'device_telemetry' else 'model runs only (no telemetry yet)' }}</div>
+      </div>
+    </div>
+    <div class="col-6 col-md">
+      <div class="gc-stat-card">
+        <div class="gc-stat-label">Carbon Footprint</div>
+        <div class="gc-stat-value">{{ gc.carbon }} kg CO₂</div>
+        <div class="gc-stat-change {{ gc.carbon_change_cls }}">{{ gc.carbon_change }}</div>
+      </div>
+    </div>
+    <div class="col-6 col-md">
+      <div class="gc-stat-card">
+        <div class="gc-stat-label">Green Score</div>
+        <div class="gc-stat-value">{{ gc.green_score }}{{ ' / 100' if gc.green_score != '–' else '' }}</div>
+        <div class="gc-stat-change {{ gc.score_change_cls }}">{{ gc.score_change }}</div>
+      </div>
+    </div>
+    <div class="col-6 col-md">
+      <div class="gc-stat-card">
+        <div class="gc-stat-label">Sync Queue</div>
+        <div class="gc-stat-value">{{ gc.sync_queue }} records</div>
+        <div class="gc-stat-change neutral">Pending upload</div>
+      </div>
+    </div>
+    <div class="col-6 col-md">
+      <div class="gc-stat-card">
+        <div class="gc-stat-label">Uptime Today</div>
+        <div class="gc-stat-value">{{ gc.uptime }}</div>
+        <div class="gc-stat-change neutral">{{ gc.offline_gaps }} offline gaps</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── ROW 2: ENERGY TRACKER / SYNC STATUS / GREEN SCORE ── -->
+  <div class="row g-3 mb-3">
+
+    <!-- Energy & Carbon Tracker -->
+    <div class="col-lg-6 col-12">
+      <div class="gc-card">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-1">
+          <div>
+            <div class="gc-card-title">Energy &amp; Carbon Tracker</div>
+            <div class="gc-card-subtitle" id="trackerSubtitle">Consumption and emissions</div>
+          </div>
+          <span class="live-badge">Live</span>
+        </div>
+        <div class="period-tabs mb-3">
+          <button class="period-tab" onclick="switchPeriod(this,'24h')">24 Hours</button>
+          <button class="period-tab active" onclick="switchPeriod(this,'7d')">7 Days</button>
+          <button class="period-tab" onclick="switchPeriod(this,'30d')">30 Days</button>
+          <button class="period-tab" onclick="switchPeriod(this,'90d')">90 Days</button>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="energyChart" height="220"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sync / Offline Status -->
+    <div class="col-lg-3 col-md-6 col-12">
+      <div class="gc-card">
+        <div class="gc-card-title">Offline &amp; Sync Status</div>
+
+        <div class="sync-status-circle {{ 'sync-offline' if gc.is_offline else 'sync-online' }}">
+          <i class="bi {{ 'bi-wifi-off' if gc.is_offline else 'bi-wifi' }}" style="font-size:22px"></i>
+        </div>
+        <div class="sync-status-label">{{ 'OFFLINE' if gc.is_offline else 'ONLINE' }}</div>
+        <div class="sync-status-time">Last sync: {{ gc.last_sync }}</div>
+
+        <div style="font-size:12px;font-weight:700;color:var(--text-primary);margin-bottom:8px">Sync Queue</div>
+        <div class="sync-queue-row">
+          <span>Screenings</span>
+          <span class="sync-pending-badge">{{ gc.queue.screenings }} pending</span>
+        </div>
+        <div class="sync-queue-row">
+          <span>Patient records</span>
+          <span class="sync-pending-badge">{{ gc.queue.patients }} pending</span>
+        </div>
+        <div class="sync-queue-row">
+          <span>Risk assessments</span>
+          <span class="sync-pending-badge">{{ gc.queue.assessments }} pending</span>
+        </div>
+        <button class="retry-btn" {% if gc.demo_mode %}onclick="retrySync()"{% else %}disabled title="No upstream sync configured"{% endif %}>
+          <i class="bi bi-arrow-clockwise me-1"></i> Retry Sync Now
+        </button>
+      </div>
+    </div>
+
+    <!-- Green Score -->
+    <div class="col-lg-3 col-md-6 col-12">
+      <div class="gc-card">
+        <div class="gc-card-title">Green Score</div>
+        <div class="gc-card-subtitle">Sustainability rating</div>
+
+        <div class="green-score-ring">
+          <div class="green-score-inner">
+            <div class="green-score-num">{{ gc.green_score }}</div>
+            <div class="green-score-denom">/100</div>
+          </div>
+        </div>
+        <div class="green-score-label mb-3">{{ gc.score_label }}</div>
+
+        {% for item in gc.score_breakdown %}
+        <div class="score-bar-row">
+          <div class="score-bar-label">
+            <span>{{ item.label }}</span>
+            <span>{{ '–' if item.na else item.pct ~ '%' }}</span>
+          </div>
+          <div class="score-bar-track">
+            <div class="score-bar-fill" style="width:{{ item.pct }}%"></div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- ── LIVE INFERENCE LOG ── -->
+  <div class="row g-3 mb-3">
+    <div class="col-12">
+      <div class="gc-card" style="height:auto">
+        <div class="gc-card-title">Live Inference Log</div>
+        <div class="gc-card-subtitle">Latest model runs. <b>battery</b> = read from the phone's battery sensor · <b>estimated</b> = CPU-share estimate (sensor unreadable, or phone was charging) · <b>seeded</b> = demo data</div>
+        <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+          <table class="table table-borderless emb-table mb-0">
+            <thead><tr><th>Time</th><th>Latency</th><th>CPU</th><th>Memory</th><th>Power</th><th>Energy</th><th>Carbon</th><th>Source</th></tr></thead>
+            <tbody>
+              {% if not inferences %}<tr><td colspan="8" style="font-size:12px;color:var(--text-muted)">No inferences recorded yet.</td></tr>{% endif %}
+              {% for i in inferences %}
+              <tr><td>{{ i.time }}</td><td>{{ i.latency }}</td><td>{{ i.cpu }}</td><td>{{ i.ram }}</td><td>{{ i.power }}</td><td>{{ i.energy }}</td><td>{{ i.carbon }}</td><td>{{ i.method }}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── ROW 3: EMBEDDED DISPLAY / CONNECTIVITY / ENERGY BREAKDOWN ── -->
+  <div class="row g-3">
+
+    <!-- Embedded Screening Display -->
+    <div class="col-lg-5 col-12">
+      <div class="gc-card">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-1">
+          <div>
+            <div class="gc-card-title">Embedded Screening Display</div>
+            <div class="gc-card-subtitle">Records logged during offline gaps — queued until synced</div>
+          </div>
+          {% if gc.is_offline %}
+          <span style="background:#fff3e0;color:#e65100;padding:3px 10px;border-radius:8px;font-size:11px;font-weight:700">Offline Mode</span>
+          {% else %}
+          <span style="background:#e8f5e9;color:#2e7d32;padding:3px 10px;border-radius:8px;font-size:11px;font-weight:700">Online</span>
+          {% endif %}
+        </div>
+        <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+          <table class="table table-borderless emb-table mb-0">
+            <thead>
+              <tr>
+                <th>Patient ID</th>
+                <th>FBS</th>
+                <th>Risk</th>
+                <th>Status</th>
+                <th>Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% if not embedded_records %}
+              <tr><td colspan="5" style="font-size:12px;color:var(--text-muted)">No queued or synced offline records yet.</td></tr>
+              {% endif %}
+              {% for r in embedded_records %}
+              <tr>
+                <td><span class="patient-id">{{ r.id }}</span></td>
+                <td><strong>{{ r.fbs }}</strong></td>
+                <td><span class="risk-pill risk-{{ r.risk | lower }}">{{ r.risk }}</span></td>
+                <td>
+                  {% if r.status == 'Queued' %}
+                    <span class="status-queued">Queued</span>
+                  {% else %}
+                    <span class="status-synced">Synced</span>
+                  {% endif %}
+                </td>
+                <td style="font-size:12px;color:var(--text-muted)">{{ r.time }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="d-flex justify-content-between align-items-center mt-3">
+          <span style="font-size:12px;color:var(--text-muted)">{{ gc.queued_count }} queued · {{ gc.synced_count }} synced</span>
+          <a href="{{ url_for('admin.green_pending') }}" class="view-all-link">View All →</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Connectivity Timeline -->
+    <div class="col-lg-4 col-md-6 col-12">
+      <div class="gc-card">
+        <div class="gc-card-title">Connectivity Timeline</div>
+        <div class="gc-card-subtitle">Online / offline over the last 12 hours</div>
+
+        <!-- Visual bar -->
+        <div class="conn-timeline mb-1">
+          {% for seg in gc.conn_timeline %}
+          <div class="{{ 'conn-online-seg' if seg.online else 'conn-offline-seg' }}" style="flex:{{ seg.weight }}"></div>
+          {% endfor %}
+        </div>
+        <div class="conn-time-labels mb-3">
+          {% for lbl in gc.conn_labels %}<span>{{ lbl }}</span>{% endfor %}
+        </div>
+
+        <div style="font-size:12px;font-weight:700;color:var(--text-primary);margin-bottom:8px">Offline Events</div>
+        {% if not gc.offline_events %}<div style="font-size:12px;color:var(--text-muted)">No offline gaps today.</div>{% endif %}
+        {% for ev in gc.offline_events %}
+        <div class="offline-event">
+          <div class="offline-event-time">{{ ev.time_range }}</div>
+          <div class="offline-event-meta">Duration: {{ ev.duration }}</div>
+          <div class="offline-event-queued">{{ ev.records }} records queued</div>
+        </div>
+        {% endfor %}
+        <div class="mt-2"><a href="{{ url_for('admin.green_events') }}" class="view-all-link">View full events log →</a></div>
+
+        <div class="d-flex justify-content-between mt-2" style="font-size:12px">
+          <span style="color:var(--text-muted)">Total offline: {{ gc.total_offline }}</span>
+          <span style="color:#c62828;font-weight:700">{{ gc.gap_count }} gaps</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Energy Breakdown -->
+    <div class="col-lg-3 col-md-6 col-12">
+      <div class="gc-card">
+        <div class="gc-card-title">Energy Breakdown</div>
+        <div class="gc-card-subtitle">Active components, last 24 hours</div>
+        <div class="chart-wrap">
+          <canvas id="energyDonut" height="180"></canvas>
+        </div>
+        <div class="energy-legend mt-2">
+          {% for item in gc.energy_breakdown %}
+          <div class="energy-legend-item">
+            <div class="energy-legend-left">
+              <span class="energy-dot" style="background:{{ item.color }}"></span>
+              <span style="font-size:12px;color:var(--text-muted)">{{ item.label }}</span>
+            </div>
+            <div>
+              <span class="energy-pct">{{ item.pct }}%</span>
+              <span class="energy-kwh ms-1">{{ item.kwh }} kWh</span>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% if gc.idle_note %}<div class="mt-2" style="font-size:11px;color:var(--text-muted)">{{ gc.idle_note }}</div>{% endif %}
+      </div>
+    </div>
+  </div>
+
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const GC_DATA = {{ gc | tojson }};
+
+  // Energy & Carbon bar+line chart
+  const energyCtx = document.getElementById('energyChart');
+  let energyChart = null;
+  let currentRange = sessionStorage.getItem('gcRange') || '7d';
+  if (energyCtx) {
+    energyChart = new Chart(energyCtx, {
+      data: {
+        labels: GC_DATA.energy_labels,
+        datasets: [
+          {
+            type: 'bar',
+            label: 'Energy (kWh)',
+            data: GC_DATA.energy_values,
+            backgroundColor: 'rgba(76,175,80,.7)',
+            borderRadius: 4,
+            yAxisID: 'y'
+          },
+          {
+            type: 'line',
+            label: 'Carbon (kg CO₂)',
+            data: GC_DATA.carbon_values,
+            borderColor: '#1565c0',
+            backgroundColor: 'transparent',
+            borderWidth: 2,
+            pointRadius: 4,
+            pointBackgroundColor: '#1565c0',
+            tension: 0.3,
+            yAxisID: 'y'
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+          y: { grid: { color: '#f0f4f0' }, ticks: { font: { size: 11 } }, beginAtZero: true }
+        },
+        plugins: {
+          legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } }
+        }
+      }
+    });
+  }
+
+  // Energy breakdown donut
+  const edCtx = document.getElementById('energyDonut');
+  if (edCtx) {
+    const eb = GC_DATA.energy_breakdown;
+    new Chart(edCtx, {
+      type: 'doughnut',
+      data: {
+        labels: eb.map(i => i.label),
+        datasets: [{
+          data: eb.map(i => i.pct),
+          backgroundColor: eb.map(i => i.color),
+          borderWidth: 2, borderColor: '#fff'
+        }]
+      },
+      options: {
+        cutout: '60%',
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed}%` } }
+        }
+      }
+    });
+  }
+
+  const RANGE_TEXT = {'24h': 'Hourly, last 24 hours', '7d': 'Daily, last 7 days',
+                      '30d': 'Daily, last 30 days', '90d': 'Daily, last 90 days'};
+
+  async function loadRange(period) {
+    if (!energyChart) return;
+    try {
+      const r = await fetch('/api/v1/green/charts/realtime?range=' + period, {credentials: 'same-origin'});
+      if (!r.ok) throw new Error(r.status);
+      const d = await r.json();
+      energyChart.data.labels = d.labels;
+      energyChart.data.datasets[0].data = d.energy_values;
+      energyChart.data.datasets[1].data = d.carbon_values;
+      energyChart.update();
+      document.getElementById('trackerSubtitle').textContent = RANGE_TEXT[period] +
+        (d.basis === 'device_telemetry' ? ' · whole phone' : ' · model runs only');
+    } catch (e) { console.error('tracker refresh failed', e); }
+  }
+
+  function switchPeriod(btn, period) {
+    document.querySelectorAll('.period-tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentRange = period;
+    sessionStorage.setItem('gcRange', period);
+    loadRange(period);
+  }
+
+  document.querySelectorAll('.period-tab').forEach(b => {
+    b.classList.toggle('active', (b.getAttribute('onclick') || '').includes("'" + currentRange + "'"));
+  });
+  loadRange(currentRange);
+
+  async function post(url, body) {
+    const r = await fetch(url, {method: 'POST', credentials: 'same-origin',
+      headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body || {})});
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || r.status);
+    return d;
+  }
+  async function demo(action, body) {
+    const el = document.getElementById('demoStatus');
+    el.textContent = 'Working…';
+    try {
+      const d = await post('/api/v1/green/demo/' + action, body);
+      el.textContent = d.message || 'Done';
+      setTimeout(() => location.reload(), 700);
+    } catch (e) { el.textContent = 'Failed: ' + e.message; }
+  }
+  async function retrySync() {
+    try { const d = await post('/api/v1/green/sync/retry'); alert(d.message); location.reload(); }
+    catch (e) { alert('Sync failed: ' + e.message); }
+  }
+
+  // Whole page refreshes every 30 s while the tab is visible (cheap on the phone, no extra libraries).
+  setInterval(() => { if (!document.hidden) location.reload(); }, 30000);
+</script>
+{% endblock %}
