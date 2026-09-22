@@ -3,6 +3,8 @@ from functools import wraps
 from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, session, url_for
 
 from app.controllers import auth_controller
+from app.db import get_db
+from app.models import audit_model
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -78,6 +80,11 @@ def login():
 
         user, error = auth_controller.authenticate(email, password)
         if error:
+            audit_model.log_event(
+                get_db(), user_id=None, user_name=email or "unknown", role="Unknown",
+                action=f"Failed login attempt ({email or 'unknown email'})",
+                ip_address=request.remote_addr, severity="Critical",
+            )
             flash(error, "error")
             return render_template("auth/login.html"), 401
 
@@ -87,6 +94,11 @@ def login():
         session["user_id"] = user["id"]
         session["user_name"] = f"{user['first_name']} {user['last_name']}"
         session["user_role"] = user["role"]
+        audit_model.log_event(
+            get_db(), user_id=session["user_id"], user_name=session["user_name"],
+            role=session["user_role"], action="User login",
+            ip_address=request.remote_addr, severity="Success",
+        )
 
         flash(f"Welcome back, {user['first_name']}!", "success")
         return redirect(_home_for_role(user["role"]))
@@ -118,6 +130,13 @@ def signup():
 
 @auth_bp.route("/logout")
 def logout():
+    if session.get("user_id"):
+        audit_model.log_event(
+            get_db(), user_id=session.get("user_id"),
+            user_name=session.get("user_name", "unknown"),
+            role=session.get("user_role", "Unknown"), action="User logout",
+            ip_address=request.remote_addr, severity="Info",
+        )
     session.clear()
     flash("You have been signed out.", "success")
     return redirect(url_for("auth.login"))

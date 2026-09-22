@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, make_response, render_template, request, redirect, url_for, abort, flash
+from flask import Blueprint, jsonify, make_response, render_template, request, redirect, url_for, abort, flash, session
 import sqlite3
 import csv
 import io
@@ -8,6 +8,7 @@ from werkzeug.security import generate_password_hash
 from app.controllers import auth_controller, metrics_controller
 from app.constants import BARANGAYS, CSV_IMPORT_COLUMNS, ROLE_MAP, STATION_MAP
 from app.db import get_db
+from app.models import audit_model
 from app.views.auth_views import login_required, require_role_for_blueprint, role_required
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
@@ -31,6 +32,13 @@ def _csv_row_form(row):
     return {"first_name":_csv_value(row.get("first_name")),"middle_name":_csv_value(row.get("middle_name")),"last_name":_csv_value(row.get("last_name")),"birthday":auth_controller.normalize_import_birthday(_csv_value(row.get("birthday"))),"sex":_csv_value(row.get("sex")).lower(),"email":_csv_value(row.get("email")),"phone":_csv_value(row.get("phone")),"role":_ROLE_BY_LABEL.get(_csv_value(row.get("role")).casefold(),""),"facility":_STATION_BY_LABEL.get(_csv_value(row.get("station")).casefold(),""),"barangay":_BARANGAY_BY_VALUE.get(_csv_value(row.get("barangay")).casefold(),_BARANGAY_BY_LABEL.get(_csv_value(row.get("barangay")).casefold(),"")),"password":row.get("temporary_password") or "","confirm_password":row.get("temporary_password") or ""}
 def _import_error(errors,row_number,message): errors.append({"row":row_number,"message":message})
 STAFF_STATUSES = ["Approved", "Rejected", "Pending"]
+
+def _audit_event(action, severity="Info"):
+    audit_model.log_event(
+        get_db(), user_id=session.get("user_id"), user_name=session.get("user_name", "unknown"),
+        role=session.get("user_role", "Unknown"), action=action,
+        ip_address=request.remote_addr, severity=severity,
+    )
 
 @admin_bp.route("/dashboard")
 @login_required
@@ -210,6 +218,13 @@ def staff_import_template():
     return response
 
 
+@admin_bp.route("/data-management/export-audit", methods=["POST"])
+@login_required
+def staff_export_audit():
+    _audit_event("Exported CSV: staff records", "Warning")
+    return jsonify({"ok": True})
+
+
 @admin_bp.route("/data-management/import", methods=["POST"])
 @login_required
 def staff_import():
@@ -288,6 +303,7 @@ def staff_import():
         user_model.create_users_bulk(rows)
     except sqlite3.IntegrityError:
         return jsonify({"ok": False, "imported": 0, "errors": [{"row": 2, "message": "email already exists"}]}), 400
+    _audit_event(f"Bulk staff import: {len(rows)} employees", "Warning")
     return jsonify({"ok": True, "imported": len(rows), "errors": []})
 
 
@@ -366,6 +382,7 @@ def add_staff():
                 ), 400
             raise
 
+        _audit_event(f"Employee account created: {cleaned['email']}", "Success")
         flash("Employee account created successfully.", "success")
         return redirect(url_for("admin.staff_detail", employee_id=f"EMP-{user_id:05d}"))
 
@@ -433,6 +450,7 @@ def staff_update_role(employee_id):
 
     new_role = request.form.get("role", "").strip()
     if user_model.update_user_role(employee_id, new_role):
+        _audit_event(f"Role changed: {employee['role']} -> {new_role} (user: {employee_id})", "Warning")
         flash("Employee role updated successfully.", "success")
     else:
         flash("Please select a valid role.", "error")
@@ -454,6 +472,7 @@ def approve_staff(employee_id):
         abort(404)
 
     user_model.set_status(user["id"], "approved")
+    _audit_event(f"Staff account approved: {employee_id}", "Success")
     flash("Account approved successfully. The user can now sign in.", "success")
     return redirect(url_for("admin.staff_detail", employee_id=employee_id))
 
@@ -472,6 +491,7 @@ def reject_staff(employee_id):
         abort(404)
 
     user_model.set_status(user["id"], "rejected")
+    _audit_event(f"Staff account rejected: {employee_id}", "Warning")
     flash("Account rejected. The user cannot sign in.", "success")
     return redirect(url_for("admin.staff_detail", employee_id=employee_id))
 
@@ -484,6 +504,7 @@ def delete_staff(employee_id):
     if not user_model.delete_user_by_employee_id(employee_id):
         abort(404)
 
+    _audit_event(f"Employee account deleted: {employee_id}", "Critical")
     flash("Employee account deleted successfully.", "success")
     return redirect(url_for("admin.data_management"))
 
@@ -534,6 +555,7 @@ def update_session_timeout():
         return redirect(url_for("admin.privacy_security"))
 
     settings_model.set_session_timeout_minutes(minutes)
+    _audit_event(f"Session timeout updated to {minutes} minute(s)", "Info")
     flash(f"Session timeout updated to {minutes} minute(s).", "success")
     return redirect(url_for("admin.privacy_security"))
 
@@ -565,30 +587,7 @@ def green_pending():
 @admin_bp.route("/audit-trails")
 @login_required
 def audit_trails():
-    logs = [
-        {"time": "09:47 AM", "date": "May 27", "user": "lhu.admin",     "role": "Admin",
-         "action": "User login",                               "ip": "192.168.1.12", "severity": "Info"},
-        {"time": "09:44 AM", "date": "May 27", "user": "Nurse Kurt",     "role": "Nurse",
-         "action": "Exported CSV",                             "ip": "192.168.1.45", "severity": "Warning"},
-        {"time": "09:39 AM", "date": "May 27", "user": "Nurse Vennisse", "role": "Nurse",
-         "action": "Screening saved: CAB-2025-0165",           "ip": "192.168.1.33", "severity": "Success"},
-        {"time": "09:33 AM", "date": "May 27", "user": "unknown",        "role": "Unknown",
-         "action": "Failed login attempt (3rd try)",           "ip": "103.22.88.14", "severity": "Critical"},
-        {"time": "09:28 AM", "date": "May 27", "user": "Nurse Vennisse", "role": "Nurse",
-         "action": "Patient record edited: CAB-2025-0150",     "ip": "192.168.1.22", "severity": "Info"},
-        {"time": "09:21 AM", "date": "May 27", "user": "Nurse Kurt",     "role": "Nurse",
-         "action": "Patient profile edited: CAB-2025-0148",    "ip": "192.168.1.45", "severity": "Info"},
-        {"time": "09:14 AM", "date": "May 27", "user": "lhu.admin",      "role": "Admin",
-         "action": "Role changed: Viewer \u2192 Health Officer (user: garcia_m)", "ip": "192.168.1.12", "severity": "Warning"},
-        {"time": "09:08 AM", "date": "May 27", "user": "lhu.admin",      "role": "Admin",
-         "action": "Monthly report generated (PDF)",           "ip": "192.168.1.12", "severity": "Info"},
-        {"time": "09:00 AM", "date": "May 27", "user": "Nurse Kurt",     "role": "Nurse",
-         "action": "User login",                               "ip": "192.168.1.33", "severity": "Info"},
-        {"time": "08:55 AM", "date": "May 27", "user": "lhu.admin",      "role": "Admin",
-         "action": "Patient record deleted: CAB-2024-0088 (approved)",   "ip": "192.168.1.12", "severity": "Critical"},
-        {"time": "08:48 AM", "date": "May 27", "user": "lhu.admin",      "role": "Admin",
-         "action": "Bulk data import: 120 patient records",   "ip": "192.168.1.12", "severity": "Warning"},
-        {"time": "08:40 AM", "date": "May 27", "user": "Nurse Venisse", "role": "Nurse",
-         "action": "Profile updated: contact info changed",    "ip": "192.168.1.22", "severity": "Info"},
-    ]
-    return render_template("dashboard/audit_trails.html", logs=logs, audit_date="March 27")
+    logs = audit_model.get_recent_logs(get_db())
+    audit_now = datetime.utcnow()
+    audit_date = f"{audit_now.strftime('%B')} {audit_now.day}"
+    return render_template("dashboard/audit_trails.html", logs=logs, audit_date=audit_date)

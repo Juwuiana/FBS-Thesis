@@ -1,5 +1,5 @@
-from flask import Blueprint, render_template, request, jsonify, abort, redirect, url_for, Response, current_app
-from app.models import patient_model, visit_model, lab_model, lookup_model, health_analytics_model
+from flask import Blueprint, render_template, request, jsonify, abort, redirect, url_for, Response, current_app, session
+from app.models import patient_model, visit_model, lab_model, lookup_model, health_analytics_model, audit_model
 from app.db import get_db
 from app.controllers import metrics_controller
 from datetime import date as date_cls
@@ -12,6 +12,14 @@ nurse_bp = Blueprint('nurse', __name__)
 # blueprints later if medical_officer should eventually get a separate, more limited view here.
 from app.views.auth_views import require_role_for_blueprint  # noqa: E402 (after Blueprint())
 require_role_for_blueprint(nurse_bp, "health_worker", "medical_officer")
+
+
+def _audit_event(action, severity="Info"):
+    audit_model.log_event(
+        get_db(), user_id=session.get("user_id"), user_name=session.get("user_name", "unknown"),
+        role=session.get("user_role", "Unknown"), action=action,
+        ip_address=request.remote_addr, severity=severity,
+    )
 
 
 @nurse_bp.route('/nurse_dashboard')
@@ -100,6 +108,7 @@ def create_patient():
         visit_model.save_cvd_responses(visit_id, cvd_answers)
 
     patient_code = patient_model.get_patient_code_by_id(patient_id)
+    _audit_event(f"Patient created with intake visit: {patient_code}", "Success")
 
     return jsonify({
         "message": "Patient created and intake visit recorded.",
@@ -147,6 +156,10 @@ def create_followup_record(patient_id):
     if cvd_answers:
         visit_model.save_cvd_responses(visit_id, cvd_answers)
 
+    _audit_event(f"Follow-up visit created: {patient_id} (visit: {visit_id})", "Success")
+    if demographic_updates:
+        _audit_event(f"Patient record edited: {patient_id} (patient_id: {patient['id']})", "Info")
+
     return jsonify({
         "message": "Follow-up visit recorded.",
         "patient_code": patient_id,
@@ -181,6 +194,7 @@ def nurse_screening_submit(patient_id, visit_id):
     }
 
     lab_screening_id = lab_model.create_lab_screening(visit_id, data)
+    _audit_event(f"Screening saved: {patient_id} (visit: {visit_id})", "Success")
 
     # ML + GREEN COMPUTING
     # Keep the nurse workflow on the same measured prediction path as the
@@ -338,6 +352,7 @@ def nurse_patient_delete(patient_id):
     if patient is None:
         abort(404)
     patient_model.soft_delete_patient(patient["id"])
+    _audit_event(f"Patient soft-deleted: {patient_id}", "Critical")
     return redirect(url_for('nurse.nurse_data_management'))
 
 
@@ -354,6 +369,7 @@ def nurse_patient_restore(patient_id):
     if patient is None:
         abort(404)
     patient_model.restore_patient(patient["id"])
+    _audit_event(f"Patient restored: {patient_id}", "Success")
     return redirect(url_for('nurse.nurse_recycle_bin'))
 
 
@@ -363,6 +379,7 @@ def nurse_patient_purge(patient_id):
     if patient is None:
         abort(404)
     patient_model.purge_patient_permanently(patient["id"])
+    _audit_event(f"Patient permanently purged: {patient_id}", "Critical")
     return redirect(url_for('nurse.nurse_recycle_bin'))
 
 @nurse_bp.route('/nurse_data_management/export', methods=['POST'])
@@ -374,6 +391,7 @@ def nurse_data_management_export():
     all_visits = request.form.get('all_visits') == 'true'
 
     csv_content = patient_model.export_patients_csv(barangay=barangay, risk=risk, date=date, all_visits=all_visits)
+    _audit_event("Exported CSV: patient data", "Warning")
 
     filename = f"srcho_fbs_export_{date_cls.today().isoformat()}.csv"
 
@@ -390,6 +408,7 @@ def nurse_patient_export_all(patient_id):
         abort(404)
 
     csv_content = patient_model.export_single_patient_csv(patient_id, all_visits=True)
+    _audit_event(f"Exported CSV: patient {patient_id}", "Warning")
     filename = f"{patient_id}_full_history_{date_cls.today().isoformat()}.csv"
 
     return Response(
@@ -415,6 +434,7 @@ def nurse_patient_export_visit(patient_id, visit_id):
     matching_lines = [ln for ln in lines[1:] if f",{target_visit['date']}," in ln]
 
     csv_content = header + "\n" + "\n".join(matching_lines)
+    _audit_event(f"Exported CSV: patient {patient_id}, visit {visit_id}", "Warning")
     filename = f"{patient_id}_visit_{target_visit['date']}_{date_cls.today().isoformat()}.csv"
 
     return Response(
@@ -462,6 +482,11 @@ def nurse_data_management_import():
 
     staff_id = None  # wire ng auth sesh
     result = patient_model.import_patients_from_csv(file.stream, staff_id=staff_id)
+    _audit_event(
+        f"Imported CSV: {result['new_patients']} new, {result['matched_existing']} matched, "
+        f"{result['skipped']} skipped",
+        "Warning",
+    )
 
     return jsonify({
         "message": (

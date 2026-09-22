@@ -194,6 +194,13 @@
     const a    = document.createElement('a');
     a.href = url; a.download = 'staff_records.csv'; a.click();
     URL.revokeObjectURL(url);
+
+    fetch('{{ url_for("admin.staff_export_audit") }}', {
+      method: 'POST',
+      credentials: 'same-origin',
+      keepalive: true,
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    });
   }
 
   (() => {
