@@ -6,7 +6,10 @@ with user input) run through sqlite3. Parameterization is what keeps raw
 SQL safe from injection -- always pass values via the `?` placeholders,
 never f-strings/.format()/% into the query text.
 """
+import sqlite3
+
 from app.db import get_db
+from app.constants import BARANGAYS
 
 
 def display_role_from_db(role):
@@ -33,6 +36,19 @@ def display_facility_from_db(facility):
         "rhuii": "RHU II",
     }
     return labels.get((facility or "").lower(), (facility or "Unknown Facility").title())
+
+
+def display_sex_from_db(sex):
+    return {"male": "Male", "female": "Female"}.get(
+        (sex or "").lower(), (sex or "Unknown").title()
+    )
+
+
+def display_barangay_from_db(barangay):
+    labels = dict(BARANGAYS)
+    return labels.get(
+        (barangay or "").lower(), (barangay or "Unknown Barangay").title()
+    )
 
 
 def display_status_from_db(status):
@@ -100,6 +116,41 @@ def create_user(data, password_hash, status="pending"):
     return cur.lastrowid
 
 
+def create_users_bulk(rows):
+    """Insert validated users in one transaction."""
+    db = get_db()
+    try:
+        for row in rows:
+            db.execute(
+                """
+                INSERT INTO users (
+                    first_name, middle_name, last_name, birthday, sex,
+                    email, phone, role, facility, barangay,
+                    password_hash, status
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    row["first_name"],
+                    row.get("middle_name") or None,
+                    row["last_name"],
+                    row["birthday"],
+                    row["sex"],
+                    row["email"].strip().lower(),
+                    row["phone"],
+                    row["role"],
+                    row["facility"],
+                    row["barangay"],
+                    row["password_hash"],
+                    "approved",
+                ),
+            )
+        db.commit()
+    except sqlite3.Error:
+        db.rollback()
+        raise
+
+
 def update_last_login(user_id):
     db = get_db()
     db.execute(
@@ -154,12 +205,19 @@ def get_employee_by_id(employee_id):
     return {
         "id": f"EMP-{user['id']:05d}",
         "name": " ".join(part for part in [user["first_name"], user["middle_name"], user["last_name"]] if part),
+        "first_name": user["first_name"],
+        "middle_name": user["middle_name"],
+        "last_name": user["last_name"],
+        "birthday": user["birthday"],
+        "sex": display_sex_from_db(user["sex"]),
         "email": user["email"],
         "role": display_role_from_db(user["role"]),
         "station": display_facility_from_db(user["facility"]),
+        "barangay": display_barangay_from_db(user["barangay"]),
         "contact": user["phone"],
         "status": display_status_from_db(user["status"]),
         "date_added": user["created_at"],
+        "last_login_at": user["last_login_at"],
     }
 
 

@@ -24,12 +24,36 @@
 
     <form method="POST" action="{{ url_for('admin.add_staff') }}" class="row g-3">
       <div class="col-md-6 col-12">
-        <label class="ps-field-label">Full Name</label>
-        <input type="text" class="ps-input" name="name" value="{{ form_data.name or '' }}" required>
+        <label class="ps-field-label">First Name</label>
+        <input type="text" class="ps-input" name="first_name" value="{{ form_data.first_name or '' }}" pattern="[A-Za-z\s.\-]+" title="Letters, spaces, periods, and hyphens only" required>
+      </div>
+      <div class="col-md-6 col-12">
+        <label class="ps-field-label">Middle Name</label>
+        <input type="text" class="ps-input" name="middle_name" value="{{ form_data.middle_name or '' }}" pattern="[A-Za-z\s.\-]*" title="Letters, spaces, periods, and hyphens only">
+      </div>
+      <div class="col-md-6 col-12">
+        <label class="ps-field-label">Last Name</label>
+        <input type="text" class="ps-input" name="last_name" value="{{ form_data.last_name or '' }}" pattern="[A-Za-z\s.\-]+" title="Letters, spaces, periods, and hyphens only" required>
+      </div>
+      <div class="col-md-6 col-12">
+        <label class="ps-field-label">Birthday</label>
+        <input type="date" class="ps-input" name="birthday" value="{{ form_data.birthday or '' }}" max="{{ today }}" required>
+      </div>
+      <div class="col-md-6 col-12">
+        <label class="ps-field-label">Sex</label>
+        <select class="ps-select" name="sex" required>
+          <option value="">Select Sex</option>
+          <option value="male" {{ 'selected' if form_data.sex == 'male' }}>Male</option>
+          <option value="female" {{ 'selected' if form_data.sex == 'female' }}>Female</option>
+        </select>
       </div>
       <div class="col-md-6 col-12">
         <label class="ps-field-label">Email</label>
         <input type="email" class="ps-input" name="email" value="{{ form_data.email or '' }}" required>
+      </div>
+      <div class="col-md-6 col-12">
+        <label class="ps-field-label">Contact Number</label>
+        <input type="text" class="ps-input" name="contact" value="{{ form_data.contact or '' }}" placeholder="09171234567" required>
       </div>
       <div class="col-md-6 col-12">
         <label class="ps-field-label">Role</label>
@@ -50,12 +74,21 @@
         </select>
       </div>
       <div class="col-md-6 col-12">
-        <label class="ps-field-label">Contact Number</label>
-        <input type="text" class="ps-input" name="contact" value="{{ form_data.contact or '' }}" placeholder="09171234567">
+        <label class="ps-field-label">Assigned Barangay</label>
+        <select class="ps-select" name="barangay" required>
+          <option value="">Select Barangay</option>
+          {% for value, label in barangays %}
+            <option value="{{ value }}" {{ 'selected' if value == form_data.barangay }}>{{ label }}</option>
+          {% endfor %}
+        </select>
       </div>
       <div class="col-md-6 col-12">
         <label class="ps-field-label">Temporary Password</label>
         <input type="password" class="ps-input" name="password" minlength="12" required>
+      </div>
+      <div class="col-md-6 col-12">
+        <label class="ps-field-label">Confirm Password</label>
+        <input type="password" class="ps-input" name="confirm_password" minlength="12" required>
       </div>
       <div class="col-12 mt-4">
         <button type="submit" class="filter-btn" style="padding:8px 20px;">

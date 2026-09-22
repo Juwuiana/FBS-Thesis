@@ -14,12 +14,6 @@
       </a>
     </div>
 
-    <!--
-        TEMPORARY DEMO DATA — EMPLOYEES lives in-memory in admin_views.py,
-        there is no Staff/User model or DB table yet. Saving the role below
-        only updates that in-memory list; it resets on app restart.
-    -->
-
     <div class="row g-3 mb-4">
       <div class="col-md-6 col-12">
         <label class="ps-field-label">Employee ID</label>
@@ -28,6 +22,26 @@
       <div class="col-md-6 col-12">
         <label class="ps-field-label">Full Name</label>
         <input type="text" class="ps-input" value="{{ employee.name }}" readonly>
+      </div>
+      <div class="col-md-6 col-12">
+        <label class="ps-field-label">First Name</label>
+        <input type="text" class="ps-input" value="{{ employee.first_name }}" readonly>
+      </div>
+      <div class="col-md-6 col-12">
+        <label class="ps-field-label">Middle Name</label>
+        <input type="text" class="ps-input" value="{{ employee.middle_name or 'None' }}" readonly>
+      </div>
+      <div class="col-md-6 col-12">
+        <label class="ps-field-label">Last Name</label>
+        <input type="text" class="ps-input" value="{{ employee.last_name }}" readonly>
+      </div>
+      <div class="col-md-6 col-12">
+        <label class="ps-field-label">Birthday</label>
+        <input type="text" class="ps-input" value="{{ employee.birthday }}" readonly>
+      </div>
+      <div class="col-md-6 col-12">
+        <label class="ps-field-label">Sex</label>
+        <input type="text" class="ps-input" value="{{ employee.sex }}" readonly>
       </div>
       <div class="col-md-6 col-12">
         <label class="ps-field-label">Email</label>
@@ -40,6 +54,10 @@
       <div class="col-md-6 col-12">
         <label class="ps-field-label">Station / LHU</label>
         <input type="text" class="ps-input" value="{{ employee.station }}" readonly>
+      </div>
+      <div class="col-md-6 col-12">
+        <label class="ps-field-label">Assigned Barangay</label>
+        <input type="text" class="ps-input" value="{{ employee.barangay }}" readonly>
       </div>
       <div class="col-md-6 col-12">
         <label class="ps-field-label">Status</label>

@@ -284,12 +284,18 @@ def _register_cli(app):
         finally:
             conn.close()
 
+    from app.constants import BARANGAYS
+
     @app.cli.command("create-admin")
     @click.option("--email", prompt=True)
     @click.option("--password", prompt=True, hide_input=True, confirmation_prompt=True)
-    @click.option("--first-name", default="Admin")
-    @click.option("--last-name", default="User")
-    def create_admin_command(email, password, first_name, last_name):
+    @click.option("--first-name", default="Admin", show_default=True)
+    @click.option("--last-name", default="User", show_default=True)
+    @click.option("--birthday", prompt=True, help="Admin birthday (YYYY-MM-DD).")
+    @click.option("--sex", prompt=True, type=click.Choice(["male", "female"], case_sensitive=False))
+    @click.option("--phone", prompt=True, help="10-digit mobile number starting with 9, or +63/0 form.")
+    @click.option("--barangay", prompt=True, type=click.Choice([value for value, _ in BARANGAYS]))
+    def create_admin_command(email, password, first_name, last_name, birthday, sex, phone, barangay):
         """flask create-admin — seed one pre-approved account so you have
         a way to log in and start approving other sign-ups."""
         from werkzeug.security import generate_password_hash
@@ -304,13 +310,13 @@ def _register_cli(app):
             "first_name": first_name,
             "middle_name": None,
             "last_name": last_name,
-            "birthday": "1990-01-01",
-            "sex": "male",
+            "birthday": birthday,
+            "sex": sex.lower(),
             "email": email,
-            "phone": "9000000000",
+            "phone": phone,
             "role": "medical_officer",
             "facility": "rhui",
-            "barangay": "aplaya",
+            "barangay": barangay,
         }
         password_hash = generate_password_hash(password)
         user_model.create_user(data, password_hash, status="approved")

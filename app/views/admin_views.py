@@ -1,10 +1,9 @@
 from flask import Blueprint, render_template, request, redirect, url_for, abort, flash
+import sqlite3
 from datetime import datetime
-import re
-
 from werkzeug.security import generate_password_hash
 
-from app.controllers import metrics_controller
+from app.controllers import auth_controller, metrics_controller
 from app.db import get_db
 from app.views.auth_views import login_required, require_role_for_blueprint, role_required
 
@@ -17,41 +16,6 @@ require_role_for_blueprint(admin_bp, "medical_officer")
 STAFF_ROLES = ["Health Officer", "LHU Nurse"]
 STATIONS = ["RHU I", "RHU II"]
 STAFF_STATUSES = ["Approved", "Rejected", "Pending"]
-
-# ── TEMPORARY STUB ────────────────────────────────────────────────────────
-# In-memory only — resets whenever the app restarts. There is no Staff/User
-# model or DB table for this yet. Moved to module scope (out of
-# data_management()) so the new staff detail/edit route below can look up
-# and update the same records the list page shows. When a real model
-# lands, replace EMPLOYEES with an actual query and delete this comment.
-EMPLOYEES = [
-    {"id": "EMP-2025-001", "name": "Linda Walker",    "email": "l.walker@lhu.gov.ph",
-     "role": "Health Officer", "station": "Sta. Rosa", "contact": "09171234567",
-     "status": "Active",    "date_added": "Jan 10, 2025"},
-    {"id": "EMP-2025-002", "name": "Kurt Pernia",       "email": "k.pernia@lhu.gov.ph",
-     "role": "LHU Nurse",     "station": "Cabuyao",   "contact": "09182345678",
-     "status": "Active",    "date_added": "Jan 10, 2025"},
-    {"id": "EMP-2025-003", "name": "Clarise Espiritu",  "email": "c.espiritu@lhu.gov.ph",
-     "role": "Admin",         "station": "Sta. Rosa", "contact": "09193456789",
-     "status": "Active",    "date_added": "Jan 11, 2025"},
-    {"id": "EMP-2025-004", "name": "Jerome Elano",      "email": "j.elano@lhu.gov.ph",
-     "role": "Encoder",       "station": "Calamba",   "contact": "09204567890",
-     "status": "Active",    "date_added": "Jan 12, 2025"},
-    {"id": "EMP-2025-005", "name": "Maria Santos",      "email": "m.santos@lhu.gov.ph",
-     "role": "LHU Nurse",     "station": "Biñan",     "contact": "09215678901",
-     "status": "On Leave",  "date_added": "Feb 3, 2025"},
-    {"id": "EMP-2025-006", "name": "Pedro Dela Cruz",   "email": "p.delacruz@lhu.gov.ph",
-     "role": "Health Officer","station": "San Pedro", "contact": "09226789012",
-     "status": "Active",    "date_added": "Feb 10, 2025"},
-    {"id": "EMP-2025-007", "name": "Ana Garcia",        "email": "a.garcia@lhu.gov.ph",
-     "role": "Encoder",       "station": "Cabuyao",   "contact": "09237890123",
-     "status": "Inactive",  "date_added": "Mar 1, 2025"},
-    {"id": "EMP-2025-008", "name": "Jose Reyes",        "email": "j.reyes@lhu.gov.ph",
-     "role": "LHU Nurse",     "station": "Calamba",   "contact": "09248901234",
-     "status": "Active",    "date_added": "Mar 15, 2025"},
-]
-# ── END TEMPORARY STUB ───────────────────────────────────────────────────
-
 
 @admin_bp.route("/dashboard")
 @login_required
@@ -210,80 +174,121 @@ def data_management():
 @login_required
 def add_staff():
     from app.models import user as user_model
+    from app.constants import BARANGAYS, ROLE_MAP, STATION_MAP
 
     if request.method == "POST":
-        name = request.form.get("name", "").strip()
-        email = request.form.get("email", "").strip()
-        role = request.form.get("role", "").strip()
-        station = request.form.get("station", "").strip()
-        contact = request.form.get("contact", "").strip()
-        password = request.form.get("password", "")
+        role_label = request.form.get("role", "").strip()
+        station_label = request.form.get("station", "").strip()
 
-        errors = []
-        name_parts = name.split()
-        if len(name_parts) < 2:
-            errors.append("Enter the employee's first and last name.")
-        if not email or not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
-            errors.append("Enter a valid email address.")
-        elif user_model.email_exists(email):
-            errors.append("An account with this email already exists.")
-        if role not in STAFF_ROLES:
+        profile_form = {
+            "first_name": request.form.get("first_name", ""),
+            "middle_name": request.form.get("middle_name", ""),
+            "last_name": request.form.get("last_name", ""),
+            "birthday": request.form.get("birthday", ""),
+            "sex": request.form.get("sex", ""),
+            "email": request.form.get("email", ""),
+            "phone": request.form.get("contact", ""),
+            "role": ROLE_MAP.get(role_label, ""),
+            "facility": STATION_MAP.get(station_label, ""),
+            "barangay": request.form.get("barangay", ""),
+            "password": request.form.get("password", ""),
+            "confirm_password": request.form.get("confirm_password", ""),
+        }
+
+        errors, cleaned, password = auth_controller.validate_profile_fields(
+            profile_form, normalize_phone_input=True
+        )
+        if profile_form["barangay"] not in {value for value, _ in BARANGAYS}:
+            errors.append("Please select an assigned barangay.")
+        if role_label not in STAFF_ROLES:
             errors.append("Please select a valid role.")
-        if station not in STATIONS:
+        if station_label not in STATIONS:
             errors.append("Please select a valid station.")
-        normalized_contact = contact.lstrip("+").lstrip("0")
-        if not re.match(r"^9\d{9}$", normalized_contact):
-            errors.append("Enter a valid 10-digit mobile number starting with 9.")
-        if len(password) < 12:
-            errors.append("Password must be at least 12 characters.")
+
+        form_data = {
+            "first_name": request.form.get("first_name", "").strip(),
+            "middle_name": request.form.get("middle_name", "").strip(),
+            "last_name": request.form.get("last_name", "").strip(),
+            "birthday": request.form.get("birthday", "").strip(),
+            "sex": request.form.get("sex", "").strip(),
+            "email": request.form.get("email", "").strip(),
+            "contact": request.form.get("contact", "").strip(),
+            "role": role_label,
+            "station": station_label,
+            "barangay": request.form.get("barangay", "").strip(),
+        }
 
         if errors:
             return render_template(
                 "admin/add_staff.html",
-                roles=STAFF_ROLES, stations=STATIONS,
-                errors=errors,
-                form_data={"name": name, "email": email, "role": role,
-                           "station": station, "contact": contact},
-            )
+                roles=STAFF_ROLES, stations=STATIONS, barangays=BARANGAYS,
+                today=datetime.utcnow().date().isoformat(),
+                errors=errors, form_data=form_data,
+            ), 400
 
-        role_map = {
-            "Health Officer": "medical_officer",
-            "LHU Nurse": "health_worker",
-        }
-        facility_map = {"RHU I": "rhui", "RHU II": "rhuii"}
-        user_id = user_model.create_user(
-            {
-                "first_name": name_parts[0],
-                "middle_name": " ".join(name_parts[1:-1]) or None,
-                "last_name": name_parts[-1],
-                "birthday": "1990-01-01",
-                "sex": "male",
-                "email": email,
-                "phone": normalized_contact,
-                "role": role_map[role],
-                "facility": facility_map[station],
-                "barangay": "aplaya",
-            },
-            generate_password_hash(password),
-            status="approved",
-        )
+        cleaned["role"] = ROLE_MAP[role_label]
+        cleaned["facility"] = STATION_MAP[station_label]
+
+        try:
+            user_id = user_model.create_user(
+                cleaned, generate_password_hash(password), status="approved"
+            )
+        except sqlite3.IntegrityError as exc:
+            if "UNIQUE" in str(exc).upper() and "EMAIL" in str(exc).upper():
+                errors.append("An account with this email already exists.")
+                return render_template(
+                    "admin/add_staff.html",
+                    roles=STAFF_ROLES, stations=STATIONS, barangays=BARANGAYS,
+                    today=datetime.utcnow().date().isoformat(),
+                    errors=errors, form_data=form_data,
+                ), 400
+            raise
+
         flash("Employee account created successfully.", "success")
         return redirect(url_for("admin.staff_detail", employee_id=f"EMP-{user_id:05d}"))
 
     return render_template(
         "admin/add_staff.html",
-        roles=STAFF_ROLES, stations=STATIONS,
+        roles=STAFF_ROLES, stations=STATIONS, barangays=BARANGAYS,
+        today=datetime.utcnow().date().isoformat(),
         errors=[], form_data={},
     )
 
 
-# ── TEMPORARY STUB ────────────────────────────────────────────────────────
-# Shows full staff info (read-only) with Role as the one editable field, per
-# spec: "view and edit the staffs... edit only the roles given." Updating
-# only mutates the in-memory EMPLOYEES list above — it does NOT persist to
-# a database (there isn't one yet) and resets on app restart. When a real
-# Staff/User model lands, replace the lookup/update below with actual
+# Shows full staff info (read-only) with Role as the one editable field.
 # queries and delete this comment.
+@admin_bp.route("/data-management/<employee_id>/view")
+@login_required
+def staff_view(employee_id):
+    from app.models import user as user_model
+
+    employee = user_model.get_employee_by_id(employee_id)
+    if employee is None:
+        abort(404)
+
+    try:
+        birthday = datetime.strptime(employee["birthday"], "%Y-%m-%d").date()
+        today = datetime.utcnow().date()
+        age = today.year - birthday.year - ((today.month, today.day) < (birthday.month, birthday.day))
+    except (KeyError, TypeError, ValueError):
+        age = None
+
+    phone = employee.get("contact") or ""
+    formatted_phone = (
+        f"+63 {phone[0:3]} {phone[3:6]} {phone[6:]}"
+        if len(phone) == 10 and phone.isdigit()
+        else phone
+    )
+    return render_template(
+        "admin/staff_view.html",
+        employee=employee,
+        age=age,
+        formatted_phone=formatted_phone,
+        last_login=employee.get("last_login_at") or "Never",
+        read_only_employee_view=True,
+    )
+
+
 @admin_bp.route("/data-management/<employee_id>")
 @login_required
 def staff_detail(employee_id):
@@ -359,7 +364,6 @@ def delete_staff(employee_id):
 
     flash("Employee account deleted successfully.", "success")
     return redirect(url_for("admin.data_management"))
-# ── END TEMPORARY STUB ───────────────────────────────────────────────────
 
 
 @admin_bp.route("/privacy-security")
