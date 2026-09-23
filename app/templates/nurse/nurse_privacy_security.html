@@ -1,144 +1,190 @@
 {% extends "nurse/nurse_base.html" %}
-
+{% set active_page = "privacy" %}
 {% block content %}
-<header class="topbar">
+
+<div class="settings-header">
     <div>
-        <h1 class="page-title">Privacy & Security</h1>
-        <p class="page-subtitle">Manage your password, session, and activity log</p>
+        <h1 class="settings-title">Privacy &amp; Security</h1>
+        <p class="settings-subtitle">Manage your password, session, and activity log</p>
     </div>
-</header>
+</div>
 
-<div class="security-grid">
+<div class="settings-body">
 
-    <!-- LEFT COLUMN -->
-    <div class="left-column" style="display:flex; flex-direction:column; gap:1.5rem;">
+    <!-- LEFT: Tab Navigation -->
+    <div class="settings-nav-panel">
+        <button class="settings-tab active" data-tab="security">
+            <span class="stab-text">
+                <span class="stab-title">Password &amp; Login</span>
+                <span class="stab-sub">Change password, recent logins</span>
+            </span>
+        </button>
+        <button class="settings-tab" data-tab="audit">
+            <span class="stab-text">
+                <span class="stab-title">Audit Trail</span>
+                <span class="stab-sub">Your recorded actions</span>
+            </span>
+        </button>
+        <button class="settings-tab" data-tab="session">
+            <span class="stab-text">
+                <span class="stab-title">Session</span>
+                <span class="stab-sub">Auto-lock timing</span>
+            </span>
+        </button>
+    </div>
 
-        <div class="form-card" style="margin-bottom:0;">
-            <div class="card-header">Change Password</div>
-            <div class="card-body">
-                <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:1.5rem;">
-                    Update your password regularly to keep your account secure.
-                </p>
-                <div class="field-group">
-                    <label class="field-label">Current Password</label>
-                    <input type="password" class="field-input" name="current_password" placeholder="••••••••">
-                </div>
-                <div class="grid-2">
-                    <div class="field-group">
-                        <label class="field-label">New Password</label>
-                        <input type="password" class="field-input" name="new_password" placeholder="••••••••">
+    <div class="settings-content-panel">
+
+        <div class="settings-pane active" id="pane-security">
+
+            <div class="settings-section">
+                <div class="section-label">Change Password</div>
+                <div class="settings-form-grid" style="max-width: 480px;">
+                    <div class="form-group" style="grid-column: 1 / -1;">
+                        <label class="form-label">Current Password</label>
+                        <div class="pw-field-wrap">
+                            <input class="form-input" type="password" id="pwCurrent" name="current_password" placeholder="••••••••" autocomplete="current-password">
+                        </div>
                     </div>
-                    <div class="field-group">
-                        <label class="field-label">Confirm New Password</label>
-                        <input type="password" class="field-input" name="confirm_password" placeholder="••••••••">
+                    <div class="form-group">
+                        <label class="form-label">New Password</label>
+                        <div class="pw-field-wrap">
+                            <input class="form-input" type="password" id="pwNew" name="new_password" placeholder="At least 8 characters" autocomplete="new-password">
+                        </div>
+                        <div class="pw-strength-bar" id="pwStrengthBar">
+                            <div class="pw-strength-fill" id="pwStrengthFill"></div>
+                        </div>
+                        <span class="pw-strength-label" id="pwStrengthLabel"></span>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Confirm New Password</label>
+                        <div class="pw-field-wrap">
+                            <input class="form-input" type="password" id="pwConfirm" name="confirm_password" placeholder="Re-enter new password" autocomplete="new-password">
+                        </div>
+                        <span class="form-hint" id="pwMatchHint"></span>
                     </div>
                 </div>
-                <div style="margin-top:1rem;">
-                    <button type="button" class="btn btn-primary">Update Password</button>
+                <div class="form-actions">
+                    <button type="button" class="btn-save">Update Password</button>
                 </div>
             </div>
-        </div>
 
-        <div class="form-card" style="margin-bottom:0;">
-            <div class="card-header">Recent Account Activity</div>
-            <div class="card-body">
-                <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:1rem;">
+            <div class="settings-section">
+                <div class="section-label">Recent Login Activity</div>
+                <p class="form-hint" style="margin-bottom: 0.875rem;">
                     Successful login history and connection verifications on this terminal.
                 </p>
-                <table class="data-table security-table">
-                    <thead>
-                        <tr>
-                            <th style="width:30%;">Date</th>
-                            <th>Event</th>
-                            <th style="width:22%;">Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td class="log-timestamp">Jun 10, 08:12</td>
-                            <td>Session login verified</td>
-                            <td><span class="risk-badge badge-success">Success</span></td>
-                        </tr>
-                        <tr>
-                            <td class="log-timestamp">Jun 9, 07:54</td>
-                            <td>Session login verified</td>
-                            <td><span class="risk-badge badge-success">Success</span></td>
-                        </tr>
-                        <tr>
-                            <td class="log-timestamp">Jun 8, 08:02</td>
-                            <td>Session login verified</td>
-                            <td><span class="risk-badge badge-success">Success</span></td>
-                        </tr>
-                    </tbody>
-                </table>
+                <div class="login-activity-list">
+                    <div class="la-item la-current">
+                        <div class="la-info">
+                            <div class="la-device">Session login verified — <span class="la-badge-current">Current Session</span></div>
+                            <div class="la-meta">Jun 10, 08:12 AM</div>
+                        </div>
+                    </div>
+                    <div class="la-item">
+                        <div class="la-info">
+                            <div class="la-device">Session login verified</div>
+                            <div class="la-meta">Jun 9, 07:54 AM</div>
+                        </div>
+                    </div>
+                    <div class="la-item">
+                        <div class="la-info">
+                            <div class="la-device">Session login verified</div>
+                            <div class="la-meta">Jun 8, 08:02 AM</div>
+                        </div>
+                    </div>
+                </div>
             </div>
+
         </div>
 
-        <div class="form-card" style="margin-bottom:0;">
-            <div class="card-header">Operational Audit Trail</div>
-            <div class="card-body">
-                <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:1rem;">
-                    Tracks report downloads, patient record printing, intake entries, and credential updates made by your account.
+        <!-- ══ TAB: AUDIT TRAIL ══ -->
+        <div class="settings-pane" id="pane-audit">
+            <div class="settings-section">
+                <p class="form-hint" style="margin-bottom: 0.875rem;">
+                    Tracks report downloads, patient record printing, intake entries, and credential
+                    updates made by your account.
                 </p>
-                <table class="data-table security-table">
-                    <thead>
-                        <tr>
-                            <th style="width:30%;">Date</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td class="log-timestamp">Jun 10, 14:32</td>
-                            <td>Downloaded clinical summary PDF<br><span style="font-size:0.75rem;color:var(--text-muted);">Barangay Risk Statistics</span></td>
-                        </tr>
-                        <tr>
-                            <td class="log-timestamp">Jun 10, 11:15</td>
-                            <td>Printed screening result<br><span style="font-size:0.75rem;color:var(--text-muted);">Patient ID: SRCHO-2026-0391</span></td>
-                        </tr>
-                        <tr>
-                            <td class="log-timestamp">Jun 9, 13:45</td>
-                            <td>Password updated<br><span style="font-size:0.75rem;color:var(--text-muted);">User Security Record</span></td>
-                        </tr>
-                        <tr>
-                            <td class="log-timestamp">Jun 9, 10:22</td>
-                            <td>New patient registered<br><span style="font-size:0.75rem;color:var(--text-muted);">Patient Intake Form</span></td>
-                        </tr>
-                        <tr>
-                            <td class="log-timestamp">Jun 8, 15:40</td>
-                            <td>Exported data ledger (.csv)<br><span style="font-size:0.75rem;color:var(--text-muted);">Health Registry Ledger</span></td>
-                        </tr>
-                    </tbody>
-                </table>
+                <div class="account-action-list">
+                    <div class="account-action-item">
+                        <div class="aai-info">
+                            <div class="aai-title">Downloaded clinical summary PDF</div>
+                            <div class="aai-sub">Barangay Risk Statistics · Jun 10, 14:32</div>
+                        </div>
+                    </div>
+                    <div class="account-action-item">
+                        <div class="aai-info">
+                            <div class="aai-title">Printed screening result</div>
+                            <div class="aai-sub">Patient ID: SRCHO-2026-0391 · Jun 10, 11:15</div>
+                        </div>
+                    </div>
+                    <div class="account-action-item">
+                        <div class="aai-info">
+                            <div class="aai-title">Password updated</div>
+                            <div class="aai-sub">User Security Record · Jun 9, 13:45</div>
+                        </div>
+                    </div>
+                    <div class="account-action-item">
+                        <div class="aai-info">
+                            <div class="aai-title">New patient registered</div>
+                            <div class="aai-sub">Patient Intake Form · Jun 9, 10:22</div>
+                        </div>
+                    </div>
+                    <div class="account-action-item">
+                        <div class="aai-info">
+                            <div class="aai-title">Exported data ledger (.csv)</div>
+                            <div class="aai-sub">Health Registry Ledger · Jun 8, 15:40</div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
-    </div>
-
-    <!-- RIGHT COLUMN -->
-    <div class="right-column" style="display:flex; flex-direction:column; gap:1.5rem;">
-
-        <div class="form-card" style="margin-bottom:0;">
-            <div class="card-header">Session Settings</div>
-            <div class="card-body">
-                <div class="status-indicator" style="margin-bottom:1.5rem;">
+        <!-- ══ TAB: SESSION ══ -->
+        <div class="settings-pane" id="pane-session">
+            <div class="settings-section">
+                <div class="section-label">Session Settings</div>
+                <div class="readonly-note" style="margin-bottom: 1.1rem;">
                     Your account session is verified and active.
                 </div>
-                <div class="field-group">
-                    <label class="field-label">Auto-lock screen after</label>
-                    <select class="field-input" name="session_timeout">
-                        <option value="15">15 minutes of inactivity</option>
-                        <option value="30">30 minutes of inactivity</option>
-                        <option value="60">1 hour of inactivity</option>
-                    </select>
+                <div class="settings-form-grid" style="max-width: 480px;">
+                    <div class="form-group" style="grid-column: 1 / -1;">
+                        <label class="form-label">Auto-lock screen after</label>
+                        <select class="form-input" name="session_timeout">
+                            <option value="15">15 minutes of inactivity</option>
+                            <option value="30" selected>30 minutes of inactivity</option>
+                            <option value="60">1 hour of inactivity</option>
+                        </select>
+                    </div>
                 </div>
-                <div style="margin-top:1rem;">
-                    <button type="button" class="btn btn-primary" style="width:100%;">Save Session Rules</button>
+                <div class="form-actions">
+                    <button type="button" class="btn-save">Save Session Rules</button>
                 </div>
             </div>
         </div>
 
-    </div>
+    </div><!-- end settings-content-panel -->
+</div><!-- end settings-body -->
 
-</div>
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/settings_shared.css') }}">
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const tabs  = document.querySelectorAll('.settings-tab');
+    const panes = document.querySelectorAll('.settings-pane');
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            tabs.forEach(t => t.classList.remove('active'));
+            panes.forEach(p => p.classList.remove('active'));
+            tab.classList.add('active');
+            document.getElementById('pane-' + tab.dataset.tab).classList.add('active');
+        });
+    });
+});
+</script>
 {% endblock %}

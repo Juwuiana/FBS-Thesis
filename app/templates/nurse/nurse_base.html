@@ -6,6 +6,7 @@
     <title>FBS Diabetes Risk Prediction</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='vendor/fontawesome/all.min.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/nurse_base.css') }}">
+{% block extra_css %}{% endblock %}
 </head>
 <body>
     <div class="mobile-overlay" id="mobileOverlay"></div>
@@ -23,9 +24,7 @@
                 <span class="user-menu-caret" id="userMenuCaret">▲</span>
             </div>
             <div class="user-dropdown" id="userDropdown">
-                <label class="user-dropdown-item" for="avatarFileInput">
-                    <span class="udd-icon">🖼</span> Change Profile Photo
-                    <input type="file" id="avatarFileInput" accept="image/*" style="display:none;">
+                <label class="user-dropdown-item" for="avatarFileInput"><input type="file" id="avatarFileInput" accept="image/*" style="display:none;">
                 </label>
             </div>
         </div>

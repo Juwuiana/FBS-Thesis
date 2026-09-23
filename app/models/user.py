@@ -32,8 +32,8 @@ def db_role_from_display(role_name):
 
 def display_facility_from_db(facility):
     labels = {
-        "rhui": "RHU I",
-        "rhuii": "RHU II",
+        "lhui": "LHU I",
+        "lhuii": "LHU II",
     }
     return labels.get((facility or "").lower(), (facility or "Unknown Facility").title())
 
@@ -267,7 +267,7 @@ def seed_demo_users():
             "email": "l.walker@lhu.gov.ph",
             "phone": "9171234567",
             "role": "medical_officer",
-            "facility": "rhui",
+            "facility": "lhui",
             "barangay": "aplaya",
             "status": "approved",
             "password": "Password123!",
@@ -281,7 +281,7 @@ def seed_demo_users():
             "email": "k.pernia@lhu.gov.ph",
             "phone": "9182345678",
             "role": "health_worker",
-            "facility": "rhui",
+            "facility": "lhui",
             "barangay": "market_area",
             "status": "approved",
             "password": "Password123!",
@@ -295,7 +295,7 @@ def seed_demo_users():
             "email": "c.espiritu@lhu.gov.ph",
             "phone": "9193456789",
             "role": "medical_officer",
-            "facility": "rhuii",
+            "facility": "lhuii",
             "barangay": "tagapo",
             "status": "approved",
             "password": "Password123!",
