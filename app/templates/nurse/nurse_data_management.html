@@ -93,7 +93,7 @@
                     Compile staging data records accumulated on this terminal into an encrypted, standardized file for transfer to the central health office.
                 </p>
                 <p style="font-size:0.8rem; color:var(--text-muted); line-height:1.5; margin-bottom:1.5rem;">
-                    Patient names are excluded from export. Patient ID (e.g. CAB-2026-0003) is retained for internal cross-reference.
+                    Patient names are excluded from export. Patient ID (e.g. SRCHO-2026-0003) is retained for internal cross-reference.
                 </p>
                 <form method="POST" action="{{ url_for('nurse.nurse_data_management_export') }}">
                     <input type="hidden" name="barangay" value="{{ request.args.get('barangay', '') }}">

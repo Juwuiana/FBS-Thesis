@@ -27,7 +27,7 @@ def generate_next_patient_code(conn=None) -> str:
     own_conn = conn is None
     conn = conn or get_connection()
     year = date.today().year
-    prefix = f"CAB-{year}-"
+    prefix = f"SRCHO-{year}-"
 
     row = conn.execute(
         """
