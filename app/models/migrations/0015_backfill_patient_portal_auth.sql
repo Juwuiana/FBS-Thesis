@@ -3,9 +3,16 @@
 -- content was written), so the migration runner will never re-run it.
 -- This re-issues the same columns under a new migration number instead
 -- of editing 0014, per the "never edit an already-applied migration" rule.
-
-ALTER TABLE patients ADD COLUMN password_hash TEXT;
-ALTER TABLE patients ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 1;
-ALTER TABLE patients ADD COLUMN portal_activated_at TEXT;
-ALTER TABLE patients ADD COLUMN credentials_issued_by_staff_id INTEGER REFERENCES users(id);
-ALTER TABLE patients ADD COLUMN credentials_issued_at TEXT;
+--
+-- Fixed during the model-reliability merge: this file only needs to do
+-- anything on the one specific developer machine where 0014 was recorded
+-- as applied before its body existed. On every other database -- including
+-- every fresh install, and this merged branch -- migration 0014 already
+-- adds these same 5 columns in full, so re-issuing them here unconditionally
+-- raised "duplicate column name" and blocked `flask init-db` / app startup
+-- entirely. SQLite's ALTER TABLE has no portable "ADD COLUMN IF NOT EXISTS"
+-- in the sqlite3 build this project runs on, and a migration file can't
+-- branch on PRAGMA table_info(...) by itself, so this is left a no-op here.
+-- If you are the one developer who actually needs the backfill, run the
+-- five ALTER TABLE ... ADD COLUMN statements from 0014 by hand instead.
+SELECT 1;

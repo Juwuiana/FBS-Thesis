@@ -4,6 +4,17 @@
 {% block title %}Audit Trails – FBS Diabetes Risk{% endblock %}
 {% block page_title %}Audit Log &amp; Trails{% endblock %}
 
+{% block head %}
+<style>
+  @media print {
+    .sidebar, .topbar, .audit-card > .row, .audit-log-header .d-flex,
+    .audit-pagination, .details-btn, .view-location-link { display: none !important; }
+    .main-wrapper, .page-content, .audit-card, .audit-table-wrap { margin: 0; padding: 0; width: 100%; }
+    .audit-table tr[style*="display: none"] { display: none !important; }
+  }
+</style>
+{% endblock %}
+
 {% block content %}
 <main class="page-content">
   <div class="audit-card">
@@ -36,7 +47,7 @@
         </select>
       </div>
       <div class="col-6 col-md">
-        <select class="audit-filter-select" id="filterDate">
+        <select class="audit-filter-select" id="filterDate" onchange="filterAudit()">
           <option>Today</option>
           <option>Last 7 Days</option>
           <option>Last 30 Days</option>
@@ -67,8 +78,8 @@
         </div>
       </div>
       <div class="d-flex gap-2 flex-wrap">
-        <button class="audit-export-btn"><i class="bi bi-download me-1"></i> Export</button>
-        <button class="audit-print-btn"><i class="bi bi-printer me-1"></i> Print</button>
+        <button class="audit-export-btn" type="button" onclick="exportAudit()"><i class="bi bi-download me-1"></i> Export</button>
+        <button class="audit-print-btn" type="button" onclick="window.print()"><i class="bi bi-printer me-1"></i> Print</button>
       </div>
     </div>
 
@@ -88,6 +99,12 @@
         <tbody id="auditTableBody">
           {% for log in logs %}
           <tr
+            data-event-id="{{ log.id }}"
+            data-timestamp="{{ log.timestamp }}"
+            data-timestamp-iso="{{ log.timestamp_iso }}"
+            data-user-id="{{ log.user_id if log.user_id is not none else '' }}"
+            data-user="{{ log.user }}"
+            data-ip="{{ log.ip }}"
             data-action="{{ log.action | lower }}"
             data-role="{{ log.role | lower }}"
             data-severity="{{ log.severity | lower }}"
@@ -126,7 +143,7 @@
                 <span class="sev-info">Info</span>
               {% endif %}
             </td>
-            <td><button class="details-btn">Details →</button></td>
+            <td><button class="details-btn" type="button" onclick="showAuditDetails(this)">Details →</button></td>
           </tr>
           {% endfor %}
         </tbody>
@@ -136,21 +153,54 @@
     <!-- Pagination -->
     <div class="audit-pagination mt-3">
       <div class="audit-pagination-info">
-        Showing 1–{{ [logs | length, 12] | min }} of {{ logs | length }} events
+        {% set start = ((page - 1) * 12 + 1) if total_count else 0 %}
+        {% set end = [page * 12, total_count] | min %}
+        Showing {{ start }}–{{ end }} of {{ total_count }} events
       </div>
       <div class="page-btns">
-        <button class="page-btn page-btn-arrow">‹</button>
-        <button class="page-btn active">1</button>
-        <button class="page-btn">2</button>
-        <button class="page-btn">3</button>
-        <button class="page-btn" style="width:auto;padding:0 8px">…</button>
-        <button class="page-btn">21</button>
-        <button class="page-btn page-btn-arrow">›</button>
+        {% if page > 1 %}
+          <a class="page-btn page-btn-arrow" href="{{ url_for('admin.audit_trails', page=page - 1) }}" aria-label="Previous page">‹</a>
+        {% else %}
+          <span class="page-btn page-btn-arrow disabled" aria-disabled="true">‹</span>
+        {% endif %}
+        {% for page_number in range(1, total_pages + 1) %}
+          {% if page_number == page %}
+            <span class="page-btn active">{{ page_number }}</span>
+          {% else %}
+            <a class="page-btn" href="{{ url_for('admin.audit_trails', page=page_number) }}">{{ page_number }}</a>
+          {% endif %}
+        {% endfor %}
+        {% if page < total_pages %}
+          <a class="page-btn page-btn-arrow" href="{{ url_for('admin.audit_trails', page=page + 1) }}" aria-label="Next page">›</a>
+        {% else %}
+          <span class="page-btn page-btn-arrow disabled" aria-disabled="true">›</span>
+        {% endif %}
       </div>
     </div>
 
   </div>
 </main>
+
+<div class="modal fade" id="auditDetailsModal" tabindex="-1" aria-labelledby="auditDetailsTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="auditDetailsTitle">Audit Event Details</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <dl class="row mb-0">
+          <dt class="col-sm-4">Event ID</dt><dd class="col-sm-8" id="detailEventId"></dd>
+          <dt class="col-sm-4">Timestamp</dt><dd class="col-sm-8" id="detailTimestamp"></dd>
+          <dt class="col-sm-4">Actor</dt><dd class="col-sm-8" id="detailActor"></dd>
+          <dt class="col-sm-4">Action / Event</dt><dd class="col-sm-8 text-break" id="detailAction"></dd>
+          <dt class="col-sm-4">IP Address</dt><dd class="col-sm-8" id="detailIp"></dd>
+          <dt class="col-sm-4">Severity</dt><dd class="col-sm-8"><span class="sev-info" id="detailSeverity"></span></dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -159,6 +209,7 @@
     const q    = document.getElementById('auditSearch').value.toLowerCase();
     const type = document.getElementById('filterType').value.toLowerCase();
     const role = document.getElementById('filterRole').value.toLowerCase();
+    const date = document.getElementById('filterDate').value;
     const sev  = document.getElementById('filterSeverity').value.toLowerCase();
     const rows = document.querySelectorAll('#auditTableBody tr');
     let visible = 0;
@@ -167,8 +218,13 @@
       const matchSearch = !q    || row.dataset.search.includes(q);
       const matchType   = !type || row.dataset.action.includes(type);
       const matchRole   = !role || row.dataset.role.includes(role);
+      const eventDate = new Date(row.dataset.timestampIso.replace(' ', 'T') + 'Z');
+      const ageDays = (Date.now() - eventDate.getTime()) / 86400000;
+      const matchDate = !date || (date === 'Today' && ageDays < 1) ||
+        (date === 'Last 7 Days' && ageDays < 7) ||
+        (date === 'Last 30 Days' && ageDays < 30);
       const matchSev    = !sev  || row.dataset.severity.includes(sev);
-      const show = matchSearch && matchType && matchRole && matchSev;
+      const show = matchSearch && matchType && matchRole && matchDate && matchSev;
       row.style.display = show ? '' : 'none';
       if (show) visible++;
     });
@@ -185,6 +241,26 @@
         else el.selectedIndex = 0;
       });
     filterAudit();
+  }
+
+  function exportAudit() {
+    window.location.href = '{{ url_for("admin.audit_trails_export") }}';
+  }
+
+  function showAuditDetails(button) {
+    const row = button.closest('tr');
+    const actor = row.dataset.userId
+      ? `${row.dataset.user} (${row.dataset.role}, user ID ${row.dataset.userId})`
+      : `${row.dataset.user} (${row.dataset.role}; No account on record)`;
+    document.getElementById('detailEventId').textContent = row.dataset.eventId;
+    document.getElementById('detailTimestamp').textContent = row.dataset.timestamp;
+    document.getElementById('detailActor').textContent = actor;
+    document.getElementById('detailAction').textContent = row.querySelector('.audit-action').textContent;
+    document.getElementById('detailIp').textContent = row.dataset.ip;
+    const severity = document.getElementById('detailSeverity');
+    severity.textContent = row.dataset.severity;
+    severity.className = `sev-${row.dataset.severity}`;
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('auditDetailsModal')).show();
   }
 </script>
 {% endblock %}

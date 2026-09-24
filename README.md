@@ -87,6 +87,11 @@ Create or update `.env` as needed. Admin approval should be enabled for normal t
 REQUIRE_ADMIN_APPROVAL=True
 ```
 
+Run from project root to populate model:
+
+```powershell
+python scripts/import_phase4_results.py data/enns_only_phase5_summary.json
+```
 ## Run the Application
 
 ```powershell

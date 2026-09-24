@@ -1,0 +1,546 @@
+{
+  "selected_model": "XGBoost",
+  "used_tuned_hyperparameters": false,
+  "tuning_source": null,
+  "benchmark_passed": false,
+  "cv_results": {
+    "NaiveBayes": {
+      "accuracy": 0.22867513611615245,
+      "precision": 0.3365203577608701,
+      "recall": 0.33026960784313725,
+      "f1": 0.22296699083713487,
+      "auc": 0.5170158720583289
+    },
+    "LogisticRegression": {
+      "accuracy": 0.4624319419237749,
+      "precision": 0.39791224591771207,
+      "recall": 0.4216215375038905,
+      "f1": 0.3788692397979777,
+      "auc": 0.5725548675027159
+    },
+    "DecisionTree": {
+      "accuracy": 0.5604053236539625,
+      "precision": 0.441471744174037,
+      "recall": 0.4604236694677872,
+      "f1": 0.44437231120784776,
+      "auc": 0.602069183818178
+    },
+    "KNN": {
+      "accuracy": 0.3332728372655777,
+      "precision": 0.3419214839828314,
+      "recall": 0.3544779022720199,
+      "f1": 0.2990753874996981,
+      "auc": 0.5261650439869723
+    },
+    "RandomForest": {
+      "accuracy": 0.5794313369630973,
+      "precision": 0.39907110453998984,
+      "recall": 0.37557967631497047,
+      "f1": 0.37110832648400216,
+      "auc": 0.6593969548081438
+    },
+    "XGBoost": {
+      "accuracy": 0.600302480338778,
+      "precision": 0.42642615674483614,
+      "recall": 0.40753073451602867,
+      "f1": 0.4056336104223085,
+      "auc": 0.6590038105499945
+    },
+    "LightGBM": {
+      "accuracy": 0.5846642468239565,
+      "precision": 0.3906847580504392,
+      "recall": 0.37877489884842824,
+      "f1": 0.37454020031365876,
+      "auc": 0.648264813187307
+    }
+  },
+  "composite_scores": {
+    "NaiveBayes": 0.3844180723837376,
+    "LogisticRegression": 0.47525161590991005,
+    "DecisionTree": 0.5177780616488863,
+    "KNN": 0.41252648666291164,
+    "RandomForest": 0.5009776110925028,
+    "XGBoost": 0.5193635258295751,
+    "LightGBM": 0.4974211131227418
+  },
+  "best_baseline_auc": 0.602069183818178,
+  "ensemble_margin_over_best_baseline": 0.056934626731816484,
+  "test_metrics": {
+    "accuracy": 0.6222222222222222,
+    "precision": 0.5202128815032041,
+    "recall": 0.44895343540329985,
+    "f1": 0.4611111111111111,
+    "auc": 0.6745228384865323
+  },
+  "edge_readiness": {
+    "latency_s": 0.005468499998096376,
+    "size_mb": 0.5835990905761719,
+    "passed_latency": true
+  },
+  "data_fingerprint": "74ff2332059a576fd1e4ae06f7fbd7ccfb5a6496f21ef486f2850a1638538db8",
+  "model_path": "processed\\optimized_model_XGBoost_74ff233205.joblib",
+  "confusion_matrix": [
+    [
+      2,
+      7,
+      4
+    ],
+    [
+      2,
+      67,
+      12
+    ],
+    [
+      1,
+      25,
+      15
+    ]
+  ],
+  "class_names": [
+    "Diabetic",
+    "Normal",
+    "Pre-Diabetic"
+  ],
+  "feature_importance": [
+    {
+      "feature": "age",
+      "importance": 0.04012182354927063
+    },
+    {
+      "feature": "fg3",
+      "importance": 0.03177759796380997
+    },
+    {
+      "feature": "fg26",
+      "importance": 0.02928863652050495
+    },
+    {
+      "feature": "epwt_fg18",
+      "importance": 0.02639732137322426
+    },
+    {
+      "feature": "wrkplace",
+      "importance": 0.026332056149840355
+    },
+    {
+      "feature": "epwt_fg19",
+      "importance": 0.022022990509867668
+    },
+    {
+      "feature": "vita",
+      "importance": 0.021334579214453697
+    },
+    {
+      "feature": "anthro_group",
+      "importance": 0.02101375348865986
+    },
+    {
+      "feature": "fg5",
+      "importance": 0.020503483712673187
+    },
+    {
+      "feature": "waist_cm",
+      "importance": 0.020482081919908524
+    },
+    {
+      "feature": "drnk_30days",
+      "importance": 0.02009313926100731
+    },
+    {
+      "feature": "fg18",
+      "importance": 0.018974963575601578
+    },
+    {
+      "feature": "fg27",
+      "importance": 0.01847190409898758
+    },
+    {
+      "feature": "tri",
+      "importance": 0.018304875120520592
+    },
+    {
+      "feature": "epwt_fg6",
+      "importance": 0.018038619309663773
+    },
+    {
+      "feature": "Total_Iron",
+      "importance": 0.01746426895260811
+    },
+    {
+      "feature": "bmi",
+      "importance": 0.01564665138721466
+    },
+    {
+      "feature": "fg10",
+      "importance": 0.015618128702044487
+    },
+    {
+      "feature": "epwt_fg9",
+      "importance": 0.01513188797980547
+    },
+    {
+      "feature": "fg9",
+      "importance": 0.014916734769940376
+    },
+    {
+      "feature": "Total_VitC",
+      "importance": 0.014527086168527603
+    },
+    {
+      "feature": "fg15",
+      "importance": 0.014042227528989315
+    },
+    {
+      "feature": "Total_Food",
+      "importance": 0.013729646801948547
+    },
+    {
+      "feature": "fg25",
+      "importance": 0.013539875857532024
+    },
+    {
+      "feature": "fg2",
+      "importance": 0.013421127572655678
+    },
+    {
+      "feature": "rep_prov_socio",
+      "importance": 0.01325494796037674
+    },
+    {
+      "feature": "epwt_fg8",
+      "importance": 0.013221502304077148
+    },
+    {
+      "feature": "Total_Ener",
+      "importance": 0.01312442310154438
+    },
+    {
+      "feature": "height",
+      "importance": 0.012942833825945854
+    },
+    {
+      "feature": "uic",
+      "importance": 0.012844068929553032
+    },
+    {
+      "feature": "systolic_bp",
+      "importance": 0.012762997299432755
+    },
+    {
+      "feature": "haswork",
+      "importance": 0.012280142866075039
+    },
+    {
+      "feature": "epwt_fg14",
+      "importance": 0.012165705673396587
+    },
+    {
+      "feature": "fg16",
+      "importance": 0.01194650586694479
+    },
+    {
+      "feature": "fg19",
+      "importance": 0.011934320442378521
+    },
+    {
+      "feature": "csc",
+      "importance": 0.011738111265003681
+    },
+    {
+      "feature": "Total_CHO",
+      "importance": 0.011629053391516209
+    },
+    {
+      "feature": "diastolic_bp",
+      "importance": 0.011397581547498703
+    },
+    {
+      "feature": "drnk_30d_num",
+      "importance": 0.011224296875298023
+    },
+    {
+      "feature": "pa_met",
+      "importance": 0.011087590828537941
+    },
+    {
+      "feature": "ever_smk",
+      "importance": 0.01104360818862915
+    },
+    {
+      "feature": "educ",
+      "importance": 0.010968105867505074
+    },
+    {
+      "feature": "epwt_fg1",
+      "importance": 0.010416626930236816
+    },
+    {
+      "feature": "hip",
+      "importance": 0.01013669092208147
+    },
+    {
+      "feature": "fg23",
+      "importance": 0.010050864890217781
+    },
+    {
+      "feature": "ldl",
+      "importance": 0.009997461922466755
+    },
+    {
+      "feature": "weight",
+      "importance": 0.00986967608332634
+    },
+    {
+      "feature": "epwt_fg10",
+      "importance": 0.00974173005670309
+    },
+    {
+      "feature": "fg21",
+      "importance": 0.009613328613340855
+    },
+    {
+      "feature": "fg6",
+      "importance": 0.009586858563125134
+    },
+    {
+      "feature": "hemoglobin",
+      "importance": 0.009450934827327728
+    },
+    {
+      "feature": "fg14",
+      "importance": 0.009387745521962643
+    },
+    {
+      "feature": "Total_Calc",
+      "importance": 0.009355871006846428
+    },
+    {
+      "feature": "Total_Fat",
+      "importance": 0.00934445671737194
+    },
+    {
+      "feature": "Total_Food_epwt",
+      "importance": 0.009084212593734264
+    },
+    {
+      "feature": "chol",
+      "importance": 0.009036138653755188
+    },
+    {
+      "feature": "hdl",
+      "importance": 0.00902754906564951
+    },
+    {
+      "feature": "epwt_fg16",
+      "importance": 0.009012831375002861
+    },
+    {
+      "feature": "fg4",
+      "importance": 0.00894815195351839
+    },
+    {
+      "feature": "fg7",
+      "importance": 0.008741823956370354
+    },
+    {
+      "feature": "epwt_fg17",
+      "importance": 0.008711671456694603
+    },
+    {
+      "feature": "fg8",
+      "importance": 0.00857036467641592
+    },
+    {
+      "feature": "Total_VitA",
+      "importance": 0.008446397259831429
+    },
+    {
+      "feature": "Total_Nia",
+      "importance": 0.00837796088308096
+    },
+    {
+      "feature": "fg24",
+      "importance": 0.008377731777727604
+    },
+    {
+      "feature": "epwt_fg4",
+      "importance": 0.008054293692111969
+    },
+    {
+      "feature": "Total_Prot",
+      "importance": 0.008006757125258446
+    },
+    {
+      "feature": "alcohol",
+      "importance": 0.007647152058780193
+    },
+    {
+      "feature": "con_alcohol",
+      "importance": 0.007371887564659119
+    },
+    {
+      "feature": "fg1",
+      "importance": 0.007290146313607693
+    },
+    {
+      "feature": "Total_Ribo",
+      "importance": 0.006907920353114605
+    },
+    {
+      "feature": "occup",
+      "importance": 0.0066976482048630714
+    },
+    {
+      "feature": "Total_Thia",
+      "importance": 0.006396202836185694
+    },
+    {
+      "feature": "fg17",
+      "importance": 0.005675085354596376
+    },
+    {
+      "feature": "epwt_fg15",
+      "importance": 0.0053732385858893394
+    },
+    {
+      "feature": "epwt_fg23",
+      "importance": 0.005150278098881245
+    },
+    {
+      "feature": "psc",
+      "importance": 0.004441551864147186
+    },
+    {
+      "feature": "fg11",
+      "importance": 0.0009395262459293008
+    },
+    {
+      "feature": "currentsmoking",
+      "importance": 0.0
+    },
+    {
+      "feature": "binge_drink",
+      "importance": 0.0
+    },
+    {
+      "feature": "rep_natl_socio",
+      "importance": 0.0
+    },
+    {
+      "feature": "interview_status",
+      "importance": 0.0
+    },
+    {
+      "feature": "ethnicity",
+      "importance": 0.0
+    },
+    {
+      "feature": "mos_lactation",
+      "importance": 0.0
+    },
+    {
+      "feature": "fg12",
+      "importance": 0.0
+    },
+    {
+      "feature": "fg13",
+      "importance": 0.0
+    },
+    {
+      "feature": "fg20",
+      "importance": 0.0
+    },
+    {
+      "feature": "epwt_fg2",
+      "importance": 0.0
+    },
+    {
+      "feature": "epwt_fg3",
+      "importance": 0.0
+    },
+    {
+      "feature": "epwt_fg5",
+      "importance": 0.0
+    },
+    {
+      "feature": "epwt_fg7",
+      "importance": 0.0
+    },
+    {
+      "feature": "epwt_fg11",
+      "importance": 0.0
+    },
+    {
+      "feature": "epwt_fg12",
+      "importance": 0.0
+    },
+    {
+      "feature": "epwt_fg13",
+      "importance": 0.0
+    },
+    {
+      "feature": "epwt_fg20",
+      "importance": 0.0
+    },
+    {
+      "feature": "epwt_fg21",
+      "importance": 0.0
+    },
+    {
+      "feature": "epwt_fg24",
+      "importance": 0.0
+    },
+    {
+      "feature": "epwt_fg25",
+      "importance": 0.0
+    },
+    {
+      "feature": "epwt_fg26",
+      "importance": 0.0
+    },
+    {
+      "feature": "epwt_fg27",
+      "importance": 0.0
+    },
+    {
+      "feature": "alcohol_status_current",
+      "importance": 0.0
+    },
+    {
+      "feature": "alcohol_status_former",
+      "importance": 0.0
+    },
+    {
+      "feature": "alcohol_status_never",
+      "importance": 0.0
+    },
+    {
+      "feature": "alcohol_status_unknown",
+      "importance": 0.0
+    },
+    {
+      "feature": "sex_female",
+      "importance": 0.0
+    },
+    {
+      "feature": "sex_male",
+      "importance": 0.0
+    },
+    {
+      "feature": "smoking_status_current",
+      "importance": 0.0
+    },
+    {
+      "feature": "smoking_status_former",
+      "importance": 0.0
+    },
+    {
+      "feature": "smoking_status_never",
+      "importance": 0.0
+    },
+    {
+      "feature": "smoking_status_unknown",
+      "importance": 0.0
+    }
+  ]
+}

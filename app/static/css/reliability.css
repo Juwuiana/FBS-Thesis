@@ -155,6 +155,43 @@
 .cm-fp { background: #fff3e0; color: #e65100; }
 .cm-fn { background: #ffebee; color: #c62828; }
 
+/* ── CONFUSION MATRIX (N-class) ── */
+/* feature/model-reliability: generic NxN grid for the actual 3-class
+   (Normal / Pre-Diabetic / Diabetic) classifier, alongside the 2x2
+   .cm-tn/.cm-fp/.cm-fn/.cm-tp cells above used by the demo/placeholder data. */
+.confusion-grid-nxn {
+  font-size: 12px;
+}
+
+.confusion-grid-nxn .cm-header {
+  font-weight: 600;
+  color: var(--text-muted);
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 2px;
+  text-align: center;
+}
+
+.confusion-grid-nxn .cm-cell {
+  border-radius: 6px;
+  padding: 8px 4px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.confusion-grid-nxn .cm-diag {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.confusion-grid-nxn .cm-offdiag {
+  background: #f8fbf8;
+  color: var(--text-primary);
+}
+
 /* ── DETAIL ROWS ── */
 .detail-row {
   display: flex;

@@ -9,6 +9,7 @@ from app.controllers import auth_controller, metrics_controller
 from app.constants import BARANGAYS, CSV_IMPORT_COLUMNS, ROLE_MAP, STATION_MAP
 from app.db import get_db
 from app.models import audit_model
+from app.models.model_performance_model import list_models, get_best_model
 from app.views.auth_views import login_required, require_role_for_blueprint, role_required
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
@@ -92,6 +93,25 @@ def dashboard():
         "roc_auc": 0.93,
     }
 
+    # From feature/model-reliability: once real evaluation results exist in
+    # model_performance_logs, use the actual best model's numbers instead of
+    # the placeholder figures above. Falls back to the placeholders (and thus
+    # never breaks the dashboard) when the table is empty or unmigrated.
+    try:
+        best = get_best_model()
+    except sqlite3.Error:
+        best = None
+    if best:
+        if best.get("accuracy") is not None:
+            metrics["model_accuracy"] = round(best["accuracy"] * 100, 1)
+        model_performance = {
+            "accuracy": round(best["accuracy"] * 100, 1) if best.get("accuracy") is not None else model_performance["accuracy"],
+            "precision": best.get("precision_score") if best.get("precision_score") is not None else model_performance["precision"],
+            "recall": best.get("recall_score") if best.get("recall_score") is not None else model_performance["recall"],
+            "f1_score": best.get("f1_score") if best.get("f1_score") is not None else model_performance["f1_score"],
+            "roc_auc": best.get("roc_auc") if best.get("roc_auc") is not None else model_performance["roc_auc"],
+        }
+
     return render_template(
         "dashboard/index.html",
         metrics=metrics,
@@ -102,87 +122,173 @@ def dashboard():
     )
 
 
+# ── Demo/placeholder fallback for the Model Reliability page ───────────────
+# Shown only when model_performance_logs has no rows yet (fresh DB, migrations
+# applied but scripts/seed_model_performance.py hasn't been run). Keeps the
+# page usable out of the box instead of 404ing; real data from
+# app.models.model_performance_model always takes priority when present.
+_DEMO_BENCHMARKS = [
+    {"name": "Random Forest", "accuracy": 0.883, "precision": 0.871,
+     "recall": 0.856, "f1": 0.863, "auc": 0.889, "cv_auc": 0.885,
+     "composite_score": 0.885, "best": True},
+    {"name": "XGBoost", "accuracy": 0.871, "precision": 0.858,
+     "recall": 0.843, "f1": 0.850, "auc": 0.878, "cv_auc": 0.874,
+     "composite_score": 0.874, "best": False},
+    {"name": "LightGBM", "accuracy": 0.865, "precision": 0.851,
+     "recall": 0.837, "f1": 0.844, "auc": 0.872, "cv_auc": 0.869,
+     "composite_score": 0.869, "best": False},
+]
+_DEMO_BEST_MODEL = {
+    "name": "Random Forest", "accuracy": 0.883, "precision": 0.871,
+    "recall": 0.856, "f1": 0.863, "auc": 0.889, "test_n": 800,
+    "confusion_matrix": [[420, 30, 8], [26, 210, 18], [6, 15, 267]],
+}
+_DEMO_OPTIMIZATION = {
+    "technique": "Post-Training Quantization",
+    "serialized_size_kb": 182,
+    "inference_time_ms": 0.4,
+    "target_device": "Android edge device (Termux)",
+}
+_DEMO_TRAINING_SET = {
+    "source": "1 LHU \u2013 Santa Rosa City (placeholder)",
+    "total_records": 4820,
+    "class_breakdown": [
+        {"label": "Normal", "count": 2456, "pct": 51.0},
+        {"label": "Pre-Diabetic", "count": 1420, "pct": 29.5},
+        {"label": "Diabetic", "count": 944, "pct": 19.5},
+    ],
+    "train_split": 70,
+    "test_split": 30,
+    "primary_feature": "FBS (mg/dL)",
+}
+_DEMO_FEATURE_IMPORTANCE = [
+    {"name": "FBS (mg/dL)", "importance": 0.5821},
+    {"name": "Age", "importance": 0.1342},
+    {"name": "BMI", "importance": 0.0987},
+    {"name": "Systolic BP", "importance": 0.0765},
+    {"name": "Diastolic BP", "importance": 0.0534},
+    {"name": "Sex", "importance": 0.0312},
+    {"name": "Waist Circum.", "importance": 0.0239},
+]
+_DEMO_CV = {
+    "fold_scores": [0.881, 0.893, 0.876, 0.901, 0.885,
+                    0.879, 0.897, 0.868, 0.891, 0.883],
+    "mean_auc": 0.885, "std_auc": 0.009, "min_auc": 0.868, "max_auc": 0.901,
+    "accuracy": 0.878, "precision": 0.865, "recall": 0.851, "f1": 0.858,
+}
+_DEMO_ROC_POINTS = [
+    {"fpr": 0.00, "tpr": 0.00}, {"fpr": 0.02, "tpr": 0.32},
+    {"fpr": 0.05, "tpr": 0.55}, {"fpr": 0.10, "tpr": 0.72},
+    {"fpr": 0.15, "tpr": 0.80}, {"fpr": 0.20, "tpr": 0.85},
+    {"fpr": 0.30, "tpr": 0.91}, {"fpr": 0.40, "tpr": 0.94},
+    {"fpr": 0.50, "tpr": 0.96}, {"fpr": 0.70, "tpr": 0.98},
+    {"fpr": 1.00, "tpr": 1.00},
+]
+
+
 @admin_bp.route("/reliability")
 @login_required
 def reliability():
+    try:
+        logs = list_models()
+    except sqlite3.Error:
+        logs = []
+
+    if not logs:
+        # No evaluation results yet -- render the page with placeholder data
+        # (flagged as such) instead of a dead 404, so the page is always
+        # demoable. Run scripts/seed_model_performance.py or
+        # scripts/evaluate_models.py to replace this with real data.
+        return render_template(
+            "model/reliability.html",
+            benchmarks=_DEMO_BENCHMARKS,
+            best_model=_DEMO_BEST_MODEL,
+            optimization=_DEMO_OPTIMIZATION,
+            training_set=_DEMO_TRAINING_SET,
+            feature_importance=_DEMO_FEATURE_IMPORTANCE,
+            cv=_DEMO_CV,
+            roc_points=_DEMO_ROC_POINTS,
+            is_placeholder=True,
+        )
+
     benchmarks = [
-        {"name": "Random Forest", "accuracy": 0.883, "precision": 0.871,
-         "recall": 0.856, "f1": 0.863, "auc": 0.889, "best": True},
-        {"name": "XGBoost",       "accuracy": 0.871, "precision": 0.858,
-         "recall": 0.843, "f1": 0.850, "auc": 0.878, "best": False},
-        {"name": "LightGBM",      "accuracy": 0.865, "precision": 0.851,
-         "recall": 0.837, "f1": 0.844, "auc": 0.872, "best": False},
+        {
+            "name": log["model_name"],
+            "accuracy": log["accuracy"],
+            "precision": log["precision_score"],
+            "recall": log["recall_score"],
+            "f1": log["f1_score"],
+            "auc": log["roc_auc"],
+            "cv_auc": log["cv_mean_auc"],
+            "composite_score": log["composite_score"],
+            "best": log["is_best"],
+        }
+        for log in logs
     ]
+
+    best = get_best_model() or logs[0]
+
     best_model = {
-        "name":      "Random Forest",
-        "accuracy":  0.883,
-        "precision": 0.871,
-        "recall":    0.856,
-        "f1":        0.863,
-        "auc":       0.889,
-        "test_n":    800,
-        "cm": {"tn": 512, "fp": 48, "fn": 65, "tp": 175},
+        "name": best["model_name"],
+        "accuracy": best["accuracy"],
+        "precision": best["precision_score"],
+        "recall": best["recall_score"],
+        "f1": best["f1_score"],
+        "auc": best["roc_auc"],
+        "test_n": best["test_set_size"],
+        # {} until a raw NxN export exists; template treats an empty
+        # value as "not available yet" rather than assuming a fixed shape.
+        "confusion_matrix": best["confusion_matrix"],
     }
+
     optimization = {
-        "technique":      "Post-Training Quantization",
-        "original_size":  "2.1 MB",
-        "optimized_size": "182 KB",
-        "reduction":      "91% \u2198",
-        "accuracy_loss":  "< 0.5%",
-        "inference_time": "0.4 ms",
-        "target_device":  "Rpi Zero 2W",
+        "technique": best["optimization_technique"],
+        "serialized_size_kb": best["serialized_model_size_kb"],
+        "inference_time_ms": best["avg_inference_latency_ms"],
+        "target_device": best["target_device"],
     }
+
+    total = best["total_records"] or 0
+    class_counts = best["class_counts"]  # {} until known
+    class_breakdown = [
+        {
+            "label": label,
+            "count": count,
+            "pct": round(100 * count / total, 1) if total else None,
+        }
+        for label, count in class_counts.items()
+    ]
     training_set = {
-        "source":            "1 LHU \u2013 Santa Rosa City",
-        "total_records":     4820,
-        "diabetic_count":    1644,
-        "diabetic_pct":      34.1,
-        "non_diabetic_count": 3176,
-        "non_diabetic_pct":  65.9,
-        "train_split":       70,
-        "test_split":        30,
-        "primary_feature":   "FBS (mg/dL)",
+        "source": best["training_source"],
+        "total_records": total,
+        "class_breakdown": class_breakdown,  # list of {label, count, pct} -- N classes, not 2
+        "train_split": best["train_split_pct"],
+        "test_split": best["test_split_pct"],
+        "primary_feature": best["primary_feature"],
     }
-    feature_importance = [
-        {"name": "FBS (mg/dL)",  "importance": 0.5821},
-        {"name": "Age",           "importance": 0.1342},
-        {"name": "BMI",           "importance": 0.0987},
-        {"name": "Systolic BP",   "importance": 0.0765},
-        {"name": "Diastolic BP",  "importance": 0.0534},
-        {"name": "Sex",           "importance": 0.0312},
-        {"name": "Waist Circum.", "importance": 0.0239},
-    ]
+
     cv = {
-        "fold_scores": [0.881, 0.893, 0.876, 0.901, 0.885,
-                        0.879, 0.897, 0.868, 0.891, 0.883],
-        "mean_auc": 0.885,
-        "std_auc":  0.009,
-        "min_auc":  0.868,
-        "max_auc":  0.901,
+        "fold_scores": best["cv_fold_scores"],
+        "mean_auc": best["cv_mean_auc"],
+        "std_auc": best["cv_std_auc"],
+        "min_auc": best["cv_min_auc"],
+        "max_auc": best["cv_max_auc"],
+        "accuracy": best["cv_accuracy"],
+        "precision": best["cv_precision_score"],
+        "recall": best["cv_recall_score"],
+        "f1": best["cv_f1_score"],
     }
-    # Simplified ROC curve points (FPR, TPR pairs)
-    roc_points = [
-        {"fpr": 0.00, "tpr": 0.00},
-        {"fpr": 0.02, "tpr": 0.32},
-        {"fpr": 0.05, "tpr": 0.55},
-        {"fpr": 0.10, "tpr": 0.72},
-        {"fpr": 0.15, "tpr": 0.80},
-        {"fpr": 0.20, "tpr": 0.85},
-        {"fpr": 0.30, "tpr": 0.91},
-        {"fpr": 0.40, "tpr": 0.94},
-        {"fpr": 0.50, "tpr": 0.96},
-        {"fpr": 0.70, "tpr": 0.98},
-        {"fpr": 1.00, "tpr": 1.00},
-    ]
+
     return render_template(
         "model/reliability.html",
         benchmarks=benchmarks,
         best_model=best_model,
         optimization=optimization,
         training_set=training_set,
-        feature_importance=feature_importance,
+        feature_importance=best["feature_importance"],
         cv=cv,
-        roc_points=roc_points,
+        roc_points=best["roc_curve_points"],
+        is_placeholder=best["is_placeholder"],
     )
 
 @admin_bp.route("/data-management")
@@ -587,7 +693,39 @@ def green_pending():
 @admin_bp.route("/audit-trails")
 @login_required
 def audit_trails():
-    logs = audit_model.get_recent_logs(get_db())
+    db = get_db()
+    page_size = 12
+    total_count = audit_model.get_logs_count(db)
+    total_pages = max(1, (total_count + page_size - 1) // page_size)
+    page = max(1, min(request.args.get("page", 1, type=int) or 1, total_pages))
+    logs = audit_model.get_recent_logs(
+        db, limit=page_size, offset=(page - 1) * page_size
+    )
     audit_now = datetime.utcnow()
     audit_date = f"{audit_now.strftime('%B')} {audit_now.day}"
-    return render_template("dashboard/audit_trails.html", logs=logs, audit_date=audit_date)
+    return render_template(
+        "dashboard/audit_trails.html", logs=logs, audit_date=audit_date,
+        page=page, total_pages=total_pages, total_count=total_count,
+    )
+
+
+@admin_bp.route("/audit-trails/export")
+@login_required
+def audit_trails_export():
+    db = get_db()
+    _audit_event("Exported CSV: audit trails", "Warning")
+    logs = audit_model.get_recent_logs(db, limit=audit_model.get_logs_count(db))
+
+    output = io.StringIO(newline="")
+    writer = csv.writer(output, lineterminator="\r\n")
+    writer.writerow(["Time", "Date", "User", "Role", "Action", "IP Address", "Severity"])
+    for log in logs:
+        writer.writerow([
+            log["time"], log["date"], log["user"], log["role"], log["action"],
+            log["ip"], log["severity"],
+        ])
+
+    response = make_response(output.getvalue())
+    response.headers["Content-Type"] = "text/csv; charset=utf-8"
+    response.headers["Content-Disposition"] = "attachment; filename=audit_trails.csv"
+    return response

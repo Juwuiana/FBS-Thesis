@@ -194,6 +194,24 @@ canvas { max-width: 100% !important; }
 .view-btn { padding: 5px 14px; border-radius: 6px; font-size: 12px; white-space: nowrap; }
 .filter-btn { padding: 7px 20px; }
 
+/* Disabled state -- without this, the browser's own default disabled-button
+   rendering (a washed-out, semi-transparent look) shows on top of the green
+   background instead, e.g. the "Import" button in the CSV import modal
+   before a file is chosen. */
+.filter-btn:disabled, .view-btn:disabled,
+.export-btn:disabled, .audit-export-btn:disabled, .ps-secondary-btn:disabled {
+  opacity: 1;
+  cursor: not-allowed;
+  background: #d7ded7;
+  color: #8a978a;
+  border-color: #d7ded7;
+}
+.filter-btn:disabled:hover, .view-btn:disabled:hover,
+.export-btn:disabled:hover, .audit-export-btn:disabled:hover, .ps-secondary-btn:disabled:hover {
+  background: #d7ded7;
+  color: #8a978a;
+}
+
 .export-btn, .audit-export-btn, .ps-secondary-btn {
   background: transparent; color: var(--accent-green); border: 1.5px solid var(--accent-green); padding: 6px 16px;
 }

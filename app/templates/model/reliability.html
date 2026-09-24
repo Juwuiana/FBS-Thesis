@@ -10,6 +10,10 @@
 
 {% block content %}
 <main class="page-content">
+  {% if is_placeholder %} <div class="alert alert-warning py-2 px-3 mb-3" style="font-size:12px;"> 
+    ⚠️ Showing placeholder data — real model evaluation results pending. 
+  </div> 
+  {% endif %}
 
   <!-- ── ROW 1: BENCHMARK TABLE + DETAILED METRICS ── -->
   <div class="row g-3 mb-3">
@@ -28,6 +32,7 @@
                 <th>Recall</th>
                 <th>F1</th>
                 <th>AUC</th>
+                <th>CV AUC</th>
               </tr>
             </thead>
             <tbody>
@@ -37,16 +42,23 @@
                   {{ m.name }}
                   {% if m.best %}<span class="best-dot"></span>{% endif %}
                 </td>
-                <td>{{ "%.3f"|format(m.accuracy) }}</td>
-                <td>{{ "%.3f"|format(m.precision) }}</td>
-                <td>{{ "%.3f"|format(m.recall) }}</td>
-                <td>{{ "%.3f"|format(m.f1) }}</td>
-                <td>{{ "%.3f"|format(m.auc) }}</td>
+                <td>{{ "%.3f"|format(m.accuracy) if m.accuracy is not none else "—" }}</td>
+                <td>{{ "%.3f"|format(m.precision) if m.precision is not none else "—" }}</td>
+                <td>{{ "%.3f"|format(m.recall) if m.recall is not none else "—" }}</td>
+                <td>{{ "%.3f"|format(m.f1) if m.f1 is not none else "—" }}</td>
+                <td>{{ "%.3f"|format(m.auc) if m.auc is not none else "—" }}</td>
+                <td>{{ "%.3f"|format(m.cv_auc) if m.cv_auc is not none else "—" }}</td>
               </tr>
               {% endfor %}
             </tbody>
           </table>
         </div>
+        {% if benchmarks | selectattr("accuracy", "none") | list | length > 0 %}
+        <p class="text-muted-sm mt-2" style="font-size:11px;">
+          Candidate models show only CV-level metrics (—) — test-set metrics are
+          computed for the selected model only.
+        </p>
+        {% endif %}
       </div>
     </div>
 
@@ -67,30 +79,47 @@
         <div class="metric-bar-row">
           <div class="d-flex justify-content-between mb-1">
             <span class="metric-bar-label">{{ label }}</span>
-            <span class="metric-bar-value">{{ "%.3f"|format(val) }}</span>
+            <span class="metric-bar-value">{{ "%.3f"|format(val) if val is not none else "—" }}</span>
           </div>
           <div class="metric-bar-track">
-            <div class="metric-bar-fill" style="width:{{ (val * 100)|int }}%"></div>
+            <div class="metric-bar-fill" style="width:{{ (val * 100)|int if val is not none else 0 }}%"></div>
           </div>
         </div>
         {% endfor %}
 
+        {% set cm = best_model.confusion_matrix %}
+        {% set cm_labels = training_set.class_breakdown | map(attribute='label') | list %}
         <div class="confusion-label mt-3">
-          Confusion Matrix (TEST SET N = {{ best_model.test_n }})
+          Confusion Matrix (TEST SET N = {{ best_model.test_n if best_model.test_n is not none else "—" }})
         </div>
-        <div class="confusion-grid mt-2">
+
+        {# NOTE: assumes confusion_matrix, once populated, is a raw NxN list-of-lists
+           (e.g. sklearn's confusion_matrix().tolist()) ordered to match
+           training_set.class_breakdown. Confirm against one live DB value before
+           relying on this in production -- if the real shape turns out to be a
+           dict keyed by label instead, this block needs adjusting. #}
+        {% if cm and cm is iterable and cm is not mapping and cm | length > 0 %}
+        <div class="confusion-grid-nxn mt-2"
+             style="display:grid; grid-template-columns: repeat({{ cm | length + 1 }}, 1fr); gap:4px;">
           <div></div>
-          <div class="cm-header">Pred: Negative</div>
-          <div class="cm-header">Pred: Positive</div>
+          {% for j in range(cm | length) %}
+          <div class="cm-header">Pred: {{ cm_labels[j] if j < cm_labels | length else "Class " ~ j }}</div>
+          {% endfor %}
 
-          <div class="cm-header">Actual: Negative</div>
-          <div class="cm-cell cm-tn">{{ best_model.cm.tn }}<span class="cm-tag">TN</span></div>
-          <div class="cm-cell cm-fp">{{ best_model.cm.fp }}<span class="cm-tag">FP</span></div>
-
-          <div class="cm-header">Actual: Positive</div>
-          <div class="cm-cell cm-fn">{{ best_model.cm.fn }}<span class="cm-tag">FN</span></div>
-          <div class="cm-cell cm-tp">{{ best_model.cm.tp }}<span class="cm-tag">TP</span></div>
+          {% for i in range(cm | length) %}
+          <div class="cm-header">Actual: {{ cm_labels[i] if i < cm_labels | length else "Class " ~ i }}</div>
+            {% for j in range(cm | length) %}
+            <div class="cm-cell {{ 'cm-diag' if i == j else 'cm-offdiag' }}">
+              {{ cm[i][j] if cm[i] is defined and cm[i][j] is defined else "—" }}
+            </div>
+            {% endfor %}
+          {% endfor %}
         </div>
+        {% else %}
+        <div class="text-muted-sm mt-2" style="font-size:12px;">
+          Confusion matrix not yet available for this model.
+        </div>
+        {% endif %}
       </div>
     </div>
   </div>
@@ -104,31 +133,20 @@
         <div class="rel-card-title">Model Optimization Details</div>
         {% set opt = optimization %}
         <div class="detail-row">
-          <span class="detail-label">Technique</span>
-          <span class="detail-value">{{ opt.technique }}</span>
+          <span class="detail-label">Optimization Technique</span>
+          <span class="detail-value">{{ opt.technique or "—" }}</span>
         </div>
         <div class="detail-row">
-          <span class="detail-label">Original Size</span>
-          <span class="detail-value">{{ opt.original_size }}</span>
+          <span class="detail-label">Serialized Model Size</span>
+          <span class="detail-value">{{ (opt.serialized_size_kb ~ " KB") if opt.serialized_size_kb is not none else "—" }}</span>
         </div>
         <div class="detail-row">
-          <span class="detail-label">Optimized Size</span>
-          <span class="detail-value">
-            {{ opt.optimized_size }}
-            <span class="reduction-badge">{{ opt.reduction }}</span>
-          </span>
+          <span class="detail-label">Avg. Inference Latency</span>
+          <span class="detail-value">{{ (opt.inference_time_ms ~ " ms") if opt.inference_time_ms is not none else "—" }}</span>
         </div>
         <div class="detail-row">
-          <span class="detail-label">Accuracy loss</span>
-          <span class="detail-value">{{ opt.accuracy_loss }}</span>
-        </div>
-        <div class="detail-row">
-          <span class="detail-label">Inference time</span>
-          <span class="detail-value">{{ opt.inference_time }}</span>
-        </div>
-        <div class="detail-row">
-          <span class="detail-label">Target Device</span>
-          <span class="detail-value">{{ opt.target_device }}</span>
+          <span class="detail-label">Target Deployment Device</span>
+          <span class="detail-value">{{ opt.target_device or "—" }}</span>
         </div>
       </div>
     </div>
@@ -140,47 +158,65 @@
         {% set ts = training_set %}
         <div class="detail-row">
           <span class="detail-label">Source</span>
-          <span class="detail-value">{{ ts.source }}</span>
+          <span class="detail-value">{{ ts.source or "—" }}</span>
         </div>
         <div class="detail-row">
           <span class="detail-label">Total Records</span>
           <span class="detail-value">{{ ts.total_records | number_format }}</span>
         </div>
+
+        {# One row per class -- N classes, not a hardcoded binary pair #}
+        {% for cls in ts.class_breakdown %}
         <div class="detail-row">
-          <span class="detail-label">Diabetic</span>
-          <span class="detail-value">{{ ts.diabetic_count | number_format }} <span class="text-muted-sm">({{ ts.diabetic_pct }}%)</span></span>
+          <span class="detail-label">{{ cls.label }}</span>
+          <span class="detail-value">
+            {{ cls.count | number_format }}
+            <span class="text-muted-sm">({{ "%.1f"|format(cls.pct) if cls.pct is not none else "—" }}%)</span>
+          </span>
         </div>
+        {% else %}
         <div class="detail-row">
-          <span class="detail-label">Non-diabetic</span>
-          <span class="detail-value">{{ ts.non_diabetic_count | number_format }} <span class="text-muted-sm">({{ ts.non_diabetic_pct }}%)</span></span>
+          <span class="detail-label">Class breakdown</span>
+          <span class="detail-value text-muted-sm">not available</span>
         </div>
+        {% endfor %}
+
         <div class="detail-row">
           <span class="detail-label">Train / Test Split</span>
-          <span class="detail-value">{{ ts.train_split }} / {{ ts.test_split }}</span>
+          <span class="detail-value">{{ ts.train_split or "—" }} / {{ ts.test_split or "—" }}</span>
         </div>
         <div class="detail-row">
           <span class="detail-label">Primary Feature</span>
-          <span class="detail-value">{{ ts.primary_feature }}</span>
+          <span class="detail-value">{{ ts.primary_feature or "—" }}</span>
         </div>
 
-        <!-- Class balance mini bar -->
+        {# Class balance mini bar -- generic N-segment stacked bar #}
+        {% if ts.class_breakdown %}
+        {% set palette = ["#2e7d32", "#f9a825", "#c62828", "#6a1b9a", "#00838f"] %}
         <div class="mt-3">
           <div class="d-flex justify-content-between mb-1" style="font-size:11px;color:var(--text-muted)">
             <span>Class Balance</span>
           </div>
-          <div class="balance-bar">
-            <div class="balance-diabetic" style="width:{{ ts.diabetic_pct }}%">
-              <span>{{ ts.diabetic_pct }}%</span>
+          <div class="balance-bar-nxn" style="display:flex;width:100%;overflow:hidden;border-radius:4px;height:18px;">
+            {% for cls in ts.class_breakdown %}
+            <div style="width:{{ cls.pct if cls.pct is not none else 0 }}%;
+                        background:{{ palette[loop.index0 % (palette | length)] }};
+                        display:flex;align-items:center;justify-content:center;
+                        color:#fff;font-size:10px;white-space:nowrap;overflow:hidden;">
+              <span>{{ "%.0f"|format(cls.pct) if cls.pct is not none else "—" }}%</span>
             </div>
-            <div class="balance-non-diabetic" style="width:{{ ts.non_diabetic_pct }}%">
-              <span>{{ ts.non_diabetic_pct }}%</span>
-            </div>
+            {% endfor %}
           </div>
-          <div class="d-flex justify-content-between mt-1" style="font-size:10px;color:var(--text-muted)">
-            <span>■ Diabetic</span>
-            <span>Non-Diabetic ■</span>
+          <div class="d-flex flex-wrap mt-1" style="font-size:10px;color:var(--text-muted);gap:10px;">
+            {% for cls in ts.class_breakdown %}
+            <span>
+              <span style="color:{{ palette[loop.index0 % (palette | length)] }};">■</span>
+              {{ cls.label }}
+            </span>
+            {% endfor %}
           </div>
         </div>
+        {% endif %}
       </div>
     </div>
 
@@ -212,7 +248,7 @@
         <div class="rel-card-title mt-3">ROC Curve</div>
         <canvas id="rocChart" height="160"></canvas>
         <div style="font-size:11px;color:var(--text-muted);margin-top:6px;text-align:center">
-          AUC = {{ "%.3f"|format(best_model.auc) }}
+          AUC = {{ "%.3f"|format(best_model.auc) if best_model.auc is not none else "—" }}
         </div>
       </div>
     </div>
@@ -225,7 +261,11 @@
     <div class="col-lg-6 col-12">
       <div class="rel-card h-100">
         <div class="rel-card-title">Feature Importance</div>
+        {% if feature_importance %}
         <canvas id="featureChart" height="200"></canvas>
+        {% else %}
+        <div class="text-muted-sm" style="font-size:12px;">Feature importance not available.</div>
+        {% endif %}
       </div>
     </div>
 
@@ -233,23 +273,27 @@
     <div class="col-lg-6 col-12">
       <div class="rel-card h-100">
         <div class="rel-card-title">Cross-Validation Results (10-Fold)</div>
+        {% if cv.fold_scores %}
         <canvas id="cvChart" height="200"></canvas>
+        {% else %}
+        <div class="text-muted-sm" style="font-size:12px;">Per-fold CV scores not available (only mean/std/min/max recorded).</div>
+        {% endif %}
         <div class="cv-summary mt-3">
           <div class="cv-stat">
             <span class="cv-stat-label">Mean AUC</span>
-            <span class="cv-stat-value">{{ cv.mean_auc }}</span>
+            <span class="cv-stat-value">{{ "%.4f"|format(cv.mean_auc) if cv.mean_auc is not none else "—" }}</span>
           </div>
           <div class="cv-stat">
             <span class="cv-stat-label">Std Dev</span>
-            <span class="cv-stat-value">± {{ cv.std_auc }}</span>
+            <span class="cv-stat-value">± {{ "%.4f"|format(cv.std_auc) if cv.std_auc is not none else "—" }}</span>
           </div>
           <div class="cv-stat">
             <span class="cv-stat-label">Min</span>
-            <span class="cv-stat-value">{{ cv.min_auc }}</span>
+            <span class="cv-stat-value">{{ "%.4f"|format(cv.min_auc) if cv.min_auc is not none else "—" }}</span>
           </div>
           <div class="cv-stat">
             <span class="cv-stat-label">Max</span>
-            <span class="cv-stat-value">{{ cv.max_auc }}</span>
+            <span class="cv-stat-value">{{ "%.4f"|format(cv.max_auc) if cv.max_auc is not none else "—" }}</span>
           </div>
         </div>
       </div>
@@ -264,13 +308,13 @@
 <script>
   window.RELIABILITY_DATA = {
     bestModel: {
-      name: "{{ best_model.name }}",
+      name: {{ best_model.name | tojson }},
       metrics: {
-        accuracy:  {{ best_model.accuracy }},
-        precision: {{ best_model.precision }},
-        recall:    {{ best_model.recall }},
-        f1:        {{ best_model.f1 }},
-        auc:       {{ best_model.auc }}
+        accuracy:  {{ best_model.accuracy | tojson }},
+        precision: {{ best_model.precision | tojson }},
+        recall:    {{ best_model.recall | tojson }},
+        f1:        {{ best_model.f1 | tojson }},
+        auc:       {{ best_model.auc | tojson }}
       }
     },
     features: {{ feature_importance | tojson }},
