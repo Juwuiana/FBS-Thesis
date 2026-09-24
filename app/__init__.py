@@ -315,7 +315,7 @@ def _register_cli(app):
             "email": email,
             "phone": phone,
             "role": "medical_officer",
-            "facility": "rhui",
+            "facility": "lhui",
             "barangay": barangay,
         }
         password_hash = generate_password_hash(password)

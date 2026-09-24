@@ -23,7 +23,7 @@ STATIONS = list(STATION_MAP)
 MAX_IMPORT_BYTES = 1_048_576
 MAX_IMPORT_ROWS = 500
 _ROLE_BY_LABEL = {label.casefold(): value for label, value in ROLE_MAP.items()}
-_STATION_BY_LABEL = {**{label.casefold(): value for label, value in STATION_MAP.items()}, "rhu i": "rhui", "rhu ii": "rhuii"}
+_STATION_BY_LABEL = {**{label.casefold(): value for label, value in STATION_MAP.items()}, "rhu i": "lhui", "rhu ii": "lhuii"}
 _BARANGAY_BY_VALUE = {value.casefold(): value for value, label in BARANGAYS}
 _BARANGAY_BY_LABEL = {label.casefold(): value for value, label in BARANGAYS}
 
@@ -613,6 +613,31 @@ def delete_staff(employee_id):
     _audit_event(f"Employee account deleted: {employee_id}", "Critical")
     flash("Employee account deleted successfully.", "success")
     return redirect(url_for("admin.data_management"))
+
+
+@admin_bp.route("/staff/<employee_id>/reset-password", methods=["POST"])
+@login_required
+def reset_staff_password(employee_id):
+    from app.models import user as user_model
+
+    employee = user_model.get_user_by_employee_id(employee_id)
+    if employee is None:
+        abort(404)
+    if employee["status"] != "recovery":
+        return jsonify({"error": "This employee does not have a pending password recovery request."}), 400
+
+    temp_password = auth_controller.generate_temp_password()
+    user_model.reset_password(
+        employee["id"], generate_password_hash(temp_password), status="approved"
+    )
+    _audit_event(
+        f"Password reset for {employee['email']} (recovery request)", "Warning"
+    )
+    return jsonify({
+        "temp_password": temp_password,
+        "name": " ".join(part for part in [employee["first_name"], employee["middle_name"], employee["last_name"]] if part),
+        "email": employee["email"],
+    })
 
 
 @admin_bp.route("/privacy-security")

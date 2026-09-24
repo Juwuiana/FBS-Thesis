@@ -89,6 +89,7 @@ canvas { max-width: 100% !important; }
 .risk-low, .status-synced, .sev-success, .ev-success { background: #e8f5e9; color: #2e7d32; }
 .risk-moderate, .status-queued, .sev-warning, .ev-warn { background: #fff3e0; color: #e65100; }
 .risk-high, .sev-critical, .ev-danger { background: #ffebee; color: #c62828; }
+.risk-recovery { background: #e3f2fd; color: #1565c0; }
 .sev-info, .ev-info { background: #e3f2fd; color: #1565c0; }
 .badge-category { background: #f0f4f0; color: var(--text-primary); border-radius: 4px; padding: 3px 8px; }
 .ev-pill { padding: 2px 10px; border-radius: 999px; }

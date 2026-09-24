@@ -4,6 +4,7 @@ handling out of the view functions so auth_views.py just wires HTTP
 request/response to these calls.
 """
 import re
+import secrets
 from datetime import datetime
 
 from flask import current_app
@@ -18,6 +19,11 @@ EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 VALID_SEX = ("male", "female")
 VALID_ROLES = ("health_worker", "medical_officer")
 MIN_PASSWORD_LENGTH = 12
+_PASSWORD_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789"
+
+
+def generate_temp_password(length: int = 10) -> str:
+    return "".join(secrets.choice(_PASSWORD_ALPHABET) for _ in range(length))
 
 
 def _clean(form, key):
@@ -175,6 +181,8 @@ def authenticate(email, password):
     if current_app.config.get("REQUIRE_ADMIN_APPROVAL", True) and user_status != "approved":
         if user_status == "pending":
             return None, "Your account is still awaiting admin approval."
+        if user_status == "recovery":
+            return None, "Your account is awaiting a password reset from an administrator."
         return None, "Your account access has been denied. Contact your LHU administrator."
 
     user_model.update_last_login(user["id"])

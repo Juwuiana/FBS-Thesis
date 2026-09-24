@@ -3,8 +3,9 @@ from functools import wraps
 from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, session, url_for
 
 from app.controllers import auth_controller
+from app.constants import STATION_MAP
 from app.db import get_db
-from app.models import audit_model
+from app.models import audit_model, user as user_model
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -108,14 +109,38 @@ def login():
     return render_template("auth/login.html")
 
 
+@auth_bp.route("/forgot-password", methods=["GET", "POST"])
+def forgot_password():
+    confirmation = None
+    error = None
+    if request.method == "POST":
+        email = (request.form.get("email") or "").strip().lower()
+        if not email or not auth_controller.EMAIL_RE.match(email):
+            error = "A valid email address is required."
+        else:
+            user = user_model.get_user_by_email(email)
+            if user and user["status"] == "approved":
+                user_model.set_status(user["id"], "recovery")
+                audit_model.log_event(
+                    get_db(), user_id=user["id"], user_name=email,
+                    role=user["role"], action="Password recovery requested",
+                    ip_address=request.remote_addr, severity="Warning",
+                )
+            confirmation = "If that email is registered, an administrator has been notified."
+    return render_template(
+        "auth/forgot_password.html", confirmation=confirmation, error=error
+    )
+
+
 @auth_bp.route("/signup", methods=["GET", "POST"])
 def signup():
+    stations = list(STATION_MAP.items())
     if request.method == "POST":
         user_id, errors = auth_controller.register_user(request.form)
         if errors:
             for message in errors:
                 flash(message, "error")
-            return render_template("auth/signup.html"), 400
+            return render_template("auth/signup.html", stations=stations), 400
 
         flash(
             "Account created. An LHU administrator needs to approve it before you can sign in.",
@@ -125,7 +150,7 @@ def signup():
 
     if "user_id" in session:
         return redirect(url_for("admin.dashboard"))
-    return render_template("auth/signup.html")
+    return render_template("auth/signup.html", stations=stations)
 
 
 @auth_bp.route("/logout")

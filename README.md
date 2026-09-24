@@ -11,7 +11,7 @@ The following account-management features were implemented:
 - Pending accounts cannot log in until an admin approves them.
 - Rejected accounts cannot log in.
 - Added status labels and filters for `Approved`, `Rejected`, and `Pending`.
-- Updated station filtering to use `RHU I` and `RHU II`.
+- Updated station filtering to use `LHU I` and `LHU II`.
 - Added a database-backed Add Employee flow.
 - Add Employee creates an account with an approved status and a hashed password.
 - Add Employee supports the `Health Officer` and `LHU Nurse` roles.
@@ -125,8 +125,8 @@ Supported roles:
 
 Supported stations:
 
-- RHU I
-- RHU II
+- LHU I
+- LHU II
 
 ### Delete Employee
 
@@ -139,6 +139,7 @@ The database supports only these user statuses:
 - `pending` - awaiting admin approval
 - `approved` - allowed to log in
 - `rejected` - denied access
+- `recovery` - awaiting an administrator-issued password reset
 
 ## Admin CLI Commands
 
@@ -160,7 +161,7 @@ The recent changes were checked with:
 .\venv\Scripts\python.exe -m compileall app run.py config.py
 ```
 
-The Add Employee flow was also tested against an isolated temporary SQLite database. The test confirmed that the employee record, role, RHU assignment, approved status, and hashed password were saved correctly.
+The Add Employee flow was also tested against an isolated temporary SQLite database. The test confirmed that the employee record, role, LHU assignment, approved status, and hashed password were saved correctly.
 
 ## Notes for the Team
 

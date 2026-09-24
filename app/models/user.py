@@ -58,6 +58,8 @@ def display_status_from_db(status):
         return "Pending"
     if status == "rejected":
         return "Rejected"
+    if status == "recovery":
+        return "Password Recovery"
     return "Pending"
 
 
@@ -322,11 +324,20 @@ def seed_demo_users():
 
 
 def set_status(user_id, status):
-    """Helper for admin approval/rejection (call from a shell or CLI for now)."""
+    """Update an account status."""
     db = get_db()
     db.execute(
         "UPDATE users SET status = ? WHERE id = ?",
         (status, user_id),
+    )
+    db.commit()
+
+
+def reset_password(user_id, password_hash, status="approved"):
+    db = get_db()
+    db.execute(
+        "UPDATE users SET password_hash = ?, status = ? WHERE id = ?",
+        (password_hash, status, user_id),
     )
     db.commit()
 

@@ -162,8 +162,9 @@
                         <label class="field-label" for="facility">Health Facility</label>
                         <select class="field-input select-input" id="facility" name="facility" required>
                             <option value="" disabled selected>Select...</option>
-                            <option value="rhui">RHU I</option>
-                            <option value="rhuii">RHU II</option>
+                            {% for label, code in stations %}
+                                <option value="{{ code }}">{{ label }}</option>
+                            {% endfor %}
                         </select>
                     </div>
                     <div class="field-group">

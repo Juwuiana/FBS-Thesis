@@ -27,8 +27,8 @@ ROLE_MAP = {
 }
 
 STATION_MAP = {
-    "LHU I": "rhui",
-    "LHU II": "rhuii",
+    "LHU I": "lhui",
+    "LHU II": "lhuii",
 }
 
 CSV_IMPORT_COLUMNS = [

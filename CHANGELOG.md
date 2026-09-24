@@ -1,3 +1,12 @@
+# Staff password recovery
+
+- **Fixed:** standardized staff facility codes and labels on `LHU I`/`LHU II`, including repair of existing accounts saved with the old codes.
+
+- **Added:** staff-account password recovery for `health_worker` and `medical_officer` accounts, including anti-enumeration email handling, administrator reset, one-time temporary passwords, and audit events.
+- **Added:** migration `0020_add_recovery_status.sql`, which widens `users.status` with the `recovery` value while preserving existing accounts and the email index.
+- **Added:** Data Management recovery status filtering, reset action, and inline temporary-password handoff modal.
+- **Verified:** focused recovery tests cover the recovery transition, login blocking, administrator reset, and rejection of non-recovery resets; `flask db-check` passes after migration.
+
 # Green integration fix — nurse screening
 
 - **Fixed:** `nurse_screening_submit()` now routes its model inference through `metrics_controller.run_measured_prediction()` instead of the legacy `app.models.ml_model.predict_risk()` path.
