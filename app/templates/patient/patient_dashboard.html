@@ -3,7 +3,20 @@
 
 {% block content %}
 
-<!-- HERO -->
+{% if patient.must_change_password %}
+<div class="flash-messages">
+    <div class="flash-warning">
+        <span>
+            <strong>Action needed:</strong> You're still using the temporary password from your health worker.
+            Please set a new password to secure your account.
+        </span>
+        <a href="{{ url_for('patient.patient_settings', force_change=1) }}" class="btn-warning-action">
+            Change Password
+        </a>
+    </div>
+</div>
+{% endif %}
+
 <section class="hero-section">
     <div class="hero-circles">
         <div class="h-circle h-circle-1"></div>

@@ -32,8 +32,9 @@
 
         body {
             display: flex;
-            min-height: 100vh;
+            height: 100vh;  
             background: var(--green-darkest);
+            overflow: hidden;    
         }
 
         .left-panel {
@@ -133,8 +134,9 @@
             flex-direction: column;
             justify-content: space-between;
             padding: 2.5rem 3rem;
+            height: 100vh;       
+            overflow-y: auto;    
         }
-
         .right-top {
             display: flex;
             justify-content: flex-end;

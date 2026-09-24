@@ -42,6 +42,36 @@
         </div>
     </div>
 
+    <div class="form-card">
+        <div class="card-header" style="background:var(--green-light); border-top-color:var(--green-light);">Patient Portal Access</div>
+        <div class="card-body">
+            <div class="grid-3">
+                <div class="field-group">
+                    <label class="field-label">Status</label>
+                    <input type="text" class="field-input"
+                        value="{{ 'Active — awaiting first login' if patient.must_change_password else 'Active' if patient.password_hash else 'Not set up' }}"
+                        disabled>
+                </div>
+                <div class="field-group">
+                    <label class="field-label">Login ID</label>
+                    <input type="text" class="field-input" value="{{ patient.patient_code }}" disabled>
+                </div>
+                <div class="field-group">
+                    <label class="field-label">Last Issued</label>
+                    <input type="text" class="field-input" value="{{ patient.credentials_issued_at or '—' }}" disabled>
+                </div>
+            </div>
+            <form method="POST"
+                action="{{ url_for('nurse.nurse_issue_portal_credentials', patient_id=patient_id) }}"
+                onsubmit="return confirm('{% if patient.password_hash %}Reset this patient\'s portal password? Their current password will stop working immediately.{% else %}Generate a portal account for this patient?{% endif %}');"
+                style="margin-top:1rem;">
+                <button type="submit" class="btn btn-primary" style="padding:0.5rem 1rem; font-size:0.8rem;">
+                    {{ 'Reset Portal Password' if patient.password_hash else 'Generate Portal Credentials' }}
+                </button>
+            </form>
+        </div>
+    </div>
+
     <!-- para kita agad past visits -->
     <div class="form-card">
         <div class="card-header" style="background:var(--green-light); border-top-color:var(--green-light);">Past Records — Screening History</div>

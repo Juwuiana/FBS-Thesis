@@ -7,6 +7,7 @@ import hashlib
 import io
 import re
 from datetime import date
+from app.db import get_db
 from app.models.db import get_connection
 from datetime import date, datetime  
 import sqlite3
@@ -169,6 +170,37 @@ def get_patient_by_id(patient_id: int) -> dict | None:
     patient["age"] = _compute_age(patient["birthdate"])
     patient["birthdate_display"] = date.fromisoformat(patient["birthdate"]).strftime("%B %d, %Y")
     return patient
+
+def set_patient_credentials(patient_id: int, password_hash: str, staff_id: int | None = None) -> None:
+    conn = get_connection()
+    conn.execute(
+        """
+        UPDATE patients
+        SET password_hash = ?, must_change_password = 1,
+            portal_activated_at = NULL,
+            credentials_issued_by_staff_id = ?,
+            credentials_issued_at = datetime('now')
+        WHERE id = ?
+        """,
+        (password_hash, staff_id, patient_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def update_patient_password(patient_id: int, password_hash: str) -> None:
+    conn = get_connection()
+    conn.execute(
+        """
+        UPDATE patients
+        SET password_hash = ?, must_change_password = 0,
+            portal_activated_at = COALESCE(portal_activated_at, datetime('now'))
+        WHERE id = ?
+        """,
+        (password_hash, patient_id),
+    )
+    conn.commit()
+    conn.close()
 
 def list_patients(barangay: str = None, entries_limit: int = None) -> list[dict]:
     conn = get_connection()
@@ -746,3 +778,35 @@ def import_patients_from_csv(file_stream, staff_id: int | None = None) -> dict:
         "skipped": skipped,
         "errors": errors,
     }
+
+def record_login_event(patient_id: int, user_agent: str | None, ip_address: str | None) -> None:
+    conn = get_connection()
+    conn.execute(
+        "INSERT INTO patient_login_events (patient_id, user_agent, ip_address) VALUES (?, ?, ?)",
+        (patient_id, user_agent, ip_address),
+    )
+    conn.commit()
+    conn.close()
+
+def get_recent_login_events(patient_id: int, limit: int = 5) -> list[dict]:
+    from app.controllers.patient_auth_controller import describe_user_agent
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT id, user_agent, ip_address, created_at FROM patient_login_events "
+        "WHERE patient_id = ? ORDER BY created_at DESC LIMIT ?",
+        (patient_id, limit),
+    ).fetchall()
+    conn.close()
+    return [
+        {**dict(row), "device_label": describe_user_agent(row["user_agent"])}
+        for row in rows
+    ]
+
+def update_patient_consent(patient_id: int, consent: bool) -> None:
+    conn = get_connection()
+    conn.execute(
+        "UPDATE patients SET consent_research = ? WHERE id = ?",
+        (1 if consent else 0, patient_id),
+    )
+    conn.commit()
+    conn.close()

@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Patient Portal — FBS-Based Diabetes Prediction System</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
+</head>
+<body>
+    <div class="left-panel">
+        <div class="circle circle-1"></div>
+        <div class="circle circle-2"></div>
+        <div class="circle circle-3"></div>
+        <div class="circle circle-4"></div>
+        <div class="circle circle-5"></div>
+        <div class="circle circle-6"></div>
+
+        <div class="left-top">
+            <div class="brand-icon"></div>
+            <h1 class="brand-title">Patient<br>Health Portal</h1>
+            <p class="brand-subtitle">Santa Rosa City Health Office</p>
+            <div class="brand-divider"></div>
+            <p class="brand-description">
+                View your screening history, latest FBS results,
+                and follow-up schedule from your health worker.
+            </p>
+        </div>
+
+        <div class="left-bottom">
+            Use the Patient ID and password given to you by your health worker.
+        </div>
+    </div>
+
+    <div class="right-panel">
+        <div class="right-top"></div>
+
+        <div class="form-container">
+            <div class="form-header">
+                <h2 class="form-title">Sign in to view your health records</h2>
+                <div class="form-divider"></div>
+            </div>
+
+            {% if error %}
+                <div class="flash-messages">
+                    <div class="flash-danger">{{ error }}</div>
+                </div>
+            {% endif %}
+
+            <form method="POST" action="{{ url_for('patient.patient_login') }}">
+                <div class="field-group">
+                    <label class="field-label" for="patient_code">Patient ID</label>
+                    <input
+                        class="field-input"
+                        type="text"
+                        id="patient_code"
+                        name="patient_code"
+                        placeholder="SRCHO-2026-0001"
+                        autocomplete="username"
+                        style="text-transform:uppercase;"
+                        maxlength="16"
+                        required
+                    >
+                </div>
+
+                <div class="field-group">
+                    <label class="field-label" for="password">Password</label>
+                    <div class="password-wrapper" style="position: relative;">
+                        <input
+                            class="field-input"
+                            type="password"
+                            id="password"
+                            name="password"
+                            placeholder="••••••••"
+                            autocomplete="current-password"
+                            required
+                        >
+                        <button type="button" class="toggle-password" id="togglePatientLoginPassword">Show</button>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-signin">Sign in</button>
+            </form>
+
+            <p class="create-account-row">
+                LHU staff member?
+                <a href="{{ url_for('auth.login') }}">Sign in here</a>
+            </p>
+            
+            <div class="security-notice">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+                <div class="security-notice-text">
+                    <span class="security-notice-title">Lost your Patient ID or password?</span>
+                    Ask your health worker at your next visit to reissue your portal access.
+                </div>
+            </div>
+        </div>
+
+        <div class="right-footer">
+            © 2026 FBS Diabetes Risk Prediction System · LHU Sta Rosa
+        </div>
+    </div>
+
+<script src="{{ url_for('static', filename='js/patient_scripts.js') }}"></script>
+
+</body>
+</html>

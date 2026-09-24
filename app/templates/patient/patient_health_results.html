@@ -48,7 +48,6 @@
 
 <div class="results-body">
 
-    <!-- Left: History List -->
     <div class="history-list-panel">
         <h2 class="panel-title">Screening History</h2>
         {% for v in history %}
@@ -66,7 +65,6 @@
         {% endfor %}
     </div>
 
-    <!-- Right: Detail Panel -->
     <div class="detail-panel" id="detailPanel">
         <button class="back-btn" id="backToListBtn" style="display:none;"><i class="fas fa-arrow-left"></i> Back to History</button>
 
@@ -79,8 +77,8 @@
                     <div class="detail-id">Assessment No. {{ patient.patient_code }}-{{ v.visit_id }}</div>
                 </div>
                 <div class="detail-actions">
-                    <button class="btn btn-outline btn-sm" data-print-id="visit-{{ v.visit_id }}"><i class="fas fa-print"></i> Print</button>
-                    <button class="btn btn-outline btn-sm" data-download-id="visit-{{ v.visit_id }}"><i class="fas fa-file-download"></i> PDF</button>
+                    <button class="btn btn-outline btn-sm" data-print-id="visit-{{ v.visit_id }}">Print</button>
+                    <button class="btn btn-outline btn-sm" data-download-id="visit-{{ v.visit_id }}">PDF</button>
                 </div>
             </div>
 
@@ -217,8 +215,8 @@
             </div>
 
             <div class="detail-footer">
-                <button class="btn btn-outline" data-print-id="visit-{{ v.visit_id }}"><i class="fas fa-print"></i> Print This Result</button>
-                <button class="btn btn-outline" data-download-id="visit-{{ v.visit_id }}"><i class="fas fa-file-download"></i> Save as PDF</button>
+                <button class="btn btn-outline" data-print-id="visit-{{ v.visit_id }}">Print This Result</button>
+                <button class="btn btn-outline" data-download-id="visit-{{ v.visit_id }}">Save as PDF</button>
             </div>
         </div>
         {% endfor %}

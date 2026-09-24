@@ -19,7 +19,6 @@
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-profile">
             <div class="profile-icon">
-                <i class="fas fa-user"></i>
             </div>
             <div>
                 <div class="profile-name">{{ patient.first_name }} {{ patient.last_name }}</div>
@@ -29,20 +28,19 @@
 
         <nav class="sidebar-nav">
             <a href="{{ url_for('patient.patient_dashboard') }}" class="nav-link {% if request.endpoint == 'patient.patient_dashboard' %}active{% endif %}">
-                <i class="fas fa-home"></i> Home
+                Home
             </a>
             <a href="{{ url_for('patient.patient_health_results') }}" class="nav-link {% if request.endpoint == 'patient.patient_health_results' %}active{% endif %}">
-                <i class="fas fa-file-medical-alt"></i> My Result
+                My Result
             </a>
             <a href="{{ url_for('patient.patient_settings') }}" class="nav-link {% if request.endpoint == 'patient.patient_settings' %}active{% endif %}">
-                <i class="fas fa-cog"></i> Settings
+                Settings
             </a>
         </nav>
 
        <div class="sidebar-footer">
-            <form action="{{ safe_url_for('auth.patient_logout', fallback='#') }}" method="POST" style="margin:0;">
-                <button type="submit" class="nav-link sign-out" style="width:100%; text-align:left; background:none; border:none;">
-                    <i class="fas fa-sign-out-alt"></i> Sign Out
+            <form action="{{ url_for('patient.patient_logout') }}" method="POST" style="margin:0;">                    <button type="submit" class="nav-link sign-out" style="width:100%; text-align:left; background:none; border:none;">
+                    Sign Out
                 </button>
             </form>
         </div>
@@ -53,7 +51,6 @@
         {% endblock %}
     </main>
 
-    <!-- Scroll to top -->
     <button class="scroll-top-btn" id="scrollTopBtn" aria-label="Back to top">↑</button>
 
     <script src="{{ url_for('static', filename='js/patient_scripts.js') }}"></script>

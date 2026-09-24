@@ -99,6 +99,10 @@
                 Don't have an account?
                 <a href="{{ url_for('auth.signup') }}">Create account</a>
             </p>
+            <p class="create-account-row" style="margin-top:0.5rem;">
+                Looking for the patient portal?
+                <a href="{{ url_for('patient.patient_login') }}">Sign in here</a>
+            </p>            
 
             <div class="security-notice">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

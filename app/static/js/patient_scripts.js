@@ -1,14 +1,8 @@
-/* ══════════════════════════════════════════════════
-   PATIENT PORTAL — patient_scripts.js
-   Single JS file for ALL patient pages.
-   No inline JS in any template — everything lives here.
-   ══════════════════════════════════════════════════ */
+/* PATIENT PORTAL — patient_scripts.js */
 
 document.addEventListener('DOMContentLoaded', () => {
 
-    /* ════════════════════════════════════════════════
-       1. MOBILE SIDEBAR TOGGLE  (all pages)
-    ════════════════════════════════════════════════ */
+    /* 1. MOBILE SIDEBAR TOGGLE  (all pages)*/
     const menuBtn       = document.getElementById('menuBtn');
     const sidebar       = document.getElementById('sidebar');
     const mobileOverlay = document.getElementById('mobileOverlay');
@@ -26,7 +20,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Swipe left to close sidebar on mobile
     let touchStartX = 0;
     document.addEventListener('touchstart', e => {
         touchStartX = e.changedTouches[0].screenX;
@@ -39,10 +32,32 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }, { passive: true });
 
+    /* 1b. LOGIN PAGE: Patient ID auto-format + password toggle */
+    const patientCodeInput = document.getElementById('patient_code');
+    if (patientCodeInput) {
+        patientCodeInput.addEventListener('input', e => {
+            let raw = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+            const match = raw.match(/^([A-Z]+)(\d{0,4})(\d*)$/);
+            if (!match) { e.target.value = raw; return; }
+            const [, prefix, year, sequence] = match;
+            let formatted = prefix;
+            if (year) formatted += '-' + year;
+            if (sequence) formatted += '-' + sequence;
+            e.target.value = formatted;
+        });
+    }
 
-    /* ════════════════════════════════════════════════
-       2. AVATAR UPLOAD  (all pages — sidebar + settings)
-    ════════════════════════════════════════════════ */
+    const loginPwInput  = document.getElementById('password');
+    const loginPwToggle = document.getElementById('togglePatientLoginPassword');
+    if (loginPwInput && loginPwToggle) {
+        loginPwToggle.addEventListener('click', () => {
+            const isHidden = loginPwInput.type === 'password';
+            loginPwInput.type = isHidden ? 'text' : 'password';
+            loginPwToggle.textContent = isHidden ? 'Hide' : 'Show';
+        });
+    }
+
+    /* 2. AVATAR UPLOAD  (all pages — sidebar + settings) */
 
     // Sidebar avatar (patient_base.html)
     const sidebarAvatarUpload   = document.getElementById('avatarUpload');
@@ -91,10 +106,7 @@ document.addEventListener('DOMContentLoaded', () => {
     handleAvatarUpload(settingsAvatarUpload);
 
 
-    /* ════════════════════════════════════════════════
-       3. SCROLL-TO-TOP BUTTON  (all pages)
-       Always tracks window scroll — same as nurse base.
-    ════════════════════════════════════════════════ */
+    /* 3. SCROLL-TO-TOP BUTTON  (all pages) Always tracks window scroll — same as nurse base. */
     const scrollTopBtn = document.getElementById('scrollTopBtn');
     if (scrollTopBtn) {
         window.addEventListener('scroll', () => {
@@ -111,18 +123,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
-    /* ════════════════════════════════════════════════
-       4. DASHBOARD: Download PDF button
-    ════════════════════════════════════════════════ */
+    /*  4. DASHBOARD: Download PDF button */
     const downloadPdfBtn = document.getElementById('downloadPdfBtn');
     if (downloadPdfBtn) {
         downloadPdfBtn.addEventListener('click', () => window.print());
     }
 
 
-    /* ════════════════════════════════════════════════
-       5. RESULTS PAGE: showDetail + print/download
-    ════════════════════════════════════════════════ */
+    /*  5. RESULTS PAGE: showDetail + print/download */
 
     // Attach click handlers to all screening cards
     document.querySelectorAll('.screening-card').forEach(card => {
@@ -159,9 +167,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
-    /* ════════════════════════════════════════════════
-       6. SETTINGS PAGE
-    ════════════════════════════════════════════════ */
+    /* 6. SETTINGS PAGE */
 
     // Tab switching
     document.querySelectorAll('.settings-tab').forEach(tab => {
@@ -237,12 +243,46 @@ document.addEventListener('DOMContentLoaded', () => {
         downloadDataBtn.addEventListener('click', () => window.print());
     }
 
+    const viewPrivacyBtn = document.getElementById('viewPrivacyBtn');
+    const legalModal = document.getElementById('legalModal');
+    const closeLegalModal = document.getElementById('closeLegalModal');
+    if (viewPrivacyBtn && legalModal) {
+        viewPrivacyBtn.addEventListener('click', e => {
+            e.preventDefault();
+            document.getElementById('modal-title').textContent = 'Privacy Policy';
+            document.getElementById('modal-body').innerHTML = `
+                <p>1. <strong>Collection:</strong> We collect health data for screening purposes.</p>
+                <p>2. <strong>Security:</strong> Data is stored securely on local LHU hardware.</p>
+                <p>3. <strong>Patient Rights:</strong> Patients have rights under RA 10173 to access their records.</p>
+            `;
+            legalModal.style.display = 'flex';
+        });
+        closeLegalModal.addEventListener('click', () => legalModal.style.display = 'none');
+        legalModal.addEventListener('click', e => { if (e.target === legalModal) legalModal.style.display = 'none'; });
+    }
+
+    const consentToggle = document.getElementById('consentResearch');
+    if (consentToggle) {
+        consentToggle.addEventListener('change', async () => {
+            try {
+                const res = await fetch('/patient_update_consent', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ consent: consentToggle.checked }),
+                });
+                if (!res.ok) throw new Error('Failed');
+                showToast(consentToggle.checked ? 'Consent enabled.' : 'Consent withdrawn.');
+            } catch (err) {
+                consentToggle.checked = !consentToggle.checked; // revert on failure
+                showToast('Could not update consent. Try again.', 'warn');
+            }
+        });
+}
+
 });
 
 
-/* ════════════════════════════════════════════════
-   RESULTS: showDetail (global — called by page init)
-════════════════════════════════════════════════ */
+/*  RESULTS: showDetail (global — called by page init)*/
 function showDetail(id) {
     // Update list cards
     document.querySelectorAll('.screening-card').forEach(c => c.classList.remove('active'));
@@ -264,9 +304,7 @@ function showDetail(id) {
 }
 
 
-/* ════════════════════════════════════════════════
-   RESULTS: printDetail
-════════════════════════════════════════════════ */
+/* RESULTS: printDetail */
 function printDetail(id) {
     const el = document.getElementById('detail-' + id);
     if (!el) return;
@@ -335,9 +373,7 @@ function printDetail(id) {
 }
 
 
-/* ════════════════════════════════════════════════
-   SETTINGS: switchTab
-════════════════════════════════════════════════ */
+/* SETTINGS: switchTab*/
 function switchTab(tab) {
     document.querySelectorAll('.settings-tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.settings-pane').forEach(p => p.classList.remove('active'));
@@ -348,9 +384,7 @@ function switchTab(tab) {
 }
 
 
-/* ════════════════════════════════════════════════
-   SETTINGS: Password helpers
-════════════════════════════════════════════════ */
+/* SETTINGS: Password helpers */
 function checkPwStrength(val) {
     const fill  = document.getElementById('pwStrengthFill');
     const label = document.getElementById('pwStrengthLabel');
@@ -396,9 +430,7 @@ function handlePwChange() {
 }
 
 
-/* ════════════════════════════════════════════════
-   SHARED: Toast notification
-════════════════════════════════════════════════ */
+/* SHARED: Toast notification */
 function showToast(msg, type) {
     const toast = document.getElementById('settingsToast');
     if (!toast) return;

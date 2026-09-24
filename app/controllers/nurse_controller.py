@@ -4,13 +4,11 @@ from app.db import get_db
 from app.controllers import metrics_controller
 from datetime import date as date_cls
 from app.rate_limit import rate_limit
+from app.controllers import metrics_controller, patient_auth_controller
 
 
 nurse_bp = Blueprint('nurse', __name__)
-
-# Front-line staff only. Both roles can use the nurse workspace today; split this into two
-# blueprints later if medical_officer should eventually get a separate, more limited view here.
-from app.views.auth_views import require_role_for_blueprint  # noqa: E402 (after Blueprint())
+from app.views.auth_views import require_role_for_blueprint  
 require_role_for_blueprint(nurse_bp, "health_worker", "medical_officer")
 
 
@@ -498,3 +496,19 @@ def nurse_data_management_import():
     }), 200
 
 
+@nurse_bp.route('/nurse_patient/<patient_id>/issue_portal_credentials', methods=['POST'])
+@rate_limit(max_calls=10, period_seconds=60)
+def nurse_issue_portal_credentials(patient_id):
+    patient = patient_model.get_patient_by_code(patient_id)
+    if patient is None:
+        abort(404)
+
+    temp_password = patient_auth_controller.issue_patient_credentials(
+        patient["id"], staff_id=session.get("user_id")
+    )
+    _audit_event(f"Portal credentials issued: {patient_id}", "Warning")
+
+    return render_template(
+        'nurse/nurse_patient_credentials_slip.html',
+        patient=patient, temp_password=temp_password,
+    )
