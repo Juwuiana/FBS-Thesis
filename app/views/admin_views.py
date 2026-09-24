@@ -587,7 +587,39 @@ def green_pending():
 @admin_bp.route("/audit-trails")
 @login_required
 def audit_trails():
-    logs = audit_model.get_recent_logs(get_db())
+    db = get_db()
+    page_size = 12
+    total_count = audit_model.get_logs_count(db)
+    total_pages = max(1, (total_count + page_size - 1) // page_size)
+    page = max(1, min(request.args.get("page", 1, type=int) or 1, total_pages))
+    logs = audit_model.get_recent_logs(
+        db, limit=page_size, offset=(page - 1) * page_size
+    )
     audit_now = datetime.utcnow()
     audit_date = f"{audit_now.strftime('%B')} {audit_now.day}"
-    return render_template("dashboard/audit_trails.html", logs=logs, audit_date=audit_date)
+    return render_template(
+        "dashboard/audit_trails.html", logs=logs, audit_date=audit_date,
+        page=page, total_pages=total_pages, total_count=total_count,
+    )
+
+
+@admin_bp.route("/audit-trails/export")
+@login_required
+def audit_trails_export():
+    db = get_db()
+    _audit_event("Exported CSV: audit trails", "Warning")
+    logs = audit_model.get_recent_logs(db, limit=audit_model.get_logs_count(db))
+
+    output = io.StringIO(newline="")
+    writer = csv.writer(output, lineterminator="\r\n")
+    writer.writerow(["Time", "Date", "User", "Role", "Action", "IP Address", "Severity"])
+    for log in logs:
+        writer.writerow([
+            log["time"], log["date"], log["user"], log["role"], log["action"],
+            log["ip"], log["severity"],
+        ])
+
+    response = make_response(output.getvalue())
+    response.headers["Content-Type"] = "text/csv; charset=utf-8"
+    response.headers["Content-Disposition"] = "attachment; filename=audit_trails.csv"
+    return response
