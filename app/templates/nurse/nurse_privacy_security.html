@@ -106,36 +106,24 @@
                     updates made by your account.
                 </p>
                 <div class="account-action-list">
+                    {% for log in audit_logs %}
                     <div class="account-action-item">
                         <div class="aai-info">
-                            <div class="aai-title">Downloaded clinical summary PDF</div>
-                            <div class="aai-sub">Barangay Risk Statistics · Jun 10, 14:32</div>
+                            <div class="aai-title">{{ log.action }}</div>
+                            <div class="aai-sub">
+                                {{ log.date }}, {{ log.time }}{% if log.severity != 'Info' %} · {{ log.severity }}{% endif %}
+                            </div>
                         </div>
                     </div>
+                    {% else %}
                     <div class="account-action-item">
                         <div class="aai-info">
-                            <div class="aai-title">Printed screening result</div>
-                            <div class="aai-sub">Patient ID: SRCHO-2026-0391 · Jun 10, 11:15</div>
+                            <div class="aai-title" style="color:var(--text-muted); font-weight:400;">
+                                No actions recorded yet.
+                            </div>
                         </div>
                     </div>
-                    <div class="account-action-item">
-                        <div class="aai-info">
-                            <div class="aai-title">Password updated</div>
-                            <div class="aai-sub">User Security Record · Jun 9, 13:45</div>
-                        </div>
-                    </div>
-                    <div class="account-action-item">
-                        <div class="aai-info">
-                            <div class="aai-title">New patient registered</div>
-                            <div class="aai-sub">Patient Intake Form · Jun 9, 10:22</div>
-                        </div>
-                    </div>
-                    <div class="account-action-item">
-                        <div class="aai-info">
-                            <div class="aai-title">Exported data ledger (.csv)</div>
-                            <div class="aai-sub">Health Registry Ledger · Jun 8, 15:40</div>
-                        </div>
-                    </div>
+                    {% endfor %}
                 </div>
             </div>
         </div>

@@ -32,17 +32,7 @@ def _display_role(role):
     }.get(role, role or "Unknown")
 
 
-def get_recent_logs(db, limit=100, offset=0):
-    rows = db.execute(
-        """
-        SELECT user_id, user_name, role, action, ip_address, severity, created_at
-        FROM audit_log
-        ORDER BY created_at DESC, id DESC
-        LIMIT ? OFFSET ?
-        """,
-        (limit, offset),
-    ).fetchall()
-
+def _format_logs(rows):
     logs = []
     for row in rows:
         try:
@@ -62,3 +52,33 @@ def get_recent_logs(db, limit=100, offset=0):
             "severity": row["severity"],
         })
     return logs
+
+
+def get_recent_logs(db, limit=100, offset=0):
+    """System-wide log, newest first -- for the admin-facing audit view."""
+    rows = db.execute(
+        """
+        SELECT user_id, user_name, role, action, ip_address, severity, created_at
+        FROM audit_log
+        ORDER BY created_at DESC, id DESC
+        LIMIT ? OFFSET ?
+        """,
+        (limit, offset),
+    ).fetchall()
+    return _format_logs(rows)
+
+
+def get_recent_logs_for_user(db, user_id, limit=20):
+    """Same shape, scoped to one account -- backs the nurse's own
+    Privacy & Security > Audit Trail tab ("your recorded actions")."""
+    rows = db.execute(
+        """
+        SELECT user_id, user_name, role, action, ip_address, severity, created_at
+        FROM audit_log
+        WHERE user_id = ?
+        ORDER BY created_at DESC, id DESC
+        LIMIT ?
+        """,
+        (user_id, limit),
+    ).fetchall()
+    return _format_logs(rows)

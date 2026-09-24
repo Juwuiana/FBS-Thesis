@@ -339,9 +339,12 @@ def nurse_data_management():
 
 @nurse_bp.route('/nurse_privacy_security')
 def nurse_privacy_security():
-    # TODO: needs a staff_model + logged-in 
-
-    return render_template('nurse/nurse_privacy_security.html', active_page='privacy')
+    audit_logs = audit_model.get_recent_logs_for_user(get_db(), session.get("user_id"))
+    return render_template(
+        'nurse/nurse_privacy_security.html',
+        audit_logs=audit_logs,
+        active_page='privacy',
+    )
 
 
 @nurse_bp.route('/nurse_patient/<patient_id>/delete', methods=['POST'])
