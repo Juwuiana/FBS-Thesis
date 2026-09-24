@@ -32,11 +32,21 @@ def _display_role(role):
     }.get(role, role or "Unknown")
 
 
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+PH_TZ = ZoneInfo("Asia/Manila")
+
+
 def _format_logs(rows):
     logs = []
     for row in rows:
         try:
-            created_at = datetime.strptime(row["created_at"], "%Y-%m-%d %H:%M:%S")
+            created_at = (
+                datetime.strptime(row["created_at"], "%Y-%m-%d %H:%M:%S")
+                .replace(tzinfo=ZoneInfo("UTC"))
+                .astimezone(PH_TZ)
+            )
             time = created_at.strftime("%I:%M %p")
             date = f"{created_at.strftime('%B')} {created_at.day}"
         except (TypeError, ValueError):
