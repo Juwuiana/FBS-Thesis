@@ -10,12 +10,14 @@ Chart.defaults.maintainAspectRatio = true;
 function initDonutChart() {
   const el = document.getElementById('donutChart');
   if (!el) return;
+  const d = window.__dashboardData || {};
+  const riskData = d.riskData || [72.1, 17.0, 5.9];
   new Chart(el, {
     type: 'doughnut',
     data: {
       labels: ['Low Risk', 'Moderate Risk', 'High Risk'],
       datasets: [{
-        data: [72.1, 17.0, 5.9],
+        data: riskData,
         backgroundColor: ['#4caf50', '#ff9800', '#f44336'],
         borderWidth: 2, borderColor: '#fff', hoverOffset: 4
       }]
@@ -36,21 +38,26 @@ function initDonutChart() {
 function initLineChart() {
   const el = document.getElementById('lineChart');
   if (!el) return;
-  const labels = ['May 14', 'May 16', 'May 18', 'May 20', 'May 22', 'May 24', 'May 27'];
+  const d = window.__dashboardData || {};
+  const timeline = d.timeline || {
+    labels: ['May 14', 'May 16', 'May 18', 'May 20', 'May 22', 'May 24', 'May 27'],
+    totalScreened: [310, 295, 320, 305, 315, 300, 312],
+    atRisk: [155, 148, 162, 152, 158, 150, 156]
+  };
   new Chart(el, {
     type: 'line',
     data: {
-      labels,
+      labels: timeline.labels,
       datasets: [
         {
           label: 'Total Screened',
-          data: [310, 295, 320, 305, 315, 300, 312],
+          data: timeline.totalScreened,
           borderColor: '#4caf50', backgroundColor: 'rgba(76,175,80,.08)',
           fill: true, tension: 0.35, pointRadius: 3, borderWidth: 2
         },
         {
           label: 'At Risk',
-          data: [155, 148, 162, 152, 158, 150, 156],
+          data: timeline.atRisk,
           borderColor: '#f44336', backgroundColor: 'rgba(244,67,54,.05)',
           fill: true, tension: 0.35, pointRadius: 3, borderWidth: 2
         }
@@ -74,13 +81,15 @@ function initLineChart() {
 function initRadarChart() {
   const el = document.getElementById('radarChart');
   if (!el) return;
+  const d = window.__dashboardData || {};
+  const perf = d.modelPerformance || { accuracy: 0.893, precision: 0.87, recall: 0.88, f1: 0.87, rocAuc: 0.93 };
   new Chart(el, {
     type: 'radar',
     data: {
       labels: ['Accuracy', 'Precision', 'Recall', 'F1-Score', 'ROC-AUC'],
       datasets: [{
         label: 'Current Model',
-        data: [0.893, 0.87, 0.88, 0.87, 0.93],
+        data: [perf.accuracy, perf.precision, perf.recall, perf.f1, perf.rocAuc],
         backgroundColor: 'rgba(76,175,80,.15)', borderColor: '#4caf50',
         borderWidth: 2, pointBackgroundColor: '#4caf50', pointRadius: 3
       }]

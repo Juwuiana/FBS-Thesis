@@ -2,7 +2,8 @@ from flask import Blueprint, jsonify, make_response, render_template, request, r
 import sqlite3
 import csv
 import io
-from datetime import datetime
+from datetime import datetime, timedelta
+from app.models.patient_model import _compute_age
 from werkzeug.security import generate_password_hash
 
 from app.controllers import auth_controller, metrics_controller
@@ -44,53 +45,114 @@ def _audit_event(action, severity="Info"):
 @admin_bp.route("/dashboard")
 @login_required
 def dashboard():
+    conn = get_db()
+
+    total_screened = conn.execute("SELECT COUNT(*) FROM lab_screenings").fetchone()[0]
+    at_risk_count = conn.execute(
+        "SELECT COUNT(*) FROM lab_screenings WHERE final_risk_level IN ('Moderate', 'High')"
+    ).fetchone()[0]
+    high_risk_count = conn.execute(
+        "SELECT COUNT(*) FROM lab_screenings WHERE final_risk_level = 'High'"
+    ).fetchone()[0]
+    at_risk_pct = round(100 * at_risk_count / total_screened, 1) if total_screened else 0
+    high_risk_pct = round(100 * high_risk_count / total_screened, 1) if total_screened else 0
+
+    avg_fbs_row = conn.execute("SELECT AVG(fbs_mg_dl) FROM lab_screenings").fetchone()[0]
+    avg_fbs = round(avg_fbs_row, 1) if avg_fbs_row else 0
+
     metrics = {
-        "total_screened": 1392,
-        "total_screened_change": "+1.2% vs last week",
-        "at_risk": 276,
-        "at_risk_pct": 19.8,
-        "at_risk_change": "+8% vs last week",
-        "high_risk": 82,
-        "high_risk_pct": 5.9,
-        "high_risk_change": "+3% vs last week",
-        "avg_fbs": 111.4,
-        "avg_fbs_change": "+2.6 vs last week",
-        "model_accuracy": 89.3,
+        "total_screened": total_screened,
+        "at_risk": at_risk_count, "at_risk_pct": at_risk_pct,
+        "high_risk": high_risk_count, "high_risk_pct": high_risk_pct,
+        "avg_fbs": avg_fbs,
+        "model_accuracy": None,
     }
 
+    risk_rows = conn.execute(
+        "SELECT final_risk_level, COUNT(*) FROM lab_screenings "
+        "WHERE final_risk_level IS NOT NULL GROUP BY final_risk_level"
+    ).fetchall()
+    risk_counts = {row[0]: row[1] for row in risk_rows}
+    low_count = risk_counts.get("Low", 0)
+    moderate_count = risk_counts.get("Moderate", 0)
+    high_count = risk_counts.get("High", 0)
     risk_distribution = {
-        "low": {"count": 1073, "pct": 72.1},
-        "moderate": {"count": 237, "pct": 17.0},
-        "high": {"count": 82, "pct": 5.9},
+        "low":      {"count": low_count,      "pct": round(100*low_count/total_screened,1) if total_screened else 0},
+        "moderate": {"count": moderate_count, "pct": round(100*moderate_count/total_screened,1) if total_screened else 0},
+        "high":     {"count": high_count,     "pct": round(100*high_count/total_screened,1) if total_screened else 0},
     }
 
-    barangay_list = [
-        {"name": "Kanluran", "count": 58},
-        {"name": "Market Area", "count": 47},
-        {"name": "Dila", "count": 41},
-        {"name": "Dita", "count": 33},
-        {"name": "Malitlit", "count": 29},
-    ]
+    barangay_rows = conn.execute(
+        """
+        SELECT b.name, COUNT(ls.id) AS cnt
+        FROM lab_screenings ls
+        JOIN visits v ON v.id = ls.visit_id
+        JOIN patients p ON p.id = v.patient_id
+        LEFT JOIN barangays b ON b.id = p.barangay_id
+        GROUP BY b.name
+        ORDER BY cnt DESC
+        LIMIT 5
+        """
+        ).fetchall()
+    barangay_list = [{"name": row[0] or "Unknown", "count": row[1]} for row in barangay_rows]
 
-    recent_screenings = [
-        {"id": "CAB-2025-0156", "name": "Juan Dela Cruz", "fbs": 142,
-         "category": "Diabetic", "risk": "High", "date": "May 27, 2025"},
-        {"id": "CAB-2025-0155", "name": "Maria Santos", "fbs": 118,
-         "category": "Prediabetic", "risk": "Low", "date": "May 27, 2025"},
-        {"id": "CAB-2025-0154", "name": "Pedro Reyes", "fbs": 96,
-         "category": "Normal", "risk": "Moderate", "date": "May 27, 2025"},
-        {"id": "CAB-2025-0153", "name": "Ana Garcia", "fbs": 134,
-         "category": "Prediabetic", "risk": "High", "date": "May 27, 2025"},
-        {"id": "CAB-2025-0152", "name": "Lisa Perez", "fbs": 155,
-         "category": "Diabetic", "risk": "High", "date": "May 26, 2025"},
-    ]
+    today = datetime.utcnow().date()
+    start_day = today - timedelta(days=6)
+    period_rows = conn.execute(
+        "SELECT test_datetime, final_risk_level FROM lab_screenings WHERE date(test_datetime) >= date(?)",
+        (start_day.isoformat(),),
+    ).fetchall()
+    day_totals, day_at_risk = {}, {}
+    for row in period_rows:
+        try:
+            d = datetime.fromisoformat(row["test_datetime"]).date()
+        except (TypeError, ValueError):
+            continue
+        day_totals[d] = day_totals.get(d, 0) + 1
+        if row["final_risk_level"] in ("Moderate", "High"):
+            day_at_risk[d] = day_at_risk.get(d, 0) + 1
+    timeline_labels, timeline_total, timeline_at_risk = [], [], []
+    for i in range(7):
+        d = start_day + timedelta(days=i)
+        timeline_labels.append(d.strftime("%b %d"))
+        timeline_total.append(day_totals.get(d, 0))
+        timeline_at_risk.append(day_at_risk.get(d, 0))
+    timeline = {"labels": timeline_labels, "totalScreened": timeline_total, "atRisk": timeline_at_risk}
+
+    recent_rows = conn.execute(
+        """
+        SELECT ls.id, p.first_name, p.middle_name, p.last_name, p.birthdate, p.sex,
+               ls.fbs_mg_dl, ls.model_predicted_risk_level, ls.final_risk_level, ls.test_datetime
+        FROM lab_screenings ls
+        JOIN visits v ON v.id = ls.visit_id
+        JOIN patients p ON p.id = v.patient_id
+        ORDER BY ls.test_datetime DESC
+        LIMIT 10
+        """
+    ).fetchall()
+    recent_screenings = []
+    for row in recent_rows:
+        full_name = " ".join(
+            part for part in [row["first_name"], row["middle_name"], row["last_name"]] if part
+        )
+        age = _compute_age(row["birthdate"]) if row["birthdate"] else None
+        try:
+            date_display = datetime.fromisoformat(row["test_datetime"]).strftime("%b %d, %Y")
+        except (TypeError, ValueError):
+            date_display = row["test_datetime"]
+        recent_screenings.append({
+            "id": f"SCR-{row['id']:05d}",
+            "name": full_name,
+            "age_sex": f"{age if age is not None else '—'}/{row['sex'] or '—'}",
+            "fbs": row["fbs_mg_dl"],
+            "category": row["model_predicted_risk_level"],
+            "risk": row["final_risk_level"],
+            "date": date_display,
+        })
 
     model_performance = {
-        "accuracy": 89.3,
-        "precision": 0.87,
-        "recall": 0.88,
-        "f1_score": 0.87,
-        "roc_auc": 0.93,
+        "accuracy": 89.3, "precision": 0.87, "recall": 0.88,
+        "f1_score": 0.87, "roc_auc": 0.93,
     }
 
     # From feature/model-reliability: once real evaluation results exist in
@@ -119,6 +181,7 @@ def dashboard():
         barangay_list=barangay_list,
         recent_screenings=recent_screenings,
         model_performance=model_performance,
+        timeline=timeline,
     )
 
 

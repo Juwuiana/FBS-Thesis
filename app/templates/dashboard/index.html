@@ -68,19 +68,18 @@
       <div class="chart-card h-100">
         <div class="chart-card-title">Risk Distribution</div>
         <canvas id="donutChart" height="180"></canvas>
-        <div class="donut-legend mt-3">
+                <div class="donut-legend mt-3">
+          {% set legend_rows = [
+            ("Low", "low", "--risk-low"),
+            ("Moderate", "moderate", "--risk-moderate"),
+            ("High", "high", "--risk-high"),
+          ] %}
+          {% for label, key, color_var in legend_rows %}
           <div class="donut-legend-item">
-            <span class="legend-dot" style="background:var(--risk-low)"></span>
-            <span>Low Risk – <strong>72.1%</strong> (1,073)</span>
+            <span class="legend-dot" style="background:var({{ color_var }})"></span>
+            <span>{{ label }} Risk – <strong>{{ risk_distribution[key].pct }}%</strong> ({{ risk_distribution[key].count }})</span>
           </div>
-          <div class="donut-legend-item">
-            <span class="legend-dot" style="background:var(--risk-moderate)"></span>
-            <span>Moderate Risk – <strong>17.0%</strong> (237)</span>
-          </div>
-          <div class="donut-legend-item">
-            <span class="legend-dot" style="background:var(--risk-high)"></span>
-            <span>High Risk – <strong>5.9%</strong> (82)</span>
-          </div>
+          {% endfor %}
         </div>
       </div>
     </div>
@@ -201,4 +200,22 @@
   </div>
 
 </main>
+
+<script>
+  window.__dashboardData = {
+    riskData: [
+      {{ risk_distribution.low.pct }},
+      {{ risk_distribution.moderate.pct }},
+      {{ risk_distribution.high.pct }}
+    ],
+    timeline: {{ timeline | tojson }},
+    modelPerformance: {
+      accuracy: {{ (model_performance.accuracy / 100) if model_performance.accuracy else 0 }},
+      precision: {{ model_performance.precision or 0 }},
+      recall: {{ model_performance.recall or 0 }},
+      f1: {{ model_performance.f1_score or 0 }},
+      rocAuc: {{ model_performance.roc_auc or 0 }}
+    }
+  };
+</script>
 {% endblock %}
