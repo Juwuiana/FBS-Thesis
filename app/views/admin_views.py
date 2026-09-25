@@ -64,7 +64,7 @@ def dashboard():
             FROM lab_screenings ls
             JOIN visits v ON v.id = ls.visit_id
         )
-        SELECT ls.fbs_mg_dl, ls.final_risk_level
+        SELECT ls.fbs_mg_dl, COALESCE(ls.final_risk_level, ls.preliminary_risk_level) AS final_risk_level
         FROM lab_screenings ls
         JOIN latest_ids li ON li.screening_id = ls.id
         WHERE li.rn = 1
@@ -111,12 +111,11 @@ def dashboard():
         ).fetchall()
     barangay_list = [{"name": row[0] or "Unknown", "count": row[1]} for row in barangay_rows]
 
-    today = datetime.utcnow().date()
-    start_day = today - timedelta(days=6)
     period_rows = conn.execute(
-        "SELECT test_datetime, final_risk_level FROM lab_screenings WHERE date(test_datetime) >= date(?)",
-        (start_day.isoformat(),),
+        "SELECT test_datetime, COALESCE(final_risk_level, preliminary_risk_level) AS final_risk_level "
+        "FROM lab_screenings WHERE test_datetime IS NOT NULL"
     ).fetchall()
+
     day_totals, day_at_risk = {}, {}
     for row in period_rows:
         try:
@@ -126,9 +125,12 @@ def dashboard():
         day_totals[d] = day_totals.get(d, 0) + 1
         if row["final_risk_level"] in ("Moderate", "High"):
             day_at_risk[d] = day_at_risk.get(d, 0) + 1
+
+    recent_days = sorted(day_totals.keys(), reverse=True)[:14]
+    recent_days.reverse()  # chronological order for the chart
+
     timeline_labels, timeline_total, timeline_at_risk = [], [], []
-    for i in range(7):
-        d = start_day + timedelta(days=i)
+    for d in recent_days:
         timeline_labels.append(d.strftime("%b %d"))
         timeline_total.append(day_totals.get(d, 0))
         timeline_at_risk.append(day_at_risk.get(d, 0))
@@ -137,7 +139,9 @@ def dashboard():
     recent_rows = conn.execute(
         """
         SELECT ls.id, p.first_name, p.middle_name, p.last_name, p.birthdate, p.sex,
-               ls.fbs_mg_dl, ls.model_predicted_risk_level, ls.final_risk_level, ls.test_datetime
+               ls.fbs_mg_dl, ls.model_predicted_risk_level,
+               COALESCE(ls.final_risk_level, ls.preliminary_risk_level) AS final_risk_level,
+               ls.test_datetime
         FROM lab_screenings ls
         JOIN visits v ON v.id = ls.visit_id
         JOIN patients p ON p.id = v.patient_id
