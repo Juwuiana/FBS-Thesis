@@ -72,7 +72,7 @@ def require_role_for_blueprint(bp, *roles):
 @auth_bp.route("/")
 def index():
     if "user_id" in session:
-        return redirect(url_for("admin.dashboard"))
+        return redirect(_home_for_role(session.get("user_role")))
     return redirect(url_for("auth.login"))
 
 
@@ -98,6 +98,8 @@ def login():
         session["user_id"] = user["id"]
         session["user_name"] = f"{user['first_name']} {user['last_name']}"
         session["user_role"] = user["role"]
+        from app.models import settings as settings_model
+        session["security_version"] = settings_model.get_security_version(user["role"])
         audit_model.log_event(
             get_db(), user_id=session["user_id"], user_name=session["user_name"],
             role=session["user_role"], action="User login",

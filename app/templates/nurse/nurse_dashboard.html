@@ -58,6 +58,23 @@
     </div>
 </div>
 
+<div class="dash-grid-mid">
+    <div class="form-card">
+        <div class="card-header">Patients by Barangay</div>
+        <div class="card-body">
+            <select id="barangayFilterSelect" class="field-input" style="margin-bottom: 0.75rem;">
+                <option value="">Select a barangay…</option>
+                {% for b in barangays %}
+                <option value="{{ b }}">{{ b }}</option>
+                {% endfor %}
+            </select>
+            <div id="barangayPatientList">
+                <p style="font-size:0.8rem; color:var(--text-muted);">Select a barangay to view its patients.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Bottom Row: Recent Screenings Table | Model Radar -->
 <div class="dash-grid-bot">
     <div class="form-card">
@@ -111,6 +128,7 @@
         riskData: {{ risk_data | tojson }},
         timeline: {{ timeline | tojson }},
         topBarangays: {{ top_barangays | tojson }},
+        patientFileUrlTemplate: {{ url_for('nurse.nurse_patient_file_view', patient_id='__PATIENT_ID__') | tojson }},
     };
 </script>
 <script src="{{ url_for('static', filename='js/nurse_dashboard.js') }}"></script>

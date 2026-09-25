@@ -10,6 +10,7 @@ from app import create_app  # noqa: E402
 from app.controllers.metrics_controller import sql_utc  # noqa: E402
 from app.db import get_connection  # noqa: E402
 from app.ml.green_metrics import BatteryReader, measure  # noqa: E402
+from app.models.health_analytics_model import get_risk_status_distribution  # noqa: E402
 from config import Config  # noqa: E402
 
 
@@ -77,6 +78,7 @@ def app(tmp_path):
 def _login(client, role):
     with client.session_transaction() as s:
         s["user_id"], s["user_role"] = 1, role
+        s["security_version"] = 1
         s["last_active"] = datetime.now(timezone.utc).isoformat()
 
 
@@ -154,6 +156,29 @@ def test_pending_queue_and_soft_delete(app, admin):
         conn.execute("UPDATE patients SET deleted_at = CURRENT_TIMESTAMP WHERE id=?", (pid,))
         conn.commit()
     assert admin.get("/api/v1/green/sync/pending").json["records"] == []   # recycle-bin patients hidden
+
+
+def test_risk_status_distribution_groups_by_risk_not_visit_status(app):
+    with app.app_context():
+        conn = get_connection()
+        for index, risk in enumerate(("Low", "Moderate", "High"), start=1):
+            patient_id = conn.execute(
+                "INSERT INTO patients (patient_code,last_name,first_name,birthdate,sex) "
+                "VALUES (?, 'Risk', ?, '1980-01-01', 'Male')",
+                (f"RISK-{index}", risk),
+            ).lastrowid
+            visit_id = conn.execute(
+                "INSERT INTO visits (patient_id,visit_type,assessment_date,status) "
+                "VALUES (?, 'intake', '2026-01-01', 'submitted')",
+                (patient_id,),
+            ).lastrowid
+            conn.execute(
+                "INSERT INTO lab_screenings (visit_id,fbs_mg_dl,test_datetime,preliminary_risk_level) "
+                "VALUES (?, 110, '2026-01-01 08:00:00', ?)",
+                (visit_id, risk),
+            )
+        conn.commit()
+        assert get_risk_status_distribution() == {"Low": 1, "Moderate": 1, "High": 1}
 
 
 def test_telemetry_energy_and_uptime(app, admin):

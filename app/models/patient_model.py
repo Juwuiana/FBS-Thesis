@@ -333,12 +333,19 @@ def purge_patient_permanently(patient_id: int) -> None:
 
 def purge_expired_deleted_patients() -> int:
     """
-    delete patients na lagpas 15 days na sa recycle bin
+    Delete soft-deleted patients older than the configured retention window.
 
     """
+    from app.models import settings as settings_model
+
+    retention_days = settings_model.get_data_retention_days()
+    if retention_days is None:
+        return 0
+
     conn = get_connection()
     cur = conn.execute(
-        "DELETE FROM patients WHERE deleted_at IS NOT NULL AND deleted_at <= datetime('now', '-15 days')"
+        "DELETE FROM patients WHERE deleted_at IS NOT NULL AND deleted_at <= datetime('now', ?)",
+        (f"-{retention_days} days",),
     )
     conn.commit()
     purged = cur.rowcount

@@ -10,7 +10,8 @@ from datetime import datetime
 from flask import current_app
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from app.models import user as user_model
+from app.db import get_db
+from app.models import audit_model, settings as settings_model, user as user_model
 
 PH_MOBILE_RE = re.compile(r"^9\d{9}$")
 NAME_RE = re.compile(r"^[A-Za-z\s.\-]+$")
@@ -174,7 +175,24 @@ def authenticate(email, password):
     stored_hash = user["password_hash"] if user else dummy_hash
     password_ok = check_password_hash(stored_hash, password)
 
-    if not user or not password_ok:
+    if not user:
+        return None, "Invalid email or password."
+
+    if not password_ok:
+        user_model.increment_failed_login_attempts(user["id"])
+        user = user_model.get_user_by_id(user["id"])
+        max_attempts = settings_model.get_max_login_attempts()
+        if user["failed_login_attempts"] >= max_attempts:
+            user_model.set_status(user["id"], "recovery")
+            audit_model.log_event(
+                get_db(), user_id=user["id"], user_name=user["email"], role=user["role"],
+                action=f"Account locked after {max_attempts} failed login attempts: {email}",
+                ip_address=None, severity="Critical",
+            )
+            return None, (
+                "Too many failed attempts. Your account has been locked - contact "
+                "your LHU administrator for a password reset."
+            )
         return None, "Invalid email or password."
 
     user_status = user["status"]
@@ -185,6 +203,10 @@ def authenticate(email, password):
             return None, "Your account is awaiting a password reset from an administrator."
         return None, "Your account access has been denied. Contact your LHU administrator."
 
+    if not settings_model.is_role_login_enabled(user["role"]):
+        return None, "Logins for this role have been temporarily disabled by an administrator."
+
+    user_model.reset_failed_login_attempts(user["id"])
     user_model.update_last_login(user["id"])
     return user, None
 

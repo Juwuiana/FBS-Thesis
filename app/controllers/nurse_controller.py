@@ -53,6 +53,7 @@ def nurse_dashboard():
         timeline=timeline,
         top_barangays=top_barangays,
         recent=recent,
+        barangays=lookup_model.list_barangays(),
         active_page='dashboard',
     )
 @nurse_bp.route('/nurse_intake')
@@ -337,6 +338,17 @@ def nurse_data_management():
     )
 
 
+@nurse_bp.route('/nurse_dashboard/barangay-patients')
+def nurse_dashboard_barangay_patients():
+    barangay = request.args.get('barangay') or None
+    if not barangay:
+        return jsonify({"patients": []})
+    patients = patient_model.list_patients_with_latest_screening(
+        barangay=barangay, entries_limit=25
+    )
+    return jsonify({"patients": patients})
+
+
 @nurse_bp.route('/nurse_privacy_security')
 def nurse_privacy_security():
     audit_logs = audit_model.get_recent_logs_for_user(get_db(), session.get("user_id"))
@@ -399,6 +411,13 @@ def nurse_patient_purge(patient_id):
 @nurse_bp.route('/nurse_data_management/export', methods=['POST'])
 @rate_limit(max_calls=5, period_seconds=60)
 def nurse_data_management_export():
+    from app.models import settings as settings_model
+
+    if (session.get("user_role") == "health_worker" and
+            not settings_model.is_role_export_enabled("health_worker")):
+        flash("Export has been disabled for nurse accounts by an administrator.", "error")
+        return redirect(url_for("nurse.nurse_data_management"))
+
     barangay = request.form.get('barangay') or request.args.get('barangay') or None
     risk = request.form.get('risk') or request.args.get('risk') or None
     date = request.form.get('date') or request.args.get('date') or None

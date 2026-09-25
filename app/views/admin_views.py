@@ -644,34 +644,35 @@ def reset_staff_password(employee_id):
 @login_required
 def privacy_security():
     from app.models import settings as settings_model
+    from werkzeug.security import generate_password_hash
 
     session_timeout_minutes = settings_model.get_session_timeout_minutes()
+    max_login_attempts = settings_model.get_max_login_attempts()
+    data_retention_days = settings_model.get_data_retention_days()
+    password_hash_method = generate_password_hash("x").split(":", 1)[0]
     roles = [
-        {"name": "Patient",        "screen": True,  "view_records": "Own records", "export": "No",      "admin": "No"},
-        {"name": "LHU Nurse",      "screen": True,  "view_records": "Yes",         "export": "Limited", "admin": "No"},
-        {"name": "Health Officer", "screen": True,  "view_records": "Yes",         "export": "Yes",     "admin": "Read"},
-        {"name": "Admin",          "screen": True,  "view_records": "Yes",         "export": "Yes",     "admin": "Yes"},
+        {
+            "key": "patient",
+            "label": "Patient",
+            "login_enabled": settings_model.is_role_login_enabled("patient"),
+            "export_enabled": settings_model.is_role_export_enabled("patient"),
+        },
+        {
+            "key": "health_worker",
+            "label": "LHU Nurse",
+            "login_enabled": settings_model.is_role_login_enabled("health_worker"),
+            "export_enabled": settings_model.is_role_export_enabled("health_worker"),
+        },
     ]
-    lhu_agreements = [
-        {"name": "Calamba",   "status": "Signed"},
-        {"name": "Santa Rosa","status": "Signed"},
-        {"name": "Biñan",     "status": "Signed"},
-        {"name": "San Pedro", "status": "Pending"},
-        {"name": "Cabuyao",   "status": "Pending"},
-    ]
-    retention_policy = [
-        {"label": "Retention period",  "value": "5 years"},
-        {"label": "Anonymization",     "value": "On export"},
-        {"label": "Right to deletion", "value": "Yes"},
-        {"label": "Backup frequency",  "value": "Daily (encrypted)"},
-        {"label": "Storage location",  "value": "LHU local server"},
-    ]
+    lhu_agreements = [{"name": station, "status": "Signed"} for station in STATION_MAP]
     return render_template(
         "dashboard/privacy.html",
         roles=roles,
         lhu_agreements=lhu_agreements,
-        retention_policy=retention_policy,
         session_timeout_minutes=session_timeout_minutes,
+        max_login_attempts=max_login_attempts,
+        data_retention_days=data_retention_days,
+        password_hash_method=password_hash_method,
     )
 
 
@@ -681,13 +682,99 @@ def update_session_timeout():
     from app.models import settings as settings_model
 
     minutes = request.form.get("session_timeout_minutes", type=int)
-    if minutes not in settings_model.ALLOWED_SESSION_TIMEOUTS:
-        flash("Please choose a valid session timeout value.", "error")
+    max_attempts = request.form.get("max_login_attempts", type=int)
+    if (minutes not in settings_model.ALLOWED_SESSION_TIMEOUTS or
+            max_attempts not in settings_model.ALLOWED_MAX_LOGIN_ATTEMPTS):
+        flash("Please choose valid session timeout and failed-login attempt values.", "error")
         return redirect(url_for("admin.privacy_security"))
 
-    settings_model.set_session_timeout_minutes(minutes)
-    _audit_event(f"Session timeout updated to {minutes} minute(s)", "Info")
-    flash(f"Session timeout updated to {minutes} minute(s).", "success")
+    previous_minutes = settings_model.get_session_timeout_minutes()
+    previous_max_attempts = settings_model.get_max_login_attempts()
+    changed = []
+    if minutes != previous_minutes:
+        settings_model.set_session_timeout_minutes(minutes)
+        changed.append(f"session timeout to {minutes} minute(s)")
+    if max_attempts != previous_max_attempts:
+        settings_model.set_max_login_attempts(max_attempts)
+        changed.append(f"maximum failed login attempts to {max_attempts}")
+    if changed:
+        _audit_event("Security settings updated: " + "; ".join(changed), "Info")
+        flash("Security settings updated: " + "; ".join(changed) + ".", "success")
+    else:
+        flash("Security settings unchanged.", "success")
+    return redirect(url_for("admin.privacy_security"))
+
+
+@admin_bp.route("/privacy-security/role-login-toggle", methods=["POST"])
+@login_required
+def role_login_toggle():
+    from app.models import settings as settings_model
+
+    role = request.form.get("role")
+    enabled = request.form.get("enabled") == "1"
+    try:
+        settings_model.set_role_login_enabled(role, enabled)
+    except ValueError as error:
+        flash(str(error), "error")
+        return redirect(url_for("admin.privacy_security"))
+    severity = "Info" if enabled else "Critical"
+    state = "enabled" if enabled else "disabled"
+    _audit_event(f"Logins {state} for {role}", severity)
+    flash(f"Logins {state} for {role.replace('_', ' ')}.", "success")
+    return redirect(url_for("admin.privacy_security"))
+
+
+@admin_bp.route("/privacy-security/role-export-toggle", methods=["POST"])
+@login_required
+def role_export_toggle():
+    from app.models import settings as settings_model
+
+    role = request.form.get("role")
+    enabled = request.form.get("enabled") == "1"
+    try:
+        settings_model.set_role_export_enabled(role, enabled)
+    except ValueError as error:
+        flash(str(error), "error")
+        return redirect(url_for("admin.privacy_security"))
+    state = "enabled" if enabled else "disabled"
+    _audit_event(f"Exports {state} for {role}", "Info")
+    flash(f"Exports {state} for {role.replace('_', ' ')}.", "success")
+    return redirect(url_for("admin.privacy_security"))
+
+
+@admin_bp.route("/privacy-security/role-force-signout", methods=["POST"])
+@login_required
+def role_force_signout():
+    from app.models import settings as settings_model
+
+    role = request.form.get("role")
+    try:
+        settings_model.bump_security_version(role)
+    except ValueError as error:
+        flash(str(error), "error")
+        return redirect(url_for("admin.privacy_security"))
+    if session.get("user_role") == role:
+        session["security_version"] = settings_model.get_security_version(role)
+    _audit_event(f"All {role} sessions signed out", "Critical")
+    flash(f"All active {role.replace('_', ' ')} sessions have been signed out.", "success")
+    return redirect(url_for("admin.privacy_security"))
+
+
+@admin_bp.route("/privacy-security/data-retention", methods=["POST"])
+@login_required
+def update_data_retention():
+    from app.models import settings as settings_model
+
+    raw = request.form.get("data_retention_days")
+    try:
+        days = int(raw) if raw else None
+        settings_model.set_data_retention_days(days)
+    except (TypeError, ValueError):
+        flash("Please choose a valid retention period.", "error")
+        return redirect(url_for("admin.privacy_security"))
+    label = f"{days} day(s)" if days else "manual purge only"
+    _audit_event(f"Data retention threshold updated to {label}", "Info")
+    flash(f"Data retention threshold updated to {label}.", "success")
     return redirect(url_for("admin.privacy_security"))
 
 

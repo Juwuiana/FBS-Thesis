@@ -52,6 +52,7 @@ def login_as_admin(client, user_id=1):
         session["user_id"] = user_id
         session["user_role"] = "medical_officer"
         session["user_name"] = "Test Admin"
+        session["security_version"] = 1
 
 
 def test_forgot_password_sets_approved_account_to_recovery(app):

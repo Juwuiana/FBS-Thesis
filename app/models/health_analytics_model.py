@@ -39,7 +39,7 @@ def get_risk_status_distribution() -> dict:
     rows = conn.execute(f"""
         SELECT COALESCE(ls.final_risk_level, ls.preliminary_risk_level, 'Pending') AS status, COUNT(*) AS n
         {_base_query()}
-        GROUP BY status
+        GROUP BY COALESCE(ls.final_risk_level, ls.preliminary_risk_level, 'Pending')
     """).fetchall()
     conn.close()
     return {r["status"]: r["n"] for r in rows}

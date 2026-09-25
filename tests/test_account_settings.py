@@ -53,6 +53,7 @@ def login(client, user_id, role):
         session["user_id"] = user_id
         session["user_role"] = role
         session["user_name"] = "Test User"
+        session["security_version"] = 1
 
 
 def test_admin_change_password_rejects_wrong_current_password(app):

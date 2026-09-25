@@ -22,6 +22,7 @@ def _login(client):
     with client.session_transaction() as s:
         s["user_id"] = 1
         s["user_role"] = "health_worker"
+        s["security_version"] = 1
         s["last_active"] = datetime.now(timezone.utc).isoformat()
 
 

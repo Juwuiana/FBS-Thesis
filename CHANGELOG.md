@@ -1,5 +1,20 @@
 # Staff password recovery
 
+- **Fixed:** removed decorative Data Privacy controls and duplicate content-use text from the admin Privacy &amp; Security page.
+- **Added:** replaced fictional municipality agreement rows with the two real LHU stations and a shared read-only Data Handling and Confidentiality Agreement modal.
+- **Removed:** retired the redundant global all-role sign-out control from Encryption &amp; Storage; per-role Force Sign-Out remains available under Access Roles &amp; Permissions.
+- **Fixed:** simplified the admin Access Roles &amp; Permissions table to the real Patient and LHU Nurse roles, and renamed the first Privacy &amp; Security tab from “Password &amp; Login” to “Password.”
+- **Added:** wired the real patient portal login and personal-data export into the same role-control system as staff, including patient login/export toggles and patient-only force sign-out with role-scoped security versions.
+- **Added:** rebuilt admin Data Privacy access controls around the two real staff roles, with role-scoped login enablement, nurse-only export permission, and isolated force-signout actions.
+- **Fixed:** removed the fictional four-tier permissions table and duplicate decorative Data Retention Policy section from the admin Privacy & Security page.
+- **Added:** a self-contained nurse dashboard "Patients by Barangay" widget with a capped AJAX patient list, barangay filter, compact risk table, and direct links to patient files; it reuses the existing latest-screening patient query.
+
+- **Fixed:** made the admin Encryption &amp; Storage data-retention threshold control the existing automatic recycle-bin purge, with 6-, 12-, 24-month, and manual-only policies persisted in `app_settings`.
+- **Added:** replaced the decorative salt-cipher text with the actual Werkzeug password-hashing method (`scrypt`) and repurposed salt rotation as a real global session-invalidation action using a security-version counter; the UI is explicitly no longer presented as field-level AES-256-GCM encryption.
+- **Added:** focused coverage for retention persistence and purge behavior, Never Purge, and invalidating other active sessions without signing out the initiating administrator.
+- **Added:** real configurable failed-login tracking with 3-, 5-, and 10-attempt thresholds; accounts reaching the threshold enter the existing administrator password-recovery flow.
+- **Fixed:** removed the decorative admin 2FA controls and fake recent-login implication from Privacy & Security; the admin Password & Login tab now contains only password change controls.
+
 - **Fixed:** standardized staff facility codes and labels on `LHU I`/`LHU II`, including repair of existing accounts saved with the old codes.
 - **Added:** functional admin and nurse password changes with shared validation, password hashing, and `Password changed` audit events.
 - **Fixed:** admin and nurse flash messages are now visible after redirected actions.
@@ -44,11 +59,9 @@
   `health_worker` gets 403 from `/admin/*`, a `medical_officer` gets 200.
 - **Fixed**: login always redirected to `admin.dashboard` regardless of role. Added `_home_for_role()`
   so a `health_worker` lands on `/nurse_dashboard` and a `medical_officer` on `/admin/dashboard`.
-- **Fixed**: the patient portal had no auth of any kind and depended on `patient_portal_model`
-  raising `NotImplementedError` (an unhandled 500) to avoid leaking data. There is still no real
-  patient-login design (patients aren't in `users` and have no credential column), so this is not
-  "implemented" — it is now made to fail *closed* on purpose: `patient_bp` 404s unless the
-  explicit, clearly-named dev-only `FBS_DEV_NO_AUTH=1` is set, instead of crashing.
+- **Superseded:** the earlier merge note described the patient portal as fail-closed because patient
+  authentication was incomplete. The portal now has real patient credentials, login, and protected
+  self-service routes; the current role-control entry above documents the active behavior.
 - **Fixed**: `visit_model.create_visit()` — the nurse branch's actual save path — never called the
   Green Computing module's offline queue. Added the one-line integration from
   `docs/NURSE_BRANCH_INTEGRATION.md` (`sync_queue.on_visit_saved(conn, visit_id)`, same transaction,

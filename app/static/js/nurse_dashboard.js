@@ -21,6 +21,64 @@ document.addEventListener('DOMContentLoaded', async function () {
         }
     };
 
+    const barangaySelect = document.getElementById('barangayFilterSelect');
+    const barangayPatientList = document.getElementById('barangayPatientList');
+
+    function escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>'"]/g, character => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+        }[character]));
+    }
+
+    function renderBarangayPatients(patients) {
+        if (!patients.length) {
+            barangayPatientList.innerHTML = '<p style="font-size:0.8rem; color:var(--text-muted);">No patients found in this barangay yet.</p>';
+            return;
+        }
+
+        const urlTemplate = window.__dashboardData.patientFileUrlTemplate;
+        const rows = patients.map(patient => {
+            const patientUrl = urlTemplate.replace('__PATIENT_ID__', encodeURIComponent(patient.patient_code));
+            const riskClass = patient.risk === 'High' ? 'badge-danger' : patient.risk === 'Moderate' ? 'badge-warning' : patient.risk === 'Low' ? 'badge-success' : '';
+            const risk = riskClass
+                ? `<span class="risk-badge ${riskClass}">${escapeHtml(patient.risk)}</span>`
+                : `<span style="color:var(--text-muted);">${escapeHtml(patient.risk || 'Pending')}</span>`;
+            return `<tr>
+                <td><a class="patient-name-link" href="${patientUrl}">${escapeHtml(patient.last_name)}, ${escapeHtml(patient.first_name)}</a></td>
+                <td>${escapeHtml(patient.age)} / ${escapeHtml(patient.sex)}</td>
+                <td>${escapeHtml(patient.date || '—')}</td>
+                <td>${escapeHtml(patient.fbs ?? '—')}</td>
+                <td>${risk}</td>
+            </tr>`;
+        }).join('');
+
+        barangayPatientList.innerHTML = `<div style="overflow-x:auto;">
+            <table class="data-table" style="min-width:520px;">
+                <thead><tr><th>Name</th><th>Age / Sex</th><th>Date</th><th>FBS</th><th>Risk</th></tr></thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>`;
+    }
+
+    if (barangaySelect && barangayPatientList) {
+        barangaySelect.addEventListener('change', async function () {
+            const barangay = this.value;
+            if (!barangay) {
+                barangayPatientList.innerHTML = '<p style="font-size:0.8rem; color:var(--text-muted);">Select a barangay to view its patients.</p>';
+                return;
+            }
+            barangayPatientList.innerHTML = '<p style="font-size:0.8rem; color:var(--text-muted);">Loading patients…</p>';
+            try {
+                const response = await fetch(`/nurse_dashboard/barangay-patients?barangay=${encodeURIComponent(barangay)}`);
+                if (!response.ok) throw new Error('Unable to load patients');
+                const data = await response.json();
+                renderBarangayPatients(data.patients || []);
+            } catch (error) {
+                barangayPatientList.innerHTML = '<p style="font-size:0.8rem; color:var(--text-muted);">Unable to load patients right now.</p>';
+            }
+        });
+    }
+
     const toggleDataHubBtn = document.getElementById('toggleDataHubBtn');
     const dataHubWrapper   = document.getElementById('dataHubWrapper');
     const hubToggleLabel   = document.getElementById('hubToggleLabel');

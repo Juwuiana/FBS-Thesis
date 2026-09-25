@@ -104,6 +104,15 @@ def create_app(config_class=Config):
 
         from app.models import settings as settings_model
 
+        role = session.get("user_role")
+        if role and session.get("security_version") != settings_model.get_security_version(role):
+            session.clear()
+            flash(
+                "You've been signed out for security reasons. Please log in again.",
+                "error",
+            )
+            return redirect(url_for("auth.login"))
+
         timeout_minutes = settings_model.get_session_timeout_minutes()
         now = datetime.now(timezone.utc)
         last_active_raw = session.get("last_active")

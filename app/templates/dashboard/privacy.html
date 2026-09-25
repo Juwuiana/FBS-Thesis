@@ -13,8 +13,8 @@
     <div class="settings-nav-panel">
         <button class="settings-tab active" data-tab="password">
             <span class="stab-text">
-                <span class="stab-title">Password &amp; Login</span>
-                <span class="stab-sub">Change password, recent logins</span>
+                <span class="stab-title">Password</span>
+                <span class="stab-sub">Change password</span>
             </span>
         </button>
         <button class="settings-tab" data-tab="data">
@@ -76,78 +76,48 @@
         <div class="settings-pane" id="pane-data">
 
             <div class="settings-section">
-                <div class="section-label">Data Privacy Controls</div>
-
-                <div class="protocol-banner mb-3">
-                    Active Protocol: Mandatory Information Anonymization Verified
-                </div>
-
-                <p class="ps-description" style="margin-bottom: 1rem;">
-                    Direct identifiers such as patient names and numerical database index sequences
-                    are stripped out through local cryptographic hashing before clinical variables
-                    undergo feature processing.
-                </p>
-
-                <div class="settings-form-grid" style="margin-bottom: 1rem;">
-                    <div class="form-group">
-                        <label class="form-label">Anonymization Strength</label>
-                        <select class="ps-select">
-                            <option selected>Strict Pseudonymization (Mask Identifiers)</option>
-                            <option>Standard Anonymization</option>
-                            <option>Minimal – Research Mode</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Demographic Variance Guard</label>
-                        <select class="ps-select">
-                            <option selected>Balance Local Barangay Class Distribution</option>
-                            <option>No Variance Guard</option>
-                            <option>Strict Age-Sex Balancing</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="form-actions">
-                    <button class="btn-save">Update Processing Rules</button>
-                </div>
-            </div>
-
-            <div class="settings-section">
                 <div class="section-label">Access Roles &amp; Permissions</div>
                 <div class="table-responsive">
                     <table class="table table-borderless ps-roles-table mb-0">
                         <thead>
                             <tr>
                                 <th>Role</th>
-                                <th>Screen Patient</th>
-                                <th>View Records</th>
-                                <th>Export Data</th>
-                                <th>Admin Panel</th>
+                                <th>Login Enabled</th>
+                                <th>Export</th>
+                                <th>Force Sign-Out</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for role in roles %}
                             <tr>
-                                <td style="font-weight:600;font-size:13px">{{ role.name }}</td>
+                                <td style="font-weight:600;font-size:13px">{{ role.label }}</td>
                                 <td>
-                                    <span class="{{ 'perm-yes' if role.screen else 'perm-no' }}">
-                                        {{ 'Yes' if role.screen else 'No' }}
-                                    </span>
+                                    <form method="POST" action="{{ url_for('admin.role_login_toggle') }}">
+                                        <input type="hidden" name="role" value="{{ role.key }}">
+                                        <label class="toggle-switch">
+                                            <input type="checkbox" name="enabled" value="1"
+                                                   {% if role.login_enabled %}checked{% endif %}
+                                                   onchange="this.form.submit()">
+                                            <span class="toggle-slider"></span>
+                                        </label>
+                                    </form>
                                 </td>
                                 <td>
-                                    <span class="{{ 'perm-yes' if role.view_records == 'Yes' else ('perm-limited' if role.view_records == 'Own records' else ('perm-limited' if role.view_records == 'Limited' else 'perm-no')) }}">
-                                        {{ role.view_records }}
-                                    </span>
+                                    <form method="POST" action="{{ url_for('admin.role_export_toggle') }}">
+                                        <input type="hidden" name="role" value="{{ role.key }}">
+                                        <label class="toggle-switch">
+                                            <input type="checkbox" name="enabled" value="1"
+                                                   {% if role.export_enabled %}checked{% endif %}
+                                                   onchange="this.form.submit()">
+                                            <span class="toggle-slider"></span>
+                                        </label>
+                                    </form>
                                 </td>
                                 <td>
-                                    <span class="{{ 'perm-yes' if role.export == 'Yes' else ('perm-limited' if role.export == 'Limited' else 'perm-no') }}">
-                                        {{ role.export }}
-                                    </span>
-                                </td>
-                                <td>
-                                    <span class="{{ 'perm-yes' if role.admin == 'Yes' else ('perm-limited' if role.admin == 'Read' else 'perm-no') }}">
-                                        {{ role.admin }}
-                                    </span>
+                                    <form method="POST" action="{{ url_for('admin.role_force_signout') }}">
+                                        <input type="hidden" name="role" value="{{ role.key }}">
+                                        <button type="submit" class="ps-secondary-btn">Force Sign-Out</button>
+                                    </form>
                                 </td>
                             </tr>
                             {% endfor %}
@@ -164,30 +134,58 @@
                     <span class="{{ 'agreement-signed' if lhu.status == 'Signed' else 'agreement-pending' }}">
                         {{ lhu.status }}
                     </span>
+                    <a href="#" class="btn-action-outline" data-bs-toggle="modal" data-bs-target="#lhuAgreementModal">
+                        View Agreement
+                    </a>
                 </div>
                 {% endfor %}
             </div>
 
-            <div class="settings-section">
-                <div class="section-label">Content &amp; Data Use</div>
-                <p class="ps-description">
-                    Patient records are collected under informed consent protocols per DOH guidelines.
-                    Data is used solely for FBS-based diabetes risk screening and public health research
-                    as approved by the IRB. No data is shared with third parties or commercial entities.
-                </p>
-                <div class="irb-badge mt-3">
-                    IRB Approved Protocol
-                </div>
-            </div>
+            <div class="modal fade" id="lhuAgreementModal" tabindex="-1" aria-labelledby="lhuAgreementModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h2 class="modal-title" id="lhuAgreementModalLabel">DATA HANDLING AND CONFIDENTIALITY AGREEMENT</h2>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p class="form-label">FBS-Based Diabetes Risk Screening Program — City Health Office of Santa Rosa (LHU I / LHU II)</p>
 
-            <div class="settings-section">
-                <div class="section-label">Data Retention Policy</div>
-                {% for item in retention_policy %}
-                <div class="detail-row">
-                    <span class="detail-label">{{ item.label }}</span>
-                    <span class="detail-value">{{ item.value }}</span>
+                            <h3 class="section-label">1. PURPOSE</h3>
+                            <p class="ps-description">This system exists to support community-based Fasting Blood Sugar (FBS) diabetes risk screening across LHU I and LHU II, the two stations operating under the City Health Office of Santa Rosa. It allows authorized health workers to record screening data, generate a preliminary risk classification, and route high-risk patients toward confirmatory testing and care, while giving City Health Office staff visibility into screening coverage and risk distribution across Santa Rosa's barangays.</p>
+
+                            <h3 class="section-label">2. WHAT DATA IS SHARED</h3>
+                            <p class="ps-description">Only the following categories are shared between LHU I and LHU II under the City Health Office:</p>
+                            <ul class="ps-description">
+                                <li>De-identified screening results: FBS values, computed risk level (Low/Moderate/High), barangay, age range, and sex — used for aggregate reporting and resource planning.</li>
+                                <li>Patient-identifying information (name, exact birthdate, contact details) is NOT shared beyond the station where the patient was originally screened, except where the patient is referred to Santa Rosa District Hospital or a DOH facility for confirmatory testing or follow-up care, and only to the extent necessary for that referral.</li>
+                                <li>No data in this system is sold, licensed, or shared with commercial entities, insurers, or any party outside the City Health Office / DOH public-health reporting chain.</li>
+                            </ul>
+
+                            <h3 class="section-label">3. LEGAL BASIS</h3>
+                            <p class="ps-description">Data collection, processing, and handling under this program are conducted in accordance with the Data Privacy Act of 2012 (Republic Act No. 10173) and its Implementing Rules and Regulations, under the informed consent obtained from each patient at the point of screening, and under the protocol approved by the program's Institutional Review Board (IRB).</p>
+
+                            <h3 class="section-label">4. HOW DATA IS PROTECTED</h3>
+                            <ul class="ps-description">
+                                <li>Direct identifiers are separated from clinical variables before any aggregate or cross-station reporting takes place.</li>
+                                <li>Access to identifiable patient records is restricted to the health workers and officers directly involved in that patient's screening and care, enforced by role-based access controls within the system.</li>
+                                <li>All access to patient records is logged and auditable.</li>
+                            </ul>
+
+                            <h3 class="section-label">5. PATIENT RIGHTS</h3>
+                            <p class="ps-description">Patients screened under this program retain the right to access their own screening data, request correction of inaccurate information, and request deletion of their record, subject to any retention period required for public-health reporting or active care obligations.</p>
+
+                            <h3 class="section-label">6. RESPONSIBILITIES OF LHU I AND LHU II</h3>
+                            <p class="ps-description">Each station (LHU I, LHU II) and its staff agree to: use shared data solely for the purposes described above; not attempt to re-identify de-identified records; report any suspected data breach to the program administrator immediately; and ensure staff accessing the system are trained on these confidentiality obligations.</p>
+
+                            <h3 class="section-label">7. DURATION AND TERMINATION</h3>
+                            <p class="ps-description">This agreement remains in effect for the duration of the station's participation in the program and may be terminated by the City Health Office with written notice. Termination does not retroactively affect data already lawfully shared prior to termination.</p>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn-save" data-bs-dismiss="modal">Close</button>
+                        </div>
+                    </div>
                 </div>
-                {% endfor %}
             </div>
 
         </div>
@@ -196,29 +194,28 @@
             <div class="settings-section">
                 <div class="section-label">Local Encryption &amp; Storage Configuration</div>
                 <p class="ps-description" style="margin-bottom: 1rem;">
-                    Manage the cryptographic configurations safeguarding local database records
+                    Review the password-hashing method protecting local accounts
                     and configure terminal storage constraints.
                 </p>
                 <div class="settings-form-grid" style="margin-bottom: 1rem;">
                     <div class="form-group">
-                        <label class="form-label">Workstation Salt Cipher</label>
-                        <input type="text" class="ps-input" value="AES_256_GCM_OFFLINE_NODE" readonly />
+                        <label class="form-label">Password Hashing Method</label>
+                        <input type="text" class="ps-input" value="{{ password_hash_method }}" readonly />
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">Data Retention Threshold</label>
-                        <select class="ps-select">
-                            <option selected>Purge Local Staged Cache After 12 Months</option>
-                            <option>Purge After 6 Months</option>
-                            <option>Purge After 24 Months</option>
-                            <option>Never Purge (Manual Only)</option>
-                        </select>
-                    </div>
+                    <form id="dataRetentionForm" method="POST" action="{{ url_for('admin.update_data_retention') }}">
+                        <div class="form-group">
+                            <label class="form-label">Data Retention Threshold</label>
+                            <select class="ps-select" name="data_retention_days">
+                                <option value="365" {% if data_retention_days == 365 %}selected{% endif %}>Purge Local Staged Cache After 12 Months</option>
+                                <option value="180" {% if data_retention_days == 180 %}selected{% endif %}>Purge After 6 Months</option>
+                                <option value="730" {% if data_retention_days == 730 %}selected{% endif %}>Purge After 24 Months</option>
+                                <option value="" {% if data_retention_days is none %}selected{% endif %}>Never Purge (Manual Only)</option>
+                            </select>
+                        </div>
+                    </form>
                 </div>
                 <div class="form-actions d-flex gap-2 flex-wrap">
-                    <button class="ps-secondary-btn">
-                        Rotate Cryptographic Salts
-                    </button>
-                    <button class="btn-save">
+                    <button type="submit" form="dataRetentionForm" class="btn-save">
                         Save Key Policies
                     </button>
                 </div>
@@ -248,34 +245,11 @@
                         </div>
                         <div class="form-group">
                             <label class="form-label">Max Failed Login Attempts</label>
-                            <select class="ps-select" disabled>
-                                <option>3 attempts</option>
-                                <option selected>5 attempts</option>
-                                <option>10 attempts</option>
+                            <select class="ps-select" name="max_login_attempts">
+                                <option value="3" {% if max_login_attempts == 3 %}selected{% endif %}>3 attempts</option>
+                                <option value="5" {% if max_login_attempts == 5 %}selected{% endif %}>5 attempts</option>
+                                <option value="10" {% if max_login_attempts == 10 %}selected{% endif %}>10 attempts</option>
                             </select>
-                        </div>
-                    </div>
-                    <div class="settings-section" style="padding: 0; border-bottom: none;">
-                        <label class="form-label" style="margin-bottom: 0.6rem; display:block;">Two-Factor Authentication</label>
-                        <div class="toggle-list">
-                            <div class="toggle-item">
-                                <div class="toggle-info">
-                                    <div class="toggle-sub">Require 2FA for Admin accounts</div>
-                                </div>
-                                <label class="toggle-switch">
-                                    <input type="checkbox" checked disabled />
-                                    <span class="toggle-slider"></span>
-                                </label>
-                            </div>
-                            <div class="toggle-item">
-                                <div class="toggle-info">
-                                    <div class="toggle-sub">Require 2FA for Health Officer accounts</div>
-                                </div>
-                                <label class="toggle-switch">
-                                    <input type="checkbox" disabled />
-                                    <span class="toggle-slider"></span>
-                                </label>
-                            </div>
                         </div>
                     </div>
                     <div class="form-actions">

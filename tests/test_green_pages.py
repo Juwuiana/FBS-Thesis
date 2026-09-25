@@ -24,6 +24,7 @@ def app(tmp_path):
 def login(client, role="medical_officer"):
     with client.session_transaction() as s:
         s["user_id"], s["user_role"] = 1, role
+        s["security_version"] = 1
         s["last_active"] = datetime.now(timezone.utc).isoformat()
     return client
 
@@ -31,6 +32,31 @@ def login(client, role="medical_officer"):
 @pytest.fixture
 def admin(app):
     return login(app.test_client())
+
+
+def test_dashboard_barangay_patients_endpoint_filters_and_handles_empty_query(app, admin):
+    with app.app_context():
+        conn = get_connection()
+        barangay = conn.execute("SELECT id, name FROM barangays ORDER BY name LIMIT 1").fetchone()
+        patient_id = conn.execute(
+            "INSERT INTO patients (patient_code,last_name,first_name,birthdate,sex,barangay_id) "
+            "VALUES ('BARANGAY-TEST','Test','Barangay','1990-01-01','Female',?)",
+            (barangay["id"],),
+        ).lastrowid
+        conn.commit()
+
+    assert admin.get("/nurse_dashboard/barangay-patients").json == {"patients": []}
+    response = admin.get(
+        "/nurse_dashboard/barangay-patients",
+        query_string={"barangay": barangay["name"]},
+    )
+    assert response.status_code == 200
+    patients = response.json["patients"]
+    assert len(patients) == 1
+    assert patients[0]["patient_code"] == "BARANGAY-TEST"
+    assert patients[0]["barangay"] == barangay["name"]
+    assert patients[0]["first_name"] == "Barangay"
+    assert patients[0]["last_name"] == "Test"
 
 
 def add_events(app, n):

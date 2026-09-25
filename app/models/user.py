@@ -162,6 +162,24 @@ def update_last_login(user_id):
     db.commit()
 
 
+def increment_failed_login_attempts(user_id):
+    db = get_db()
+    db.execute(
+        "UPDATE users SET failed_login_attempts = failed_login_attempts + 1 WHERE id = ?",
+        (user_id,),
+    )
+    db.commit()
+
+
+def reset_failed_login_attempts(user_id):
+    db = get_db()
+    db.execute(
+        "UPDATE users SET failed_login_attempts = 0 WHERE id = ?",
+        (user_id,),
+    )
+    db.commit()
+
+
 def update_password(user_id, password_hash):
     db = get_db()
     db.execute(

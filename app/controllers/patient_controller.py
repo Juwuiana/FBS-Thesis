@@ -1,5 +1,5 @@
-from flask import Blueprint, current_app, render_template, request, session, redirect, url_for
-from app.models import patient_portal_model, patient_model
+from flask import Blueprint, current_app, flash, render_template, request, session, redirect, url_for
+from app.models import patient_portal_model, patient_model, settings as settings_model
 from app.controllers import patient_auth_controller
 from flask import Response
 
@@ -13,6 +13,11 @@ def _require_patient_login():
         return
     if request.endpoint in ("patient.patient_login",):
         return
+    if (session.get("patient_id") and
+            session.get("security_version") != settings_model.get_security_version("patient")):
+        session.clear()
+        flash("You've been signed out for security reasons. Please log in again.", "error")
+        return redirect(url_for("patient.patient_login"))
     if not session.get("patient_id"):
         return redirect(url_for('patient.patient_login'))
 
@@ -34,8 +39,15 @@ def patient_login():
     if error:
         return render_template('auth/patient_login.html', error=error)
 
+    if not settings_model.is_role_login_enabled("patient"):
+        return render_template(
+            'auth/patient_login.html',
+            error="Patient portal access is temporarily disabled. Please contact your LHU.",
+        )
+
     session.clear()
     session['patient_id'] = patient['id']
+    session['security_version'] = settings_model.get_security_version("patient")
     patient_model.record_login_event(
         patient['id'],
         user_agent=request.headers.get('User-Agent'),
@@ -86,6 +98,10 @@ def patient_settings():
 
 @patient_bp.route('/patient_download_data')
 def patient_download_data():
+    if not settings_model.is_role_export_enabled("patient"):
+        flash("Data export is temporarily disabled by an administrator.", "error")
+        return redirect(url_for('patient.patient_dashboard'))
+
     patient_id = patient_portal_model.get_current_patient_id()
     patient = patient_model.get_patient_by_id(patient_id)
     csv_data = patient_model.export_single_patient_csv(patient['patient_code'], all_visits=True)
