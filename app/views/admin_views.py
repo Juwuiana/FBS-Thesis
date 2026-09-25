@@ -47,18 +47,38 @@ def _audit_event(action, severity="Info"):
 def dashboard():
     conn = get_db()
 
-    total_screened = conn.execute("SELECT COUNT(*) FROM lab_screenings").fetchone()[0]
-    at_risk_count = conn.execute(
-        "SELECT COUNT(*) FROM lab_screenings WHERE final_risk_level IN ('Moderate', 'High')"
-    ).fetchone()[0]
-    high_risk_count = conn.execute(
-        "SELECT COUNT(*) FROM lab_screenings WHERE final_risk_level = 'High'"
-    ).fetchone()[0]
+    # "Current" stats (Total Screened, At Risk, High Risk, Avg FBS, Risk
+    # Distribution) reflect each PATIENT's most recent screening only, so a
+    # patient tested 5 times counts once, using their latest result. This
+    # matches the nurse dashboard's patient-based count. The Barangay list,
+    # Timeline, and Recent Screenings table intentionally stay as full
+    # event logs -- they're about screening activity, not current status.
+    latest_rows = conn.execute(
+        """
+        WITH latest_ids AS (
+            SELECT ls.id AS screening_id,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY v.patient_id
+                       ORDER BY ls.test_datetime DESC, ls.id DESC
+                   ) AS rn
+            FROM lab_screenings ls
+            JOIN visits v ON v.id = ls.visit_id
+        )
+        SELECT ls.fbs_mg_dl, ls.final_risk_level
+        FROM lab_screenings ls
+        JOIN latest_ids li ON li.screening_id = ls.id
+        WHERE li.rn = 1
+        """
+    ).fetchall()
+
+    total_screened = len(latest_rows)
+    at_risk_count = sum(1 for r in latest_rows if r["final_risk_level"] in ("Moderate", "High"))
+    high_risk_count = sum(1 for r in latest_rows if r["final_risk_level"] == "High")
     at_risk_pct = round(100 * at_risk_count / total_screened, 1) if total_screened else 0
     high_risk_pct = round(100 * high_risk_count / total_screened, 1) if total_screened else 0
 
-    avg_fbs_row = conn.execute("SELECT AVG(fbs_mg_dl) FROM lab_screenings").fetchone()[0]
-    avg_fbs = round(avg_fbs_row, 1) if avg_fbs_row else 0
+    fbs_values = [r["fbs_mg_dl"] for r in latest_rows if r["fbs_mg_dl"] is not None]
+    avg_fbs = round(sum(fbs_values) / len(fbs_values), 1) if fbs_values else 0
 
     metrics = {
         "total_screened": total_screened,
@@ -68,14 +88,9 @@ def dashboard():
         "model_accuracy": None,
     }
 
-    risk_rows = conn.execute(
-        "SELECT final_risk_level, COUNT(*) FROM lab_screenings "
-        "WHERE final_risk_level IS NOT NULL GROUP BY final_risk_level"
-    ).fetchall()
-    risk_counts = {row[0]: row[1] for row in risk_rows}
-    low_count = risk_counts.get("Low", 0)
-    moderate_count = risk_counts.get("Moderate", 0)
-    high_count = risk_counts.get("High", 0)
+    low_count = sum(1 for r in latest_rows if r["final_risk_level"] == "Low")
+    moderate_count = sum(1 for r in latest_rows if r["final_risk_level"] == "Moderate")
+    high_count = high_risk_count
     risk_distribution = {
         "low":      {"count": low_count,      "pct": round(100*low_count/total_screened,1) if total_screened else 0},
         "moderate": {"count": moderate_count, "pct": round(100*moderate_count/total_screened,1) if total_screened else 0},
