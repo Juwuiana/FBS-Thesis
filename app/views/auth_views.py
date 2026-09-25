@@ -1,6 +1,9 @@
+import os
 from functools import wraps
+from pathlib import Path
+from urllib.parse import urlparse
 
-from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, session, url_for
+from flask import Blueprint, abort, current_app, flash, jsonify, redirect, render_template, request, session, url_for
 
 from app.controllers import auth_controller
 from app.constants import STATION_MAP
@@ -165,4 +168,45 @@ def logout():
     session.clear()
     flash("You have been signed out.", "success")
     return redirect(url_for("auth.login"))
+
+
+@auth_bp.route("/profile/avatar", methods=["POST"])
+@login_required
+def upload_avatar():
+    fallback = _home_for_role(session.get("user_role"))
+    referrer = request.referrer
+    if referrer:
+        parsed = urlparse(referrer)
+        if not parsed.netloc or parsed.netloc == request.host:
+            fallback = referrer
+
+    uploaded = request.files.get("avatar")
+    allowed_extensions = {"png", "jpg", "jpeg", "webp"}
+    extension = Path(uploaded.filename or "").suffix.lower().lstrip(".") if uploaded else ""
+    if not uploaded or not uploaded.filename or extension not in allowed_extensions:
+        flash("Please choose a PNG, JPG, JPEG, or WebP image.", "error")
+        return redirect(fallback)
+    if not (uploaded.content_type or "").lower().startswith("image/"):
+        flash("The uploaded file must be an image.", "error")
+        return redirect(fallback)
+
+    uploaded.stream.seek(0, os.SEEK_END)
+    size = uploaded.stream.tell()
+    uploaded.stream.seek(0)
+    if size > 2 * 1024 * 1024:
+        flash("Profile photos must be 2 MB or smaller.", "error")
+        return redirect(fallback)
+
+    user_id = session["user_id"]
+    avatar_dir = Path(current_app.static_folder) / "uploads" / "avatars"
+    avatar_dir.mkdir(parents=True, exist_ok=True)
+    filename = f"user_{user_id}.{extension}"
+    for old_extension in allowed_extensions:
+        old_path = avatar_dir / f"user_{user_id}.{old_extension}"
+        if old_path.name != filename:
+            old_path.unlink(missing_ok=True)
+    uploaded.save(avatar_dir / filename)
+    user_model.update_avatar(user_id, filename)
+    flash("Profile photo updated successfully.", "success")
+    return redirect(fallback)
 

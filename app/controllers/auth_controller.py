@@ -187,3 +187,27 @@ def authenticate(email, password):
 
     user_model.update_last_login(user["id"])
     return user, None
+
+
+def change_own_password(user_id, form):
+    user = user_model.get_user_by_id(user_id)
+    if user is None:
+        return ["Your account could not be found."]
+
+    current_password = form.get("current_password") or ""
+    new_password = form.get("new_password") or ""
+    confirm_password = form.get("confirm_password") or ""
+    errors = []
+
+    if not check_password_hash(user["password_hash"], current_password):
+        errors.append("Current password is incorrect.")
+    if len(new_password) < MIN_PASSWORD_LENGTH:
+        errors.append(f"Password must be at least {MIN_PASSWORD_LENGTH} characters.")
+    if new_password != confirm_password:
+        errors.append("Passwords do not match.")
+    if new_password == current_password:
+        errors.append("New password must be different from your current password.")
+
+    if not errors:
+        user_model.update_password(user_id, generate_password_hash(new_password))
+    return errors

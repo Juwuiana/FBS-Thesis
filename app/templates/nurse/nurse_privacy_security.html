@@ -39,7 +39,8 @@
 
             <div class="settings-section">
                 <div class="section-label">Change Password</div>
-                <div class="settings-form-grid" style="max-width: 480px;">
+                <form method="POST" action="{{ url_for('nurse.nurse_change_password') }}">
+                    <div class="settings-form-grid" style="max-width: 480px;">
                     <div class="form-group" style="grid-column: 1 / -1;">
                         <label class="form-label">Current Password</label>
                         <div class="pw-field-wrap">
@@ -49,7 +50,7 @@
                     <div class="form-group">
                         <label class="form-label">New Password</label>
                         <div class="pw-field-wrap">
-                            <input class="form-input" type="password" id="pwNew" name="new_password" placeholder="At least 8 characters" autocomplete="new-password">
+                            <input class="form-input" type="password" id="pwNew" name="new_password" placeholder="At least 12 characters" autocomplete="new-password">
                         </div>
                         <div class="pw-strength-bar" id="pwStrengthBar">
                             <div class="pw-strength-fill" id="pwStrengthFill"></div>
@@ -63,10 +64,11 @@
                         </div>
                         <span class="form-hint" id="pwMatchHint"></span>
                     </div>
-                </div>
-                <div class="form-actions">
-                    <button type="button" class="btn-save">Update Password</button>
-                </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn-save">Update Password</button>
+                    </div>
+                </form>
             </div>
 
             <div class="settings-section">

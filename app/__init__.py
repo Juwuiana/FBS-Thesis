@@ -81,7 +81,15 @@ def create_app(config_class=Config):
     @app.context_processor
     def inject_session_settings():
         from app.models import settings as settings_model
-        return {"session_timeout_minutes": settings_model.get_session_timeout_minutes()}
+        from flask import session
+        from app.models import user as user_model
+
+        signed_in_user = user_model.get_user_by_id(session["user_id"]) if session.get("user_id") else None
+        return {
+            "session_timeout_minutes": settings_model.get_session_timeout_minutes(),
+            "signed_in_user_name": session.get("user_name"),
+            "current_user_avatar": signed_in_user["avatar_filename"] if signed_in_user else None,
+        }
 
     @app.before_request
     def _enforce_session_timeout():

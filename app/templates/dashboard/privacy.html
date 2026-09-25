@@ -11,7 +11,13 @@
 <div class="settings-body" style="padding: 1.25rem 24px 24px;">
 
     <div class="settings-nav-panel">
-        <button class="settings-tab active" data-tab="data">
+        <button class="settings-tab active" data-tab="password">
+            <span class="stab-text">
+                <span class="stab-title">Password &amp; Login</span>
+                <span class="stab-sub">Change password, recent logins</span>
+            </span>
+        </button>
+        <button class="settings-tab" data-tab="data">
             <span class="stab-text">
                 <span class="stab-title">Data Privacy</span>
                 <span class="stab-sub">Anonymization, roles, agreements</span>
@@ -33,7 +39,41 @@
 
     <div class="settings-content-panel">
 
-        <div class="settings-pane active" id="pane-data">
+        <div class="settings-pane active" id="pane-password">
+            <div class="settings-section">
+                <div class="section-label">Change Password</div>
+                <form method="POST" action="{{ url_for('admin.change_password') }}">
+                    <div class="settings-form-grid" style="max-width: 480px;">
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label class="form-label" for="adminPwCurrent">Current Password</label>
+                            <div class="pw-field-wrap">
+                                <input class="form-input" type="password" id="adminPwCurrent" name="current_password" placeholder="••••••••" autocomplete="current-password" required>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="adminPwNew">New Password</label>
+                            <div class="pw-field-wrap">
+                                <input class="form-input" type="password" id="adminPwNew" name="new_password" placeholder="At least 12 characters" autocomplete="new-password" required>
+                            </div>
+                            <div class="pw-strength-bar" id="adminPwStrengthBar"><div class="pw-strength-fill" id="adminPwStrengthFill"></div></div>
+                            <span class="pw-strength-label" id="adminPwStrengthLabel"></span>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="adminPwConfirm">Confirm New Password</label>
+                            <div class="pw-field-wrap">
+                                <input class="form-input" type="password" id="adminPwConfirm" name="confirm_password" placeholder="Re-enter new password" autocomplete="new-password" required>
+                            </div>
+                            <span class="form-hint" id="adminPwMatchHint"></span>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn-save">Update Password</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="settings-pane" id="pane-data">
 
             <div class="settings-section">
                 <div class="section-label">Data Privacy Controls</div>

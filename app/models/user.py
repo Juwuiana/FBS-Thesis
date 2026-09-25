@@ -162,6 +162,24 @@ def update_last_login(user_id):
     db.commit()
 
 
+def update_password(user_id, password_hash):
+    db = get_db()
+    db.execute(
+        "UPDATE users SET password_hash = ? WHERE id = ?",
+        (password_hash, user_id),
+    )
+    db.commit()
+
+
+def update_avatar(user_id, filename):
+    db = get_db()
+    db.execute(
+        "UPDATE users SET avatar_filename = ? WHERE id = ?",
+        (filename, user_id),
+    )
+    db.commit()
+
+
 def get_staff_records():
     """Return user records in the shape expected by the Data Management table."""
     db = get_db()

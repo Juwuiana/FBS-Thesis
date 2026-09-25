@@ -691,6 +691,20 @@ def update_session_timeout():
     return redirect(url_for("admin.privacy_security"))
 
 
+@admin_bp.route("/privacy-security/change-password", methods=["POST"])
+@login_required
+def change_password():
+    errors = auth_controller.change_own_password(session["user_id"], request.form)
+    if errors:
+        for message in errors:
+            flash(message, "error")
+        return redirect(url_for("admin.privacy_security"))
+
+    _audit_event("Password changed", "Warning")
+    flash("Password changed successfully.", "success")
+    return redirect(url_for("admin.privacy_security"))
+
+
 @admin_bp.route("/green-computing")
 @role_required("medical_officer")
 def green_computing():

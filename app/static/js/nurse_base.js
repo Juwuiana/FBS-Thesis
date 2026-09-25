@@ -42,8 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const userDropdown    = document.getElementById('userDropdown');
     const userMenuCaret   = document.getElementById('userMenuCaret');
     const avatarFileInput = document.getElementById('avatarFileInput');
-    const avatarPreview   = document.getElementById('userAvatarPreview');
-    const avatarFallback  = document.getElementById('userAvatarFallback');
+    const avatarUploadForm = document.getElementById('avatarUploadForm');
 
     function openUserMenu() {
         userDropdown.classList.add('open');
@@ -69,31 +68,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Profile photo di ko pa na coconnect 
-    const AVATAR_KEY = 'nurseAvatarDataUrl';
-
-    function applyAvatar(dataUrl) {
-        if (!dataUrl) return;
-        avatarPreview.src = dataUrl;
-        avatarPreview.style.display = 'block';
-        avatarFallback.style.display = 'none';
-    }
-
-    const savedAvatar = localStorage.getItem(AVATAR_KEY);
-    if (savedAvatar) applyAvatar(savedAvatar);
-
     if (avatarFileInput) {
         avatarFileInput.addEventListener('change', () => {
-            const file = avatarFileInput.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = e => {
-                const dataUrl = e.target.result;
-                localStorage.setItem(AVATAR_KEY, dataUrl);
-                applyAvatar(dataUrl);
-                closeUserMenu();
-            };
-            reader.readAsDataURL(file);
+            if (avatarFileInput.files.length) avatarUploadForm.submit();
         });
     }
 

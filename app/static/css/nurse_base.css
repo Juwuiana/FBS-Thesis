@@ -35,6 +35,10 @@ body { display: flex; min-height: 100vh; background: var(--bg); color: var(--t1)
 .nav-item:active { background: rgba(0,0,0,0.25); }
 .nav-item.active:hover { background: var(--g-mid); } 
 .user-avatar  { width: 34px; height: 34px; background: #aaa; border-radius: 50%; flex-shrink: 0; }
+.app-flash-messages { position: fixed; top: 1rem; right: 1rem; z-index: 300; width: min(360px, calc(100vw - 2rem)); }
+.app-flash { padding: 0.7rem 1rem; margin-bottom: 0.5rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; box-shadow: 0 3px 12px rgba(0,0,0,.12); }
+.app-flash-success { background: var(--g-light); color: var(--g-dark); border: 1px solid var(--g-accent); }
+.app-flash-error { background: var(--danger-bg); color: var(--danger); border: 1px solid var(--danger); }
 
 
 .main-wrapper  { flex: 1; margin-left: var(--sidebar-w); padding: 2rem 2.5rem; min-width: 0; }

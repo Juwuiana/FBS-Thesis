@@ -9,25 +9,36 @@
 {% block extra_css %}{% endblock %}
 </head>
 <body>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="app-flash-messages">
+                {% for category, message in messages %}
+                    <div class="app-flash app-flash-{{ category }}" role="status">{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
     <div class="mobile-overlay" id="mobileOverlay"></div>
     <aside class="sidebar" id="sidebar">
         <div class="user-menu-wrapper">
             <div class="sidebar-user" id="userMenuToggle" role="button" tabindex="0" title="Account options">
                 <div class="user-avatar-wrap">
-                    <img id="userAvatarPreview" src="" alt="" style="display:none; width:38px; height:38px; border-radius:50%; object-fit:cover;">
-                    <div class="user-avatar" id="userAvatarFallback"></div>
+                    <img id="userAvatarPreview" src="{{ url_for('static', filename='uploads/avatars/' + current_user_avatar) if current_user_avatar else '' }}" alt="User avatar" style="{{ 'display:block;' if current_user_avatar else 'display:none;' }} width:38px; height:38px; border-radius:50%; object-fit:cover;">
+                    <div class="user-avatar" id="userAvatarFallback" style="{{ 'display:none;' if current_user_avatar else '' }}"></div>
                 </div>
                 <div style="flex:1; min-width:0;">
-                    <div style="font-weight:700; font-size:0.85rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ current_user.name if current_user else 'Health Officer' }}</div>
-                    <div style="font-size:0.75rem; opacity:0.7;">{{ current_user.facility_display if current_user else 'LHU Santa Rosa' }}</div>
+                    <div style="font-weight:700; font-size:0.85rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ signed_in_user_name or 'Health Officer' }}</div>
+                    <div style="font-size:0.75rem; opacity:0.7;">{{ signed_in_user_name or 'LHU Santa Rosa' }}</div>
                 </div>
                 <span class="user-menu-caret" id="userMenuCaret">▲</span>
             </div>
             <div class="user-dropdown" id="userDropdown">
-                <label class="user-dropdown-item" for="avatarFileInput">
-                    Change Photo
-                    <input type="file" id="avatarFileInput" accept="image/*" style="display:none;">
-                </label>
+                <form id="avatarUploadForm" method="POST" action="{{ url_for('auth.upload_avatar') }}" enctype="multipart/form-data">
+                    <label class="user-dropdown-item" for="avatarFileInput">
+                        Change Photo
+                        <input type="file" id="avatarFileInput" name="avatar" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" style="display:none;">
+                    </label>
+                </form>
             </div>
         </div>
 

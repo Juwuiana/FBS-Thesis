@@ -55,6 +55,10 @@ body {
 .topbar { background: #fff; border-bottom: 1px solid var(--border-color); padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 50; }
 .topbar-title { font-size: 20px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 10px; }
 .page-content { padding: 24px; flex: 1; min-width: 0; }
+.app-flash-messages { position: fixed; top: 14px; right: 24px; z-index: 300; width: min(360px, calc(100vw - 32px)); }
+.app-flash { padding: 10px 14px; margin-bottom: 8px; border-radius: 6px; font-size: 13px; font-weight: 600; box-shadow: 0 3px 12px rgba(0,0,0,.12); }
+.app-flash-success { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; }
+.app-flash-error { background: #ffebee; color: #c62828; border: 1px solid #ef9a9a; }
 .chart-wrap { position: relative; width: 100%; min-height: 0; }
 canvas { max-width: 100% !important; }
 

@@ -14,28 +14,37 @@
 </head>
 <body data-session-timeout-minutes="{{ session_timeout_minutes | default(30) }}" data-logout-url="{{ url_for('auth.logout') }}">
 
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="app-flash-messages">
+        {% for category, message in messages %}
+          <div class="app-flash app-flash-{{ category }}" role="status">{{ message }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
   <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
   <nav class="sidebar" id="sidebar">
     <div class="sidebar-footer" id="userMenuToggle" role="button" tabindex="0" title="Account options">
       <div class="user-avatar-wrap">
-        <img id="userAvatarPreview" src="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' fill='%234caf50'/%3E%3Ctext x='20' y='26' font-size='16' text-anchor='middle' fill='white' font-family='sans-serif'%3EHO%3C/text%3E%3C/svg%3E" alt="User avatar" />
+        <img id="userAvatarPreview" src="{{ url_for('static', filename='uploads/avatars/' + current_user_avatar) if current_user_avatar else 'data:image/svg+xml;utf8,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 40 40\'%3E%3Crect width=\'40\' height=\'40\' fill=\'%234caf50\'/%3E%3Ctext x=\'20\' y=\'26\' font-size=\'16\' text-anchor=\'middle\' fill=\'white\' font-family=\'sans-serif\'%3EHO%3C/text%3E%3C/svg%3E' }}" alt="User avatar" />
       </div>
       <div class="sidebar-footer-text">
         <div class="sidebar-footer-name">Health Officer</div>
-        <div class="sidebar-footer-role">LHU Santa Rosa</div>
+        <div class="sidebar-footer-role">{{ signed_in_user_name or "LHU Santa Rosa" }}</div>
       </div>
       <span class="user-menu-caret" id="userMenuCaret">▲</span>
     </div>
 
     <div class="user-dropdown" id="userDropdown">
-      <label class="user-dropdown-item" for="avatarFileInput">
-        Change Profile Photo
-        <input type="file" id="avatarFileInput" accept="image/*" style="display:none;">
-      </label>
-      <a href="#" class="user-dropdown-item">
-        Change Password
-      </a>
+      <form id="avatarUploadForm" method="POST" action="{{ url_for('auth.upload_avatar') }}" enctype="multipart/form-data">
+        <label class="user-dropdown-item" for="avatarFileInput">
+          Change Profile Photo
+          <input type="file" id="avatarFileInput" name="avatar" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" style="display:none;">
+        </label>
+      </form>
     </div>
 
     <div class="sidebar-nav">
@@ -94,7 +103,7 @@
       const userDropdown    = document.getElementById('userDropdown');
       const userMenuCaret   = document.getElementById('userMenuCaret');
       const avatarFileInput = document.getElementById('avatarFileInput');
-      const avatarPreview   = document.getElementById('userAvatarPreview');
+      const avatarUploadForm = document.getElementById('avatarUploadForm');
 
       function openUserMenu() {
         userDropdown.classList.add('open');
@@ -120,23 +129,9 @@
         }
       });
 
-      const AVATAR_KEY = 'adminAvatarDataUrl';
-
-      const savedAvatar = localStorage.getItem(AVATAR_KEY);
-      if (savedAvatar) avatarPreview.src = savedAvatar;
-
       if (avatarFileInput) {
         avatarFileInput.addEventListener('change', () => {
-          const file = avatarFileInput.files[0];
-          if (!file) return;
-          const reader = new FileReader();
-          reader.onload = e => {
-            const dataUrl = e.target.result;
-            localStorage.setItem(AVATAR_KEY, dataUrl);
-            avatarPreview.src = dataUrl;
-            closeUserMenu();
-          };
-          reader.readAsDataURL(file);
+          if (avatarFileInput.files.length) avatarUploadForm.submit();
         });
       }
     });

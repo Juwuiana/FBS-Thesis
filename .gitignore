@@ -17,6 +17,10 @@ __pycache__/
 *.db
 instance/
 
+# Uploaded profile photos are runtime data; keep only the directory marker.
+app/static/uploads/avatars/*
+!app/static/uploads/avatars/.gitkeep
+
 # VS Code settings / OS files
 .vscode/
 .DS_Store

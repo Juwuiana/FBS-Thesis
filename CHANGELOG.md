@@ -1,6 +1,9 @@
 # Staff password recovery
 
 - **Fixed:** standardized staff facility codes and labels on `LHU I`/`LHU II`, including repair of existing accounts saved with the old codes.
+- **Added:** functional admin and nurse password changes with shared validation, password hashing, and `Password changed` audit events.
+- **Fixed:** admin and nurse flash messages are now visible after redirected actions.
+- **Added:** persistent per-account avatar uploads with size/type validation, stored filenames, and migration `0022_add_user_avatar_filename.sql`.
 
 - **Added:** staff-account password recovery for `health_worker` and `medical_officer` accounts, including anti-enumeration email handling, administrator reset, one-time temporary passwords, and audit events.
 - **Added:** migration `0020_add_recovery_status.sql`, which widens `users.status` with the `recovery` value while preserving existing accounts and the email index.

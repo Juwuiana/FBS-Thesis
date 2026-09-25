@@ -1,10 +1,10 @@
-from flask import Blueprint, render_template, request, jsonify, abort, redirect, url_for, Response, current_app, session
+from flask import Blueprint, render_template, request, jsonify, abort, redirect, url_for, Response, current_app, session, flash
 from app.models import patient_model, visit_model, lab_model, lookup_model, health_analytics_model, audit_model
 from app.db import get_db
-from app.controllers import metrics_controller
+from app.controllers import auth_controller, metrics_controller
 from datetime import date as date_cls
 from app.rate_limit import rate_limit
-from app.controllers import metrics_controller, patient_auth_controller
+from app.controllers import patient_auth_controller
 
 
 nurse_bp = Blueprint('nurse', __name__)
@@ -345,6 +345,19 @@ def nurse_privacy_security():
         audit_logs=audit_logs,
         active_page='privacy',
     )
+
+
+@nurse_bp.route('/nurse_privacy_security/change-password', methods=['POST'])
+def nurse_change_password():
+    errors = auth_controller.change_own_password(session["user_id"], request.form)
+    if errors:
+        for message in errors:
+            flash(message, "error")
+        return redirect(url_for('nurse.nurse_privacy_security'))
+
+    _audit_event("Password changed", "Warning")
+    flash("Password changed successfully.", "success")
+    return redirect(url_for('nurse.nurse_privacy_security'))
 
 
 @nurse_bp.route('/nurse_patient/<patient_id>/delete', methods=['POST'])
