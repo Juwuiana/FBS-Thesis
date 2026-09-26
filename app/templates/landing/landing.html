@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+    <title>FBS-Based Diabetes Prediction System — Welcome</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/landing.css') }}">
+</head>
+<body class="landing-stage" id="landingStage">
+
+    <div class="dark-intro-curtain" id="darkCurtain"></div>
+
+    <div class="circle circle-1"></div>
+    <div class="circle circle-2"></div>
+    <div class="circle circle-3"></div>
+    <div class="circle circle-4"></div>
+
+    <header class="top-nav reveal-item">
+        <div class="nav-actions">
+            <a href="{{ url_for('patient.patient_login') }}" class="nav-link-btn">Patient Portal</a>
+            <a href="{{ url_for('auth.login') }}" class="nav-btn-primary">Staff Sign In</a>
+        </div>
+    </header>
+
+    <main class="landing-viewport">
+        <section class="left-hero-col reveal-item">
+            <div class="badge-pill">
+                Clinical Decision Support
+            </div>
+
+            <h1 class="landing-heading">
+                Fasting Blood Sugar<br>
+                <span class="heading-highlight">Diabetes Risk Prediction</span>
+            </h1>
+
+            <p class="landing-description">
+                An edge-deployable, green machine learning framework empowering Local Health Units with real-time glycemic screening, community analytics and personalized risk insights.
+            </p>
+
+            <!-- ECG Heartbeat Strip -->
+            <div class="ecg-strip-card">
+                <div class="ecg-status-row">
+                    <span><i class="fas fa-heart-pulse heartbeat-icon"></i> Metabolic Pulse Monitor</span>
+                    <span>72 BPM · Baseline Normal</span>
+                </div>
+                <div class="ecg-track-box">
+                      <svg viewBox="0 0 1000 32" class="ecg-svg" preserveAspectRatio="none">
+                        <polyline
+                            class="ecg-line"
+                            points="0,16 70,16 82,6 94,26 106,2 118,20 130,16 240,16 252,6 264,26 276,2 288,20 300,16 410,16 422,6 434,26 446,2 458,20 470,16 500,16 570,16 582,6 594,26 606,2 618,20 630,16 740,16 752,6 764,26 776,2 788,20 800,16 910,16 922,6 934,26 946,2 958,20 970,16 1000,16"
+                        />
+                    </svg>
+                </div>
+            </div>
+        </section>
+
+        <section class="right-device-col">
+            <div class="glucometer-unit gluco-intro" id="glucoUnit">
+                <div class="gluco-strip">
+                    <div class="strip-channel">
+                        <div class="micro-sample-pip"></div>
+                    </div>
+                </div>
+                
+                <div class="gluco-case">
+                    <div class="gluco-lcd">
+                        <div class="lcd-header">
+                            <span><i class="fas fa-clock"></i> FASTING 8H</span>
+                            <span><i class="fas fa-battery-three-quarters"></i> READY</span>
+                        </div>
+                        <div class="lcd-readout">
+                            <span class="lcd-number" id="fbsValue">92</span>
+                            <span class="lcd-units">mg/dL</span>
+                        </div>
+                        <div class="lcd-badge badge-normal" id="statusBadge">
+                            <i class="fas fa-check-circle" id="statusIcon"></i>
+                            <span id="statusLabel">Normal Glycemia (< 100)</span>
+                        </div>
+                    </div>
+
+                    <div class="gluco-keypad">
+                        <div class="gluco-key">M</div>
+                        <div class="gluco-key gluco-key-main"><i class="fas fa-power-off"></i></div>
+                        <div class="gluco-key">C</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const curtain = document.getElementById('darkCurtain');
+            const stage = document.getElementById('landingStage');
+            const gluco = document.getElementById('glucoUnit');
+
+            const HOLD_MS = 1100;
+
+            function settleGlucometer() {
+                if (!gluco || stage.classList.contains('is-revealed')) return;
+                if (document.startViewTransition) {
+                    document.startViewTransition(() => gluco.classList.remove('gluco-intro'));
+                } else {
+                    gluco.classList.remove('gluco-intro');
+                }
+            }
+            const settleTimer = setTimeout(settleGlucometer, HOLD_MS);
+
+            function skipIntro() {
+                if (stage.classList.contains('is-revealed')) return;
+                stage.classList.add('is-revealed');
+                clearTimeout(settleTimer);
+
+                curtain.style.animation = 'none';
+                curtain.style.opacity = '0';
+                curtain.style.pointerEvents = 'none';
+
+                if (gluco) {
+                    gluco.style.transition = 'none';
+                    gluco.classList.remove('gluco-intro');
+                }
+
+                document.querySelectorAll('.reveal-item').forEach((el) => {
+                    el.style.animation = 'none';
+                    el.style.opacity = '1';
+                    el.style.transform = 'none';
+                });
+            }
+            document.body.addEventListener('click', skipIntro);
+
+            // Glucometer dynamic clinical readings loop
+            const readings = [
+                { val: 92, text: "Normal Glycemia (< 100)", cls: "badge-normal", icon: "fa-check-circle" },
+                { val: 114, text: "Prediabetes Risk (100–125)", cls: "badge-warning", icon: "fa-triangle-exclamation" },
+                { val: 142, text: "Diabetic Risk (≥ 126)", cls: "badge-danger", icon: "fa-circle-exclamation" }
+            ];
+
+            let idx = 0;
+            const fbsValue = document.getElementById('fbsValue');
+            const statusBadge = document.getElementById('statusBadge');
+            const statusLabel = document.getElementById('statusLabel');
+            const statusIcon = document.getElementById('statusIcon');
+
+            setInterval(() => {
+                idx = (idx + 1) % readings.length;
+                const r = readings[idx];
+                fbsValue.textContent = r.val;
+                statusLabel.textContent = r.text;
+                statusBadge.className = `lcd-badge ${r.cls}`;
+                statusIcon.className = `fas ${r.icon}`;
+            }, 3400);
+        });
+    </script>
+</body>
+</html>

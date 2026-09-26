@@ -73,8 +73,7 @@ def require_role_for_blueprint(bp, *roles):
 def index():
     if "user_id" in session:
         return redirect(_home_for_role(session.get("user_role")))
-    return redirect(url_for("auth.login"))
-
+    return render_template("landing/landing.html")
 
 @auth_bp.route("/login", methods=["GET", "POST"])
 def login():
