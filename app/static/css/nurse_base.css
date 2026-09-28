@@ -197,6 +197,27 @@ textarea.field-input   { height: auto; padding: 0.625rem 0.875rem; resize: verti
     .action-bar { flex-direction: column-reverse; }
     .action-bar .btn { width: 100%; }
 }
+/* Header action buttons (Data Management: Recalculate + Recycle Bin).
+   Uses .page-header rather than .topbar because .topbar is hidden on phones. */
+.header-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.header-actions form { margin: 0; }
+.header-actions .btn { text-align: center; justify-content: center; }
+.recycle-btn svg { margin-right: 0.45rem; flex-shrink: 0; }
+@media (max-width: 768px) {
+    .header-actions { width: 100%; flex-direction: column; }
+    .header-actions form, .header-actions .btn { width: 100%; }
+
+    /* Phones: Recycle Bin becomes a trash icon button pinned to the top-right of the header */
+    .dm-header { position: relative; }
+    .dm-header > div:first-child { padding-right: 3.5rem; }
+    .header-actions .recycle-btn {
+        position: absolute; top: 0; right: 0;
+        width: 44px; height: 44px; padding: 0;
+    }
+    .recycle-btn .recycle-label { display: none; }
+    .recycle-btn svg { margin-right: 0; width: 20px; height: 20px; }
+}
+
 .user-menu-wrapper {
     position: relative;
 }

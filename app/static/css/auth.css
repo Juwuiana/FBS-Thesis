@@ -611,39 +611,62 @@
             }
 
         @media (max-width: 768px) {
-            body { flex-direction: column; } 
-            
-            .right-panel { 
-                order: 1; 
-                padding: 2rem 1.5rem; 
+            /* The desktop layout locks the page to one screen (100vh + overflow hidden).
+               On phones let the page grow and scroll instead. */
+            html, body { height: auto; }
+            body {
+                flex-direction: column;
+                height: auto;
+                min-height: 100vh;
+                min-height: 100dvh;
+                overflow-x: hidden;
+                overflow-y: auto;
             }
 
-            .left-panel { 
-                order: 2;
-                width: 100%; 
-                
-                position: relative; 
-                height: auto;       
-                
-                min-height: auto; 
-                padding: 2rem 1.5rem 3.5rem 1.5rem; 
+            /* Form first, only as tall as its content */
+            .right-panel {
+                order: 1;
+                flex: none;
+                height: auto;
+                overflow-y: visible;
+                padding: 1.25rem 1.25rem 1rem;
             }
-            
-            .brand-title { font-size: 1.6rem; }
+            .form-container { flex: none; justify-content: flex-start; padding: 0.5rem 0; }
+            .signup-container { max-width: none; }
+            .form-header { margin-bottom: 1.1rem; }
+            .form-title { font-size: 1.3rem; }
+            .form-divider { margin-top: 0.75rem; }
+            .field-group { margin-bottom: 0.9rem; }
+            .field-input { font-size: 16px; padding: 0.7rem 0.875rem; } /* 16px stops iOS zooming on focus */
+            .btn-signin { margin-top: 1rem; padding: 0.85rem; font-size: 1rem; }
+            .security-notice { margin-top: 1rem; }
+            .right-footer { margin-top: 1rem; }
+
+            /* Branding: a short strip below the form, not a full screen */
+            .left-panel {
+                order: 2;
+                flex: 1 0 auto;
+                width: 100%;
+                position: relative;
+                height: auto;
+                min-height: auto;
+                padding: 1.5rem 1.25rem 3rem;
+            }
+            .brand-icon { width: 36px; height: 36px; margin-bottom: 1rem; }
+            .brand-title { font-size: 1.4rem; }
+            .brand-subtitle { margin-bottom: 1rem; }
+            .brand-divider { margin-bottom: 0; }
+            .brand-description { display: none; }
+            .left-steps { margin-top: 1.25rem; gap: 0.75rem; }
+            .left-bottom { bottom: 1rem; }
             .circle-1 { width: 180px; height: 180px; top: -50px; left: -50px; }
             .circle-5 { display: none; }
-            
-            .left-bottom {
-                bottom: 1rem;
-            }
 
             .form-row {
-                grid-template-columns: 1fr; 
-                gap: 0; 
+                grid-template-columns: 1fr;
+                gap: 0;
             }
             .stepper-horizontal {
-                display: none; 
+                display: none;
             }
-
-          
         }

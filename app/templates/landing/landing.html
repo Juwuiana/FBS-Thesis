@@ -38,7 +38,7 @@
             </h1>
 
             <p class="landing-description">
-                An edge-deployable, green machine learning framework empowering Local Health Units with real-time glycemic screening, community analytics and personalized risk insights.
+                An edge-deployable, green machine learning framework empowering Local Health Units with real-time glycemic screening and community analytics.
             </p>
 
             <!-- ECG Heartbeat Strip -->
@@ -102,7 +102,10 @@
 
             function settleGlucometer() {
                 if (!gluco || stage.classList.contains('is-revealed')) return;
-                if (document.startViewTransition) {
+                // Skip the view transition on phones: combined with the fixed intro
+                // position it renders clipped in iOS Safari.
+                const isPhone = window.matchMedia('(max-width: 860px)').matches;
+                if (document.startViewTransition && !isPhone) {
                     document.startViewTransition(() => gluco.classList.remove('gluco-intro'));
                 } else {
                     gluco.classList.remove('gluco-intro');
