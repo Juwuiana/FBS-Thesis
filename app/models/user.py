@@ -10,6 +10,7 @@ import sqlite3
 
 from app.db import get_db
 from app.constants import BARANGAYS
+from app.models import lookup_model
 
 
 def display_role_from_db(role):
@@ -49,6 +50,20 @@ def display_barangay_from_db(barangay):
     return labels.get(
         (barangay or "").lower(), (barangay or "Unknown Barangay").title()
     )
+
+
+def display_staff_barangay(user_row):
+    """
+    Prefer the linked barangays row (users.barangay_id, added in 0026,
+    resolved via the PSGC region/city/barangay cascade). Falls back to the
+    legacy free-text slug only for rows that predate that column.
+    """
+    barangay_id = user_row["barangay_id"] if "barangay_id" in user_row.keys() else None
+    if barangay_id:
+        name = lookup_model.get_barangay_name_by_id(barangay_id)
+        if name:
+            return name
+    return display_barangay_from_db(user_row["barangay"])
 
 
 def display_status_from_db(status):
@@ -94,10 +109,10 @@ def create_user(data, password_hash, status="pending"):
         """
         INSERT INTO users (
             first_name, middle_name, last_name, birthday, sex,
-            email, phone, role, facility, barangay,
+            email, phone, role, facility, barangay, barangay_id,
             password_hash, status
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             data["first_name"],
@@ -109,7 +124,8 @@ def create_user(data, password_hash, status="pending"):
             data["phone"],
             data["role"],
             data["facility"],
-            data["barangay"],
+            data.get("barangay"),
+            data.get("barangay_id"),
             password_hash,
             status,
         ),
@@ -127,10 +143,10 @@ def create_users_bulk(rows):
                 """
                 INSERT INTO users (
                     first_name, middle_name, last_name, birthday, sex,
-                    email, phone, role, facility, barangay,
+                    email, phone, role, facility, barangay, barangay_id,
                     password_hash, status
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     row["first_name"],
@@ -142,7 +158,8 @@ def create_users_bulk(rows):
                     row["phone"],
                     row["role"],
                     row["facility"],
-                    row["barangay"],
+                    row.get("barangay"),
+                    row.get("barangay_id"),
                     row["password_hash"],
                     "approved",
                 ),
@@ -251,7 +268,7 @@ def get_employee_by_id(employee_id):
         "email": user["email"],
         "role": display_role_from_db(user["role"]),
         "station": display_facility_from_db(user["facility"]),
-        "barangay": display_barangay_from_db(user["barangay"]),
+        "barangay": display_staff_barangay(user),
         "contact": user["phone"],
         "status": display_status_from_db(user["status"]),
         "date_added": user["created_at"],

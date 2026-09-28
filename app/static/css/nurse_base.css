@@ -56,9 +56,10 @@ body { display: flex; min-height: 100vh; background: var(--bg); color: var(--t1)
 .page-title    { font-size: clamp(1.1rem, 2.2vw, 1.25rem); font-weight: 700; }
 .page-subtitle, .breadcrumbs { font-size: 0.78rem; color: var(--t3); margin-top: 0.2rem; }
 
-.form-card   { background: var(--white); border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: var(--gap); overflow: hidden; }
-.card-header { background: var(--g-header); padding: 0.875rem 1.25rem; font-size: 0.72rem; font-weight: 700; color: var(--t3); border-bottom: 1px solid var(--border); border-top: 3px solid var(--g-accent); text-transform: uppercase; letter-spacing: 0.06em; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
-.card-body   { padding: 1.5rem; }
+.form-card   { background: var(--white); border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: var(--gap); overflow: visible; }
+.card-header { background: var(--g-header); padding: 0.875rem 1.25rem; font-size: 0.72rem; font-weight: 700; color: var(--t3); border-bottom: 1px solid var(--border); border-top: 3px solid var(--g-accent); border-radius: var(--radius) var(--radius) 0 0; text-transform: uppercase; letter-spacing: 0.06em; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
+.card-body   { padding: 1.5rem; border-radius: 0 0 var(--radius) var(--radius); }
+.card-header.section-toggle.collapsed { border-radius: var(--radius); }
 
 .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: var(--gap); }
 .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: var(--gap); }
@@ -340,4 +341,133 @@ textarea.field-input   { height: auto; padding: 0.625rem 0.875rem; resize: verti
         padding: 0.1rem 0.5rem 0.1rem 0 !important;
         font-size: 0.7rem !important;
     }
+}
+/* ---- Collapsible section headers (intake form accordion) ---- */
+.card-header.section-toggle { cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; }
+.card-header.section-toggle:hover { background: #e7f2e9; }
+.section-toggle-icon { font-size: 0.7rem; transition: transform 0.2s; margin-left: 0.5rem; flex-shrink: 0; }
+.card-header.section-toggle.collapsed .section-toggle-icon { transform: rotate(-90deg); }
+.card-body.collapsible { overflow: hidden; }
+.card-body.collapsible.collapsed { display: none; }
+
+/* ---- Required field marker ---- */
+.field-label .required-mark { color: var(--danger); margin-left: 0.2rem; font-weight: 700; }
+
+/* ---- Hover tooltip ---- */
+.field-tooltip {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 14px; height: 14px; border-radius: 50%;
+    background: var(--border); color: var(--t2);
+    font-size: 0.65rem; font-weight: 700; line-height: 1;
+    cursor: help; margin-left: 0.35rem; position: relative; flex-shrink: 0;
+}
+.field-tooltip::after {
+    content: attr(data-tip);
+    position: absolute; bottom: 130%; left: 50%; transform: translateX(-50%);
+    background: var(--t1); color: #fff;
+    padding: 0.45rem 0.65rem; border-radius: 6px;
+    font-size: 0.7rem; font-weight: 400; text-transform: none; letter-spacing: normal;
+    white-space: normal; width: 210px; line-height: 1.4;
+    opacity: 0; visibility: hidden; pointer-events: none;
+    transition: opacity 0.15s ease; z-index: 1200;
+}
+.field-tooltip::before {
+    content: ""; position: absolute; bottom: 118%; left: 50%; transform: translateX(-50%);
+    border: 5px solid transparent; border-top-color: var(--t1);
+    opacity: 0; visibility: hidden; transition: opacity 0.15s ease; z-index: 1200;
+}
+.field-tooltip:hover::after, .field-tooltip:hover::before { opacity: 1; visibility: visible; }
+.field-label { display: flex; align-items: center; }
+
+/* ---- Address cascade loading state ---- */
+.field-input.field-loading { color: var(--text-muted, var(--t2)); font-style: italic; }
+
+
+/* ==========================================================================
+   Health Results page (.hr-page) -- risk colours mean risk and nothing else
+   ========================================================================== */
+.hr-page { --risk-low: #27ae60; --risk-mod: #f59e0b; --risk-high: #ef4444; }
+.hr-muted { color: var(--t3); font-weight: 400; }
+.hr-sub   { font-size: 0.75rem; color: var(--t3); margin-top: 0.15rem; }
+.hr-note  { font-size: 0.75rem; color: var(--t3); margin: 0.6rem 0 0; line-height: 1.45; }
+.hr-empty { padding: 1rem; font-size: 0.8rem; color: var(--t3); text-align: center; }
+.hr-footnote { margin: 0.5rem 0 var(--gap); }
+.hr-print-only { display: none; }
+
+.hr-headline { font-size: clamp(1.05rem, 2.4vw, 1.4rem); font-weight: 500; line-height: 1.4; max-width: 46rem; margin: 0.25rem auto 0; text-align: center; }
+.hr-headline b { font-weight: 800; }
+.hr-headline .is-alert { color: var(--danger); }
+
+.hr-ribbon { display: flex; height: 14px; border-radius: 999px; overflow: hidden; background: var(--border); margin: 1rem auto 0.6rem; max-width: 46rem; }
+.hr-ribbon > span { display: block; flex-basis: 0; min-width: 4px; }
+.hr-ribbon .low, .dot.low   { background: var(--risk-low); }
+.hr-ribbon .mod, .dot.mod   { background: var(--risk-mod); }
+.hr-ribbon .high, .dot.high { background: var(--risk-high); }
+.hr-ribbon-legend { display: flex; gap: 1.25rem; flex-wrap: wrap; justify-content: center; font-size: 0.8rem; }
+
+/* The one moment of motion on the page: the risk ribbon draws in once. Skipped when the device asks for reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+    .hr-ribbon { animation: hr-ribbon-in 0.6s ease-out both; }
+}
+@keyframes hr-ribbon-in {
+    from { clip-path: inset(0 100% 0 0 round 999px); }
+    to   { clip-path: inset(0 0 0 0 round 999px); }
+}
+.hr-ribbon-legend .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 0.4rem; }
+
+.hr-tabs { display: flex; gap: 0.25rem; border-bottom: 1px solid var(--border); margin: 1.25rem 0 var(--gap); overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.hr-tab { background: none; border: 0; border-bottom: 3px solid transparent; padding: 0.7rem 1rem; font: inherit; font-size: 0.85rem; font-weight: 600; color: var(--t3); cursor: pointer; white-space: nowrap; }
+.hr-tab:hover { color: var(--t1); }
+.hr-tab[aria-selected="true"] { color: var(--t1); border-bottom-color: var(--g-accent); }
+.hr-tab:focus-visible, .hr-link:focus-visible { outline: 2px solid var(--g-accent); outline-offset: -2px; }
+.hr-count { display: inline-block; min-width: 1.3rem; padding: 0 0.35rem; margin-left: 0.25rem; border-radius: 999px; background: var(--g-light); color: var(--g-dark); font-size: 0.7rem; text-align: center; }
+.hr-panel { display: none; }
+.hr-panel.is-active { display: block; }
+.hr-link { background: none; border: 0; padding: 0; font: inherit; font-size: 0.72rem; font-weight: 600; color: var(--g-accent); cursor: pointer; text-decoration: underline; }
+.hr-page .stat-card .stat-value.trend-bad { color: var(--danger); }
+.hr-page .dash-grid-bot { margin-bottom: var(--gap); }
+
+.hr-select { height: 34px; padding: 0 0.6rem; font: inherit; font-size: 0.8rem; font-weight: 500; text-transform: none; letter-spacing: normal; color: var(--t1); background: var(--white); border: 1px solid var(--border); border-radius: 6px; }
+.hr-filters { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.hr-page .card-header .btn { text-transform: none; letter-spacing: normal; height: 34px; font-size: 0.8rem; }
+
+.hr-meter-row { display: grid; grid-template-columns: minmax(7rem, min(42%, 16rem)) 1fr 3.5rem; gap: 0.75rem; align-items: center; padding: 0.6rem 0; border-bottom: 1px solid var(--border); font-size: 0.83rem; }
+.hr-meter-row:last-of-type { border-bottom: 0; }
+.hr-meter { height: 8px; border-radius: 999px; background: var(--border); overflow: hidden; }
+.hr-meter > i { display: block; height: 100%; border-radius: 999px; background: var(--g-accent); }
+.hr-meter.good > i { background: var(--risk-low); }
+.hr-meter.warn > i { background: var(--risk-mod); }
+.hr-meter.bad > i  { background: var(--risk-high); }
+.hr-meter.neutral > i { background: var(--g-mid); }
+.hr-meter-val { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.hr-scroll { overflow-x: auto; }
+.hr-scroll.tall { max-height: 380px; overflow-y: auto; }
+.hr-sticky th { position: sticky; top: 0; background: var(--white); z-index: 1; white-space: nowrap; }
+.hr-worklist .card-body, .hr-redflags .card-body { padding-top: 0.5rem; }
+.data-table tr[hidden] { display: none; }
+.hr-heat { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.hr-pill { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 999px; font-size: 0.7rem; font-weight: 600; }
+.hr-pill.overdue { background: var(--danger-bg); color: #b91c1c; }
+.hr-pill.none    { background: var(--warn-bg); color: #b45309; }
+.hr-pill.ok      { background: var(--g-light); color: var(--g-dark); }
+.hr-callout { background: var(--warn-bg); border: 1px solid #f3d98a; color: #7a4a06; border-radius: var(--radius); padding: 0.85rem 1.1rem; font-size: 0.85rem; line-height: 1.45; margin-bottom: var(--gap); }
+
+@media (max-width: 600px) {
+    .hr-meter-row { grid-template-columns: 1fr 3.2rem; }
+    .hr-meter-row .hr-meter-label { grid-column: 1 / -1; }
+}
+
+@media print {
+    .hr-tabs, .hr-noprint, .hr-worklist, .hr-redflags { display: none !important; }
+    .hr-panel { display: block !important; page-break-inside: avoid; margin-bottom: 0.75rem; }
+    .hr-page canvas { display: block !important; }
+    .hr-page .chart-container { display: block !important; }
+    .hr-print-only { display: block; }
+    .hr-audit { font-size: 0.72rem; border-bottom: 2px solid #000; padding-bottom: 0.3rem; margin-bottom: 0.6rem; }
+    .hr-signoff { display: flex !important; justify-content: space-around; margin-top: 1.5rem; font-size: 0.75rem; text-align: center; page-break-inside: avoid; }
+    .hr-signoff .rule { display: block; border-top: 1px solid #000; width: 14rem; margin: 0 auto 0.3rem; }
+    .hr-ribbon, .hr-ribbon span, .hr-meter, .hr-meter i, .hr-heat, .hr-callout { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .hr-scroll, .hr-scroll.tall { max-height: none; overflow: visible; }
 }

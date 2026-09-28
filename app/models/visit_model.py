@@ -46,6 +46,77 @@ def create_visit(patient_id: int, visit_type: str, data: dict, staff_id: int | N
         conn.close()
 
 
+_VISIT_UPDATABLE_COLUMNS = {
+    "assessment_date", "smoking_status", "alcohol_intake", "illicit_drug_use",
+    "physical_activity", "past_surgical_history", "diabetes_diagnosis",
+    "bp_systolic", "bp_diastolic", "heart_rate", "respiratory_rate",
+    "height_cm", "weight_kg", "waist_cm", "bmi", "obesity_class",
+    "pe_skin", "pe_heent", "pe_chest", "pe_heart", "pe_abdomen", "pe_extremities",
+    "menarche_age", "lmp_date", "gravida", "para", "clinical_notes", "status",
+}
+
+
+def update_visit(visit_id: int, data: dict) -> None:
+    """
+    Partial update of a visit row -- used by the Data Management "edit
+    record" flow (nurse_patient_file_view). Only columns in
+    _VISIT_UPDATABLE_COLUMNS are ever touched, and only the keys actually
+    present in `data` are updated, so callers can send just the fields
+    that changed. Deliberately excludes anything lab_screenings-owned
+    (fbs, test method, risk level, etc.) -- test results are never
+    editable from here.
+    """
+    fields = {k: v for k, v in data.items() if k in _VISIT_UPDATABLE_COLUMNS}
+    if not fields:
+        return
+    set_clause = ", ".join(f"{col} = ?" for col in fields)
+    params = list(fields.values()) + [visit_id]
+    conn = get_connection()
+    try:
+        conn.execute(f"UPDATE visits SET {set_clause} WHERE id = ?", params)
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def replace_visit_conditions(visit_id: int, category: str, codes: list[str]) -> None:
+    """
+    Like save_visit_conditions, but for editing: clears this visit's
+    existing selections in `category` first, so unchecking a box in the
+    edit form actually removes it instead of only ever adding new ones
+    (save_visit_conditions is INSERT OR IGNORE-only, meant for first-time
+    intake where there's nothing to remove).
+    """
+    conn = get_connection()
+    try:
+        conn.execute("""
+            DELETE FROM visit_conditions
+            WHERE visit_id = ? AND condition_id IN (
+                SELECT id FROM condition_catalog WHERE category = ?
+            )
+        """, (visit_id, category))
+        for code in codes or []:
+            row = conn.execute(
+                "SELECT id FROM condition_catalog WHERE category = ? AND code = ?",
+                (category, code)
+            ).fetchone()
+            if row is None:
+                raise ValueError(f"Unknown condition_catalog entry: ({category!r}, {code!r})")
+            conn.execute(
+                "INSERT OR IGNORE INTO visit_conditions (visit_id, condition_id) VALUES (?, ?)",
+                (visit_id, row["id"])
+            )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
 def save_visit_conditions(visit_id: int, category: str, codes: list[str]) -> None:
     if not codes:
         return
@@ -112,7 +183,8 @@ def list_visits_for_patient(patient_id: int) -> list[dict]:
     conn = get_connection()
     rows = conn.execute("""
         SELECT v.id AS visit_id, v.assessment_date AS date,
-               ls.fbs_mg_dl AS fbs, ls.final_risk_level AS risk
+               ls.fbs_mg_dl AS fbs,
+               COALESCE(ls.final_risk_level, ls.preliminary_risk_level) AS risk
         FROM visits v
         LEFT JOIN lab_screenings ls ON ls.visit_id = v.id
         WHERE v.patient_id = ?
@@ -120,6 +192,24 @@ def list_visits_for_patient(patient_id: int) -> list[dict]:
     """, (patient_id,)).fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+def update_clinical_notes(visit_id: int, clinical_notes: str) -> None:
+    """The screening page's Clinical Notes textarea posts to the lab-screening
+    submit route, but clinical_notes lives on the visit row — this is the
+    write path for it."""
+    conn = get_connection()
+    try:
+        conn.execute(
+            "UPDATE visits SET clinical_notes = ? WHERE id = ?",
+            (clinical_notes, visit_id),
+        )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
 
 def get_visit_by_id(visit_id: int) -> dict | None:
     conn = get_connection()

@@ -74,14 +74,30 @@
         </select>
       </div>
       <div class="col-md-6 col-12">
-        <label class="ps-field-label">Assigned Barangay</label>
-        <select class="ps-select" name="barangay" required>
-          <option value="">Select Barangay</option>
-          {% for value, label in barangays %}
-            <option value="{{ value }}" {{ 'selected' if value == form_data.barangay }}>{{ label }}</option>
-          {% endfor %}
+        <label class="ps-field-label">Region</label>
+        <select class="ps-select" id="region" required>
+          <option value="">Select Region</option>
         </select>
       </div>
+      <div class="col-md-6 col-12">
+        <label class="ps-field-label">City / Municipality</label>
+        <select class="ps-select" id="city" required disabled>
+          <option value="">Select Region first</option>
+        </select>
+      </div>
+      <div class="col-md-6 col-12">
+        <label class="ps-field-label">Assigned Barangay</label>
+        <select class="ps-select" id="barangay_select" required disabled>
+          <option value="">Select City first</option>
+        </select>
+        <input type="text" class="ps-input" id="barangay_manual" placeholder="Type barangay name" style="display:none; margin-top:0.5rem;">
+      </div>
+      <input type="hidden" id="region_code" name="region_code">
+      <input type="hidden" id="region_name" name="region_name">
+      <input type="hidden" id="city_code" name="city_code">
+      <input type="hidden" id="city_name" name="city_name">
+      <input type="hidden" id="barangay_code" name="barangay_code">
+      <input type="hidden" id="barangay_name" name="barangay_name">
       <div class="col-md-6 col-12">
         <label class="ps-field-label">Temporary Password</label>
         <input type="password" class="ps-input" name="password" minlength="12" required>
@@ -98,4 +114,36 @@
     </form>
   </div>
 </main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    window.__psgcUrl = "{{ url_for('nurse.nurse_static_data', filename='psgc_data.json') }}";
+</script>
+<script src="{{ url_for('static', filename='js/psgc_cascade.js') }}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        initPsgcCascade({
+            psgcUrl: window.__psgcUrl,
+            regionSelect: document.getElementById('region'),
+            citySelect: document.getElementById('city'),
+            barangaySelect: document.getElementById('barangay_select'),
+            barangayManual: document.getElementById('barangay_manual'),
+            hidden: {
+                regionCode: document.getElementById('region_code'),
+                regionName: document.getElementById('region_name'),
+                cityCode: document.getElementById('city_code'),
+                cityName: document.getElementById('city_name'),
+                barangayCode: document.getElementById('barangay_code'),
+                barangayName: document.getElementById('barangay_name'),
+            },
+            preselect: {
+                regionCode: "{{ form_data.region_code or '' }}",
+                cityCode: "{{ form_data.city_code or '' }}",
+                barangayCode: "{{ form_data.barangay_code or '' }}",
+                barangayName: "{{ form_data.barangay_name or '' }}",
+            },
+        });
+    });
+</script>
 {% endblock %}

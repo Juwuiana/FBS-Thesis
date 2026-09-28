@@ -6,9 +6,15 @@
         <h1 class="page-title">Data Management</h1>
         <p class="page-subtitle">Import, export, and review patient screening records</p>
     </div>
-    <a href="{{ url_for('nurse.nurse_recycle_bin') }}" class="btn btn-secondary">
-        Recycle Bin
-    </a>
+    <div style="display:flex; gap:0.5rem;">
+        <form method="POST" action="{{ url_for('nurse.nurse_data_management_recalculate_pending') }}"
+              onsubmit="return confirm('Run risk prediction on every screening that currently has no risk level? This may take a moment.');">
+            <button type="submit" class="btn btn-secondary">Recalculate Pending Risk Levels</button>
+        </form>
+        <a href="{{ url_for('nurse.nurse_recycle_bin') }}" class="btn btn-secondary">
+            Recycle Bin
+        </a>
+    </div>
 </header>
 
 <div class="hub-toggle-bar">
@@ -28,7 +34,7 @@
                     Ingest historical patient profiles from paper records converted into comma-separated text files (.csv).
                 </p>
                 <a href="{{ url_for('nurse.nurse_data_management_import_template') }}" class="btn btn-secondary" style="width:100%; margin-bottom:1.25rem; text-decoration:none; display:block; text-align:center;">
-                    Download Blank CSV Template
+                    Download Blank Template
                 </a>
                 <form id="csvImportForm" enctype="multipart/form-data" style="margin-bottom:1.25rem;">
                     <div class="field-group">
@@ -38,6 +44,15 @@
                     <button type="submit" class="btn btn-primary" style="width:100%; margin-top:0.75rem; height:42px;">
                         Process and Validate File
                     </button>
+                    <div id="csvProgress" hidden style="margin-top:0.75rem;">
+                        <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:var(--text-muted); margin-bottom:0.3rem;">
+                            <span id="csvProgressLabel">Uploading…</span><span id="csvProgressPct">0%</span>
+                        </div>
+                        <div id="csvProgressTrack" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"
+                             style="height:8px; border-radius:999px; background:#e0e8e0; overflow:hidden;">
+                            <div id="csvProgressBar" style="height:100%; width:0; background:var(--green-accent, #3a7d3a); transition:width .25s ease;"></div>
+                        </div>
+                    </div>
                     <div id="csvImportResult" style="margin-top:0.75rem; font-size:0.8rem;"></div>
                 </form>
                 <div class="accordion-item">
@@ -52,12 +67,15 @@
                                 <li class="schema-item">last_name <span>(required)</span></li>
                                 <li class="schema-item">first_name <span>(required)</span></li>
                                 <li class="schema-item">middle_name</li>
+                                <li class="schema-item">maiden_name <span>(married female patients only)</span></li>
                                 <li class="schema-item">birthdate <span>(YYYY-MM-DD, required)</span></li>
                                 <li class="schema-item">sex <span>(Male/Female, required)</span></li>
                                 <li class="schema-item">civil_status</li>
                                 <li class="schema-item">religion</li>
                                 <li class="schema-item">occupation</li>
                                 <li class="schema-item">education</li>
+                                <li class="schema-item">region</li>
+                                <li class="schema-item">city</li>
                                 <li class="schema-item">barangay</li>
                                 <li class="schema-item">address</li>
                                 <li class="schema-item">contact_number</li>
@@ -79,6 +97,13 @@
                                 <li class="schema-item">immunization <span>(; separated)</span></li>
                                 <li class="schema-item">dm_symptom <span>(; separated)</span></li>
                                 <li class="schema-item">fbs_mg_dl</li>
+                                <li class="schema-item">clinical_notes <span>(type "None" if nothing to note)</span></li>
+                                <li class="schema-item">referral_action <span>(Refer for OGTT / Refer to physician / Lifestyle counseling only)</span></li>
+                                <li class="schema-item">follow_up_date <span>(YYYY-MM-DD)</span></li>
+                                <li class="schema-item">referred_to</li>
+                                <li class="schema-item">fasted_ge_8h / identity_verified <span>(Yes/No)</span></li>
+                                <li class="schema-item">glucometer_calibrated / capillary_sample_taken <span>(Yes/No)</span></li>
+                                <li class="schema-item">consent_signed / result_recorded_within_5min <span>(Yes/No)</span></li>
                             </ul>
                         </div>
                     </div>
@@ -99,6 +124,7 @@
                     <input type="hidden" name="barangay" value="{{ request.args.get('barangay', '') }}">
                     <input type="hidden" name="risk" value="{{ request.args.get('risk', '') }}">
                     <input type="hidden" name="date" value="{{ request.args.get('date', '') }}">
+                    <input type="hidden" name="q" value="{{ request.args.get('q', '') }}">
                     <div class="field-group">
                         <label class="field-label">Export Format</label>
                         <select class="field-input" name="export_format">
@@ -127,19 +153,23 @@
 <div class="form-card" style="margin-top:1.5rem;">
     <div class="card-header">Patient Records — Filter and Manage</div>
     <div class="card-body">
-        <form method="GET" action="{{ url_for('nurse.nurse_data_management') }}">
+        <form method="GET" action="{{ url_for('nurse.nurse_data_management') }}" id="filterForm">
             <div class="filter-row">
                 <div class="field-group">
+                    <label class="field-label">Search Name</label>
+                    <input type="text" class="field-input" name="q" id="filterSearch" placeholder="Last or first name…" value="{{ request.args.get('q', '') }}">
+                </div>
+                <div class="field-group">
                     <label class="field-label">Show</label>
-                    <select class="field-input" name="entries">
-                        <option value="all">All Entries</option>
-                        <option value="25">25 per page</option>
-                        <option value="50">50 per page</option>
+                    <select class="field-input" name="entries" id="filterEntries">
+                        {% for opt in ['5','10','20','50','all'] %}
+                        <option value="{{ opt }}" {% if entries == opt %}selected{% endif %}>{{ 'All Entries' if opt == 'all' else opt ~ ' per page' }}</option>
+                        {% endfor %}
                     </select>
                 </div>
                 <div class="field-group">
                     <label class="field-label">Barangay</label>
-                    <select class="field-input" name="barangay">
+                    <select class="field-input" name="barangay" id="filterBarangay">
                         <option value="">All Barangays</option>
                         {% for b in barangays %}
                             <option value="{{ b }}" {% if request.args.get('barangay') == b %}selected{% endif %}>{{ b }}</option>
@@ -148,22 +178,26 @@
                 </div>
                 <div class="field-group">
                     <label class="field-label">Risk Level</label>
-                    <select class="field-input" name="risk">
-                        <option value="">All Levels</option>
-                        <option value="Low">Low</option>
-                        <option value="Moderate">Moderate</option>
-                        <option value="High">High</option>
+                    <select class="field-input" name="risk" id="filterRisk">
+                        <option value="" {% if not request.args.get('risk') %}selected{% endif %}>All Levels</option>
+                        <option value="Low" {% if request.args.get('risk') == 'Low' %}selected{% endif %}>Low</option>
+                        <option value="Moderate" {% if request.args.get('risk') == 'Moderate' %}selected{% endif %}>Moderate</option>
+                        <option value="High" {% if request.args.get('risk') == 'High' %}selected{% endif %}>High</option>
                     </select>
                 </div>
                 <div class="field-group">
                     <label class="field-label">Date</label>
-                    <input type="date" class="field-input" name="date" value="{{ request.args.get('date', '') }}">
+                    <input type="date" class="field-input" name="date" id="filterDate" value="{{ request.args.get('date', '') }}">
                 </div>
                 <button type="submit" class="btn btn-primary filter-btn">Apply Filter</button>
+                {% if request.args.get('q') or request.args.get('barangay') or request.args.get('risk') or request.args.get('date') %}
+                    <a href="{{ url_for('nurse.nurse_data_management') }}" class="btn btn-secondary filter-btn" style="text-decoration:none; text-align:center;">Clear Filters</a>
+                {% endif %}
             </div>
         </form>
 
         <div style="overflow-x:auto; -webkit-overflow-scrolling:touch;">
+            {% set qs = request.query_string.decode() %}
             <table class="data-table" style="min-width:600px;">
                 <thead>
                     <tr>
@@ -196,11 +230,20 @@
                                 <span style="color:var(--text-muted);">Pending</span>
                             {% endif %}
                         </td>
-                        <td>{{ p.date or "—" }}</td>
+                        <td>
+                            {{ p.date or "—" }}
+                            {% if p.visit_status == "draft" %}
+                                <a href="{{ url_for('nurse.nurse_patient_file_view', patient_id=p.patient_code, return_qs=qs) }}?edit=1"
+                                   class="risk-badge draft-continue-btn"
+                                   style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1; margin-left:0.35rem; cursor:pointer; text-decoration:none; display:inline-block;"
+                                   title="Click to continue draft">Draft</a>
+                            {% endif %}
+                        </td>
                            <td>
-                                <a href="{{ url_for('nurse.nurse_patient_file_view', patient_id=p.patient_code) }}" class="btn btn-secondary" style="padding:0.35rem 0.75rem; font-size:0.75rem;">View</a>
-                                <a href="{{ url_for('nurse.nurse_new_record', patient_id=p.patient_code) }}" class="btn btn-secondary" style="padding:0.35rem 0.75rem; font-size:0.75rem;">+ Add Record</a>
+                                <a href="{{ url_for('nurse.nurse_patient_file_view', patient_id=p.patient_code, return_qs=qs) }}" class="btn btn-secondary" style="padding:0.35rem 0.75rem; font-size:0.75rem;">View</a>
+                                <a href="{{ url_for('nurse.nurse_new_record', patient_id=p.patient_code, return_qs=qs) }}" class="btn btn-secondary" style="padding:0.35rem 0.75rem; font-size:0.75rem;">+ Add Record</a>
                                 <form method="POST" action="{{ url_for('nurse.nurse_patient_delete', patient_id=p.patient_code) }}" style="display:inline;" onsubmit="return confirm('Move {{ p.first_name }} {{ p.last_name }} to Recycle Bin? This record will be permanently deleted after 15 days unless restored.');">
+                                    <input type="hidden" name="return_qs" value="{{ qs }}">
                                     <button type="submit" class="btn btn-secondary" style="padding:0.35rem 0.75rem; font-size:0.75rem; color:#b91c1c; border-color:#fca5a5;">Delete</button>
                                 </form>
                             </td>
@@ -213,6 +256,38 @@
                 </tbody>
             </table>
         </div>
+
+        {% if total_pages > 1 %}
+        <div class="pagination-bar" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.75rem; margin-top:1rem; padding-top:1rem; border-top:1px solid var(--border);">
+            <span style="font-size:0.8rem; color:var(--text-muted);">
+                Page {{ current_page }} of {{ total_pages }} &middot; {{ total_records }} record{{ 's' if total_records != 1 else '' }}
+            </span>
+            <div style="display:flex; align-items:center; gap:0.3rem; flex-wrap:wrap;">
+                {% set base_args = request.args.to_dict() %}
+                {% if current_page > 1 %}
+                    <a href="{{ url_for('nurse.nurse_data_management', **dict(base_args, page=current_page - 1)) }}" class="btn btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.8rem; text-decoration:none;" title="Previous page">&larr;</a>
+                {% else %}
+                    <span class="btn btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.8rem; opacity:0.4; cursor:default;">&larr;</span>
+                {% endif %}
+
+                {% for p in page_numbers %}
+                    {% if p is none %}
+                        <span style="padding:0 0.35rem; color:var(--text-muted);">&hellip;</span>
+                    {% elif p == current_page %}
+                        <span class="btn btn-primary" style="padding:0.35rem 0.7rem; font-size:0.8rem; cursor:default;">{{ p }}</span>
+                    {% else %}
+                        <a href="{{ url_for('nurse.nurse_data_management', **dict(base_args, page=p)) }}" class="btn btn-secondary" style="padding:0.35rem 0.7rem; font-size:0.8rem; text-decoration:none;">{{ p }}</a>
+                    {% endif %}
+                {% endfor %}
+
+                {% if current_page < total_pages %}
+                    <a href="{{ url_for('nurse.nurse_data_management', **dict(base_args, page=current_page + 1)) }}" class="btn btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.8rem; text-decoration:none;" title="Next page">&rarr;</a>
+                {% else %}
+                    <span class="btn btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.8rem; opacity:0.4; cursor:default;">&rarr;</span>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}
@@ -220,6 +295,16 @@
 {% block scripts %}
 <script>
     window.__csvImportUrl = "{{ url_for('nurse.nurse_data_management_import') }}";
+    window.__justSaved = {{ 'true' if request.args.get('just_saved') else 'false' }};
+
+    if (window.__justSaved) {
+        alert("Screening saved.");
+        if (window.history && window.history.replaceState) {
+            var url = new URL(window.location.href);
+            url.searchParams.delete('just_saved');
+            window.history.replaceState({}, '', url);
+        }
+    }
 </script>
 <script src="{{ url_for('static', filename='js/nurse_dashboard.js') }}"></script>
 <script src="{{ url_for('static', filename='js/nurse_data_management.js') }}"></script>

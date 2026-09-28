@@ -37,9 +37,9 @@ def get_fbs_distribution() -> dict:
 def get_risk_status_distribution() -> dict:
     conn = get_connection()
     rows = conn.execute(f"""
-        SELECT COALESCE(ls.final_risk_level, ls.preliminary_risk_level, 'Pending') AS status, COUNT(*) AS n
+        SELECT COALESCE(ls.final_risk_level, ls.preliminary_risk_level, ls.model_predicted_risk_level, 'Pending') AS status, COUNT(*) AS n
         {_base_query()}
-        GROUP BY COALESCE(ls.final_risk_level, ls.preliminary_risk_level, 'Pending')
+        GROUP BY COALESCE(ls.final_risk_level, ls.preliminary_risk_level, ls.model_predicted_risk_level, 'Pending')
     """).fetchall()
     conn.close()
     return {r["status"]: r["n"] for r in rows}
@@ -90,7 +90,7 @@ def get_bp_distribution() -> dict:
             CASE
                 WHEN v.bp_systolic < 120 AND v.bp_diastolic < 80 THEN 'Normal'
                 WHEN v.bp_systolic < 130 AND v.bp_diastolic < 80 THEN 'Elevated'
-                WHEN v.bp_systolic < 140 OR v.bp_diastolic < 90 THEN 'Stage 1 Hypertension'
+                WHEN v.bp_systolic < 140 AND v.bp_diastolic < 90 THEN 'Stage 1 Hypertension'
                 ELSE 'Stage 2 Hypertension'
             END AS bucket,
             COUNT(*) AS n
@@ -167,8 +167,8 @@ def get_barangay_risk_matrix() -> dict:
     """Returns {barangay: {'Low': n, 'Moderate': n, 'High': n}} for all barangays with data."""
     conn = get_connection()
     rows = conn.execute(f"""
-        SELECT b.name AS barangay, COALESCE(ls.final_risk_level, ls.preliminary_risk_level) AS risk, COUNT(*) AS n
-        {_base_query()} AND b.name IS NOT NULL
+        SELECT b.name AS barangay, COALESCE(ls.final_risk_level, ls.preliminary_risk_level, ls.model_predicted_risk_level) AS risk, COUNT(*) AS n
+        {_base_query()} AND b.name IS NOT NULL AND LOWER(b.name) NOT LIKE 'select %'
         GROUP BY b.name, risk
     """).fetchall()
     conn.close()
@@ -183,7 +183,7 @@ def get_barangay_risk_matrix() -> dict:
 def get_risk_by_sex() -> dict:
     conn = get_connection()
     rows = conn.execute(f"""
-        SELECT p.sex, COALESCE(ls.final_risk_level, ls.preliminary_risk_level) AS risk, COUNT(*) AS n
+        SELECT p.sex, COALESCE(ls.final_risk_level, ls.preliminary_risk_level, ls.model_predicted_risk_level) AS risk, COUNT(*) AS n
         {_base_query()}
         GROUP BY p.sex, risk
     """).fetchall()
@@ -200,7 +200,7 @@ def get_risk_by_age() -> dict:
     from datetime import date
     conn = get_connection()
     rows = conn.execute(f"""
-        SELECT p.birthdate, COALESCE(ls.final_risk_level, ls.preliminary_risk_level) AS risk {_base_query()}
+        SELECT p.birthdate, COALESCE(ls.final_risk_level, ls.preliminary_risk_level, ls.model_predicted_risk_level) AS risk {_base_query()}
     """).fetchall()
     conn.close()
     buckets = {"<20": {"Low": 0, "Moderate": 0, "High": 0}, "20-29": {"Low": 0, "Moderate": 0, "High": 0},
@@ -227,8 +227,8 @@ def get_dashboard_summary() -> dict:
     row = conn.execute(f"""
         SELECT
             COUNT(*) AS total_screened,
-            SUM(CASE WHEN COALESCE(ls.final_risk_level, ls.preliminary_risk_level) IN ('Moderate','High') THEN 1 ELSE 0 END) AS at_risk,
-            SUM(CASE WHEN COALESCE(ls.final_risk_level, ls.preliminary_risk_level) = 'High' THEN 1 ELSE 0 END) AS high_risk,
+            SUM(CASE WHEN COALESCE(ls.final_risk_level, ls.preliminary_risk_level, ls.model_predicted_risk_level) IN ('Moderate','High') THEN 1 ELSE 0 END) AS at_risk,
+            SUM(CASE WHEN COALESCE(ls.final_risk_level, ls.preliminary_risk_level, ls.model_predicted_risk_level) = 'High' THEN 1 ELSE 0 END) AS high_risk,
             AVG(ls.fbs_mg_dl) AS avg_fbs
         {_base_query()} AND ls.fbs_mg_dl IS NOT NULL
     """).fetchone()
@@ -264,7 +264,7 @@ def get_top_barangays(limit: int = 8) -> dict:
     conn = get_connection()
     rows = conn.execute(f"""
         SELECT b.name AS barangay, COUNT(*) AS n
-        {_base_query()} AND b.name IS NOT NULL
+        {_base_query()} AND b.name IS NOT NULL AND LOWER(b.name) NOT LIKE 'select %'
         GROUP BY b.name
         ORDER BY n DESC
         LIMIT ?
@@ -278,7 +278,7 @@ def get_recent_registries(limit: int = 5) -> list[dict]:
     conn = get_connection()
     rows = conn.execute(f"""
         SELECT p.patient_code, p.first_name, p.last_name, p.birthdate, p.sex,
-               ls.fbs_mg_dl, COALESCE(ls.final_risk_level, ls.preliminary_risk_level) AS risk,
+               ls.fbs_mg_dl, COALESCE(ls.final_risk_level, ls.preliminary_risk_level, ls.model_predicted_risk_level) AS risk,
                v.assessment_date
         {_base_query()}
         ORDER BY v.id DESC
@@ -296,5 +296,278 @@ def get_recent_registries(limit: int = 5) -> list[dict]:
             d["age"] = today.year - b.year - ((today.month, today.day) < (b.month, b.day))
         else:
             d["age"] = None
+        result.append(d)
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Health Results page: nurse action items
+# ---------------------------------------------------------------------------
+_RISK = "COALESCE(ls.final_risk_level, ls.preliminary_risk_level, ls.model_predicted_risk_level)"
+# A referral counts as recorded if EITHER the action or the destination was filled in.
+_HAS_REFERRAL = "(COALESCE(TRIM(ls.referral_action), '') != '' OR COALESCE(TRIM(ls.referred_to), '') != '')"
+
+
+def _age_from(birthdate):
+    from datetime import date
+    if not birthdate:
+        return None
+    b = date.fromisoformat(birthdate)
+    today = date.today()
+    return today.year - b.year - ((today.month, today.day) < (b.month, b.day))
+
+
+def get_followup_summary() -> dict:
+    """Action cards: Moderate/High with no referral logged, follow-up dates already
+    past (latest visit only, so a newer visit clears it), and visits (drafts included) with no FBS yet."""
+    conn = get_connection()
+    row = conn.execute(f"""
+        SELECT
+            SUM(CASE WHEN {_RISK} IN ('Moderate','High')
+                      AND NOT {_HAS_REFERRAL} THEN 1 ELSE 0 END) AS no_action,
+            SUM(CASE WHEN {_RISK} IN ('Moderate','High')
+                      AND ls.follow_up_date IS NOT NULL
+                      AND ls.follow_up_date < DATE('now') THEN 1 ELSE 0 END) AS overdue,
+            SUM(CASE WHEN v.id IS NOT NULL AND ls.fbs_mg_dl IS NULL THEN 1 ELSE 0 END) AS awaiting_lab
+        {_base_query()}
+    """).fetchone()
+    conn.close()
+    return {k: row[k] or 0 for k in ("no_action", "overdue", "awaiting_lab")}
+
+
+def get_followup_worklist(limit: int = 100) -> list[dict]:
+    """Moderate/High patients (latest visit), most urgent first:
+    High before Moderate, then overdue, then no referral, then highest FBS."""
+    from datetime import date
+    conn = get_connection()
+    rows = conn.execute(f"""
+        SELECT p.patient_code, p.first_name, p.last_name, p.birthdate, p.sex,
+               b.name AS barangay, v.assessment_date, ls.fbs_mg_dl,
+               {_RISK} AS risk, ls.referral_action, ls.referred_to, ls.follow_up_date
+        {_base_query()} AND {_RISK} IN ('Moderate','High')
+    """).fetchall()
+    conn.close()
+
+    today = date.today().isoformat()
+    result = []
+    for r in rows:
+        d = dict(r)
+        d["age"] = _age_from(d["birthdate"])
+        action = (d["referral_action"] or "").strip() or ("Referred" if (d["referred_to"] or "").strip() else "")
+        if d["follow_up_date"] and d["follow_up_date"][:10] < today:
+            d["status_key"], d["status"] = "overdue", "Follow-up overdue"
+        elif not action:
+            d["status_key"], d["status"] = "none", "No referral recorded"
+        else:
+            d["status_key"], d["status"] = "ok", action
+        result.append(d)
+
+    order = {"overdue": 0, "none": 1, "ok": 2}
+    result.sort(key=lambda d: (d["risk"] != "High", order[d["status_key"]], -(d["fbs_mg_dl"] or 0)))
+    return result[:limit]
+
+
+def get_monthly_risk_trend(months: int = 6) -> dict:
+    """{'2026-09': {'Low': n, 'Moderate': n, 'High': n}} -- every screening, not just latest per patient."""
+    conn = get_connection()
+    rows = conn.execute(f"""
+        SELECT STRFTIME('%Y-%m', ls.test_datetime) AS month, {_RISK} AS risk, COUNT(*) AS n
+        FROM lab_screenings ls
+        JOIN visits v ON v.id = ls.visit_id
+        JOIN patients p ON p.id = v.patient_id
+        WHERE p.deleted_at IS NULL AND ls.test_datetime IS NOT NULL
+        GROUP BY month, risk
+    """).fetchall()
+    conn.close()
+    data = {}
+    for r in rows:
+        if r["month"] and r["risk"] in ("Low", "Moderate", "High"):
+            data.setdefault(r["month"], {"Low": 0, "Moderate": 0, "High": 0})[r["risk"]] = r["n"]
+    return dict(sorted(data.items())[-months:])
+
+
+# ---------------------------------------------------------------------------
+# Health Results page: referral progress, quality checks, logs, red flags
+# ---------------------------------------------------------------------------
+def _pct(n, total):
+    return round((n or 0) / total * 100) if total else 0
+
+
+def _tone(pct):
+    return "good" if pct >= 90 else ("warn" if pct >= 70 else "bad")
+
+
+def get_barangay_summary() -> list[dict]:
+    """One row per barangay for the heat table + CSV, highest % High first.
+    heat_* are 0-0.6 alpha values scaled to the column max."""
+    rows = []
+    for name, c in get_barangay_risk_matrix().items():
+        total = c["Low"] + c["Moderate"] + c["High"]
+        if not total:
+            continue
+        rows.append({
+            "barangay": name, "total": total,
+            "low": c["Low"], "moderate": c["Moderate"], "high": c["High"],
+            "pct_high": _pct(c["High"], total),
+            "pct_at_risk": _pct(c["Moderate"] + c["High"], total),
+        })
+    max_high = max((r["pct_high"] for r in rows), default=0)
+    max_risk = max((r["pct_at_risk"] for r in rows), default=0)
+    for r in rows:
+        r["heat_high"] = round(r["pct_high"] / max_high * 0.6, 2) if max_high else 0
+        r["heat_risk"] = round(r["pct_at_risk"] / max_risk * 0.6, 2) if max_risk else 0
+    rows.sort(key=lambda r: (-r["pct_high"], -r["total"]))
+    return rows
+
+
+def get_referral_funnel() -> dict:
+    """Moderate/High patients (latest visit): referral logged, follow-up date set, overdue."""
+    conn = get_connection()
+    row = conn.execute(f"""
+        SELECT
+            SUM(CASE WHEN {_RISK} IN ('Moderate','High') THEN 1 ELSE 0 END) AS at_risk,
+            SUM(CASE WHEN {_RISK} IN ('Moderate','High')
+                      AND {_HAS_REFERRAL} THEN 1 ELSE 0 END) AS referred,
+            SUM(CASE WHEN {_RISK} IN ('Moderate','High')
+                      AND COALESCE(TRIM(ls.follow_up_date), '') != '' THEN 1 ELSE 0 END) AS scheduled,
+            SUM(CASE WHEN {_RISK} IN ('Moderate','High')
+                      AND ls.follow_up_date IS NOT NULL
+                      AND ls.follow_up_date < DATE('now') THEN 1 ELSE 0 END) AS overdue
+        {_base_query()}
+    """).fetchone()
+    dest = conn.execute(f"""
+        SELECT TRIM(ls.referred_to) AS name, COUNT(*) AS n
+        {_base_query()} AND {_RISK} IN ('Moderate','High') AND COALESCE(TRIM(ls.referred_to), '') != ''
+        GROUP BY TRIM(ls.referred_to) ORDER BY n DESC LIMIT 5
+    """).fetchall()
+    conn.close()
+    at_risk = row["at_risk"] or 0
+    steps = []
+    for label, key in (("Referral recorded", "referred"), ("Follow-up date set", "scheduled")):
+        n = row[key] or 0
+        p = _pct(n, at_risk)
+        steps.append({"label": label, "n": n, "pct": p, "tone": _tone(p)})
+    n = row["overdue"] or 0
+    steps.append({"label": "Follow-up overdue", "n": n, "pct": _pct(n, at_risk), "tone": "bad" if n else "good"})
+    return {"at_risk": at_risk, "steps": steps, "destinations": [dict(d) for d in dest]}
+
+
+def get_screening_quality() -> dict:
+    """Checklist compliance across all screenings + measurement completeness on latest visits."""
+    conn = get_connection()
+    c = conn.execute(f"""
+        SELECT COUNT(*) AS total,
+            SUM(COALESCE(ls.fasted_ge_8h, 0)) AS fasted,
+            SUM(COALESCE(ls.identity_verified, 0)) AS identity,
+            SUM(COALESCE(ls.glucometer_calibrated, 0)) AS calibrated,
+            SUM(COALESCE(ls.capillary_sample_taken, 0)) AS sample,
+            SUM(COALESCE(ls.consent_signed, 0)) AS consent,
+            SUM(COALESCE(ls.result_recorded_within_5min, 0)) AS within5,
+            SUM(CASE WHEN COALESCE(ls.fasted_ge_8h, 0) = 0
+                      AND {_RISK} IN ('Moderate','High') THEN 1 ELSE 0 END) AS repeat_n
+        FROM lab_screenings ls
+        JOIN visits v ON v.id = ls.visit_id
+        JOIN patients p ON p.id = v.patient_id
+        WHERE p.deleted_at IS NULL
+    """).fetchone()
+    m = conn.execute(f"""
+        SELECT COUNT(*) AS total,
+            SUM(CASE WHEN v.waist_cm IS NOT NULL THEN 1 ELSE 0 END) AS waist,
+            SUM(CASE WHEN v.bp_systolic IS NOT NULL AND v.bp_diastolic IS NOT NULL THEN 1 ELSE 0 END) AS bp,
+            SUM(CASE WHEN v.bmi IS NOT NULL THEN 1 ELSE 0 END) AS bmi,
+            SUM(CASE WHEN v.smoking_status IS NOT NULL THEN 1 ELSE 0 END) AS smoking
+        {_base_query()} AND v.id IS NOT NULL
+    """).fetchone()
+    conn.close()
+
+    def rows(src, total, spec):
+        out = []
+        for label, key in spec:
+            p = _pct(src[key], total)
+            out.append({"label": label, "pct": p, "tone": _tone(p)})
+        return out
+
+    return {
+        "total": c["total"] or 0,
+        "repeat_n": c["repeat_n"] or 0,
+        "checks": rows(c, c["total"], [
+            ("Fasted at least 8 hours", "fasted"), ("Patient identity verified", "identity"),
+            ("Glucometer calibrated", "calibrated"), ("Capillary sample taken", "sample"),
+            ("Consent signed", "consent"), ("Result recorded within 5 minutes", "within5"),
+        ]),
+        "fields_total": m["total"] or 0,
+        "fields": rows(m, m["total"], [
+            ("Waist circumference", "waist"), ("Blood pressure", "bp"),
+            ("BMI", "bmi"), ("Smoking status", "smoking"),
+        ]),
+    }
+
+
+def get_daily_log(days: int = 14) -> list[dict]:
+    conn = get_connection()
+    rows = conn.execute(f"""
+        SELECT DATE(ls.test_datetime) AS day, COUNT(*) AS screened,
+            SUM(CASE WHEN {_RISK} = 'Low' THEN 1 ELSE 0 END) AS low,
+            SUM(CASE WHEN {_RISK} = 'Moderate' THEN 1 ELSE 0 END) AS moderate,
+            SUM(CASE WHEN {_RISK} = 'High' THEN 1 ELSE 0 END) AS high,
+            SUM(CASE WHEN COALESCE(ls.fasted_ge_8h, 0) = 0 THEN 1 ELSE 0 END) AS not_fasted
+        FROM lab_screenings ls
+        JOIN visits v ON v.id = ls.visit_id
+        JOIN patients p ON p.id = v.patient_id
+        WHERE p.deleted_at IS NULL AND ls.test_datetime IS NOT NULL
+          AND DATE(ls.test_datetime) >= DATE('now', ?)
+        GROUP BY day ORDER BY day DESC
+    """, (f"-{int(days)} days",)).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_nurse_activity(days: int = 30) -> list[dict]:
+    conn = get_connection()
+    rows = conn.execute(f"""
+        SELECT COALESCE(u.first_name || ' ' || u.last_name, 'Imported / unassigned') AS nurse,
+               COUNT(*) AS screened,
+               SUM(CASE WHEN {_RISK} = 'High' THEN 1 ELSE 0 END) AS high
+        FROM lab_screenings ls
+        JOIN visits v ON v.id = ls.visit_id
+        JOIN patients p ON p.id = v.patient_id
+        LEFT JOIN users u ON u.id = v.recorded_by_staff_id
+        WHERE p.deleted_at IS NULL AND ls.test_datetime IS NOT NULL
+          AND DATE(ls.test_datetime) >= DATE('now', ?)
+        GROUP BY v.recorded_by_staff_id ORDER BY screened DESC
+    """, (f"-{int(days)} days",)).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_red_flags(limit: int = 20) -> list[dict]:
+    """Patients whose most recent visit *that has the CVD questionnaire* answered yes to
+    severe chest pain (30+ min) or stroke/TIA symptoms. Using the latest visit that has
+    answers (not just the latest visit) keeps a flag from vanishing when a follow-up visit
+    is saved without the questionnaire. CSV-imported visits have no CVD answers."""
+    conn = get_connection()
+    rows = conn.execute(f"""
+        SELECT p.patient_code, p.first_name, p.last_name, b.name AS barangay,
+               v.assessment_date, ls.fbs_mg_dl, {_RISK} AS risk,
+               cr.q7_severe_pain_30min_plus AS q7, cr.q8_tia_stroke_symptoms AS q8
+        FROM patients p
+        LEFT JOIN barangays b ON b.id = p.barangay_id
+        JOIN visits v ON v.id = (
+            SELECT v2.id FROM visits v2
+            JOIN cvd_responses c2 ON c2.visit_id = v2.id
+            WHERE v2.patient_id = p.id ORDER BY v2.id DESC LIMIT 1
+        )
+        JOIN cvd_responses cr ON cr.visit_id = v.id
+        LEFT JOIN lab_screenings ls ON ls.visit_id = v.id
+        WHERE p.deleted_at IS NULL
+          AND (cr.q7_severe_pain_30min_plus = 1 OR cr.q8_tia_stroke_symptoms = 1)
+        ORDER BY (COALESCE({_RISK}, '') = 'High') DESC, v.assessment_date DESC
+        LIMIT ?
+    """, (limit,)).fetchall()
+    conn.close()
+    result = []
+    for r in rows:
+        d = dict(r)
+        d["flags"] = (["Severe chest pain"] if d["q7"] else []) + (["Stroke / TIA symptoms"] if d["q8"] else [])
         result.append(d)
     return result

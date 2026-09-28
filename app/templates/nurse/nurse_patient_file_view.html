@@ -1,25 +1,64 @@
 {% extends "nurse/nurse_base.html" %}
 
 {% block content %}
+    {% set back_url = url_for('nurse.nurse_data_management') ~ ('?' ~ return_qs if return_qs else '') %}
     {% set cvd_questions = [
-        ('q1_chest_discomfort', 'Pain/discomfort/pressure in chest?'),
-        ('q2_pain_center_left_arm', 'Pain in center/left chest or left arm?'),
-        ('q3_occurs_uphill_hurrying', 'Occurs when walking uphill or hurrying?'),
-        ('q4_slows_down_if_occurs', 'Do you slow down if you get it while walking?'),
-        ('q5_relieved_by_rest_tablet', 'Does pain go away if you stand still or take under-tongue tablet?'),
-        ('q6_relieved_under_10min', 'Does pain go away in less than 10 minutes?'),
-        ('q7_severe_pain_30min_plus', 'Severe chest pain lasting half an hour or more?'),
-        ('q8_tia_stroke_symptoms', 'TIA/Stroke: Difficulty talking, weakness or numbness of arm/leg on one side?'),
+        ('q1_chest_discomfort', 'Pain/discomfort/pressure in chest?', 'No', 'Yes'),
+        ('q2_pain_center_left_arm', 'Pain in center/left chest or left arm?', 'No', 'Yes'),
+        ('q3_occurs_uphill_hurrying', 'Occurs when walking uphill or hurrying?', 'No', 'Yes'),
+        ('q4_slows_down_if_occurs', 'Do you slow down if you get it while walking?', 'No', 'Yes'),
+        ('q5_relieved_by_rest_tablet', 'Does pain go away if you stand still or take under-tongue tablet?', 'No', 'Yes'),
+        ('q6_relieved_under_10min', 'Does pain go away in less than 10 minutes?', 'No', 'Yes'),
+        ('q7_severe_pain_30min_plus', 'Severe chest pain lasting half an hour or more?', 'No', 'Yes'),
+        ('q8_tia_stroke_symptoms', 'TIA/Stroke: Difficulty talking, weakness or numbness of arm/leg on one side?', 'No', 'Yes (Refer to Doctor)'),
     ] %}
+    {% set pmh_options = ['Allergy','Asthma','Cancer','Cerebrovascular Disease','Coronary Artery Disease','Diabetes Mellitus','Emphysema','Epilepsy/Seizure Disease','Hepatitis','Hyperlipidemia','Hypertension','Peptic Ulcer Disease','Pneumonia','Thyroid Disease','Tuberculosis','Urinary Tract Infection'] %}
+    {% set fh_options = [('Hypertension','Hypertension'),('Stroke/Cerebrovascular Disease','Stroke'),('Coronary Artery Disease','Heart Attack / CAD'),('Diabetes Mellitus','Diabetes'),('Asthma','Asthma'),('Cancer','Cancer'),('Kidney Disease','Kidney Disease')] %}
+    {% set diet_options = [('High Fat/Salt','High Fat/Salt (Eats processed/fast foods weekly)'),('3+ servings vegetables daily','Eats 3 servings of vegetables daily'),('2-3 servings fruits daily','Eats 2-3 servings of fruits daily')] %}
+    {% set immu_options = ['BCG','OPV/IPV Series','DPT Series','Measles','Hepatitis A/B Series','HPV','MMR','Tetanus Toxoid','Pneumococcal Vaccine','Flu Vaccine'] %}
+    {% set dm_sym_options = [('Polyphagia','Polyphagia (Excessive eating)'),('Polydipsia','Polydipsia (Excessive thirst)'),('Polyuria','Polyuria (Excessive urination)')] %}
+
+    <style>
+        /* Line-drawn chevron used for both the section-collapse toggle and the
+           FBS trend indicators, replacing the old solid ▲▼ glyphs. */
+        .section-toggle { cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+        .section-toggle-icon {
+            width: 8px; height: 8px;
+            border-right: 2px solid currentColor;
+            border-bottom: 2px solid currentColor;
+            transform: rotate(45deg);
+            transition: transform .15s ease;
+            display: inline-block;
+            margin-left: 0.5rem;
+        }
+        .section-toggle.collapsed .section-toggle-icon { transform: rotate(-45deg); }
+        .collapsible {
+            overflow: hidden;
+            max-height: 3000px;
+            transition: max-height .2s ease, padding .2s ease;
+        }
+        .collapsible.collapsed { max-height: 0; padding-top: 0; padding-bottom: 0; }
+
+        .trend-arrow {
+            display: inline-block;
+            width: 7px; height: 7px;
+            border-right: 2px solid currentColor;
+            border-top: 2px solid currentColor;
+            margin-left: 0.35rem;
+            vertical-align: middle;
+        }
+        .trend-arrow.up { transform: rotate(-45deg); color: var(--danger); }
+        .trend-arrow.down { transform: rotate(135deg); color: var(--green-accent); }
+    </style>
 
     <header class="topbar">
         <div>
             <h1 class="page-title">Patient Record</h1>
-            <p class="page-subtitle">Read-only view of the patient's assessment record</p>
+            <p class="page-subtitle" id="pageSubtitle">Read-only view of the patient's assessment record</p>
         </div>
-        <div class="breadcrumbs">Data Management / <span style="color:var(--text-primary); font-weight:600;">Patient Record — {{ patient_id }}</span></div>
+        <div class="breadcrumbs"><a href="{{ back_url }}" style="color:inherit;">Data Management</a> / <span style="color:var(--text-primary); font-weight:600;">Patient Record — {{ patient_id }}</span></div>
     </header>
-    
+
     <div class="patient-info-header">
         <div>
             <h2>Patient: {{ patient.first_name }} {{ patient.last_name }}</h2>
@@ -35,12 +74,28 @@
             <p style="font-size: 0.75rem; color: rgba(255,255,255,0.5); margin-top: 0.25rem;">
                 {% if latest_visit %}
                     Viewing visit from: {{ latest_visit.assessment_date }}
+                    {% if latest_visit.status == 'draft' %}
+                        <span style="color:#fbbf24; font-weight:600;">• Draft (not yet submitted)</span>
+                    {% endif %}
                 {% else %}
                     Select a screening date below to view full record
                 {% endif %}
             </p>
         </div>
+        {% if latest_visit %}
+        <div id="editControls" style="display:flex; gap:0.5rem; align-self:flex-start;">
+            <button type="button" id="editRecordBtn" class="btn btn-secondary" style="padding:0.5rem 1rem; font-size:0.8rem;">✎ Edit Record</button>
+            <button type="button" id="saveRecordBtn" class="btn btn-primary" style="padding:0.5rem 1rem; font-size:0.8rem; display:none;">💾 Save Changes</button>
+            <button type="button" id="cancelEditBtn" class="btn btn-secondary" style="padding:0.5rem 1rem; font-size:0.8rem; display:none;">Cancel</button>
+        </div>
+        {% endif %}
     </div>
+    <p style="font-size:0.75rem; color:var(--text-muted); margin:0.35rem 0 1rem;">
+        Editing here updates patient details and this visit's clinical record. Test results (FBS, test method, risk level) are not editable from this page — use the Lab Screening page for that.
+        {% if latest_visit and latest_visit.status == 'draft' %}
+            <strong>This visit is still a draft, so every field below is open for editing.</strong>
+        {% endif %}
+    </p>
 
     <div class="form-card">
         <div class="card-header" style="background:var(--green-light); border-top-color:var(--green-light);">Patient Portal Access</div>
@@ -91,7 +146,23 @@
                             <span style="font-size:0.7rem; color:var(--green-accent); font-weight:600; margin-left:0.4rem;">● Viewing</span>
                         {% endif %}
                     </td>
-                    <td style="padding: 1rem;">{{ (r.fbs ~ " mg/dL") if r.fbs else "—" }}</td>
+                    <td style="padding: 1rem;">
+                        {% if r.fbs %}
+                            {{ r.fbs }} mg/dL
+                            {% set older = records[loop.index0 + 1] if loop.index0 + 1 < records|length else None %}
+                            {% if older and older.fbs %}
+                                {% if r.fbs > older.fbs %}
+                                    <span title="Up from {{ older.fbs }} mg/dL last visit" class="trend-arrow up"></span>
+                                {% elif r.fbs < older.fbs %}
+                                    <span title="Down from {{ older.fbs }} mg/dL last visit" class="trend-arrow down"></span>
+                                {% else %}
+                                    <span title="Unchanged from last visit" style="color:var(--text-muted); font-weight:700; margin-left:0.3rem;">—</span>
+                                {% endif %}
+                            {% endif %}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
                     <td style="padding: 1rem;">
                         {% if r.risk == 'High' %}
                             <span style="background:var(--danger-light); color:var(--danger); padding:0.25rem 0.5rem; border-radius:4px; font-size:0.7rem;">{{ r.risk }}</span>
@@ -122,102 +193,181 @@
 
     {% if not latest_visit %}
         <div class="action-bar">
-            <a href="{{ url_for('nurse.nurse_data_management') }}" class="btn btn-secondary" style="text-decoration:none; display:inline-block; text-align:center;">← Back to Data Management</a>
+            <a href="{{ back_url }}" class="btn btn-secondary" style="text-decoration:none; display:inline-block; text-align:center;">← Back to Data Management</a>
             <a href="{{ url_for('nurse.nurse_new_record', patient_id=patient_id) }}" class="btn btn-primary" style="text-decoration:none; display:inline-block; text-align:center;">+ Add New Record</a>
         </div>
     {% else %}
-    
+
+    <form id="recordForm"
+          data-current-region="{{ patient.region_code or '' }}"
+          data-current-city="{{ patient.city_code or '' }}"
+          data-current-barangay="{{ patient.barangay_code or '' }}"
+          data-is-draft="{{ 'true' if latest_visit.status == 'draft' else 'false' }}"
+          data-edit-url="{{ url_for('nurse.nurse_patient_file_edit', patient_id=patient_id, visit_id=latest_visit.visit_id) }}"
+          data-return-qs="{{ return_qs or '' }}">
     <!-- patient demo -->
     <div class="form-card">
         <div class="card-header">1. Patient Demographics</div>
         <div class="card-body">
-            <div class="grid-4">
-                <div class="field-group"><label class="field-label">Patient ID No.</label><input type="text" class="field-input" value="{{ patient.patient_code }}" disabled></div>
-                <div class="field-group"><label class="field-label">Last Name</label><input type="text" class="field-input" value="{{ patient.last_name }}" disabled></div>
-                <div class="field-group"><label class="field-label">First Name</label><input type="text" class="field-input" value="{{ patient.first_name }}" disabled></div>
-                <div class="field-group"><label class="field-label">Middle Name</label><input type="text" class="field-input" value="{{ patient.middle_name or '' }}" disabled></div>
+            <div class="grid-5">
+                <div class="field-group"><label class="field-label">Patient ID No.</label><input type="text" class="field-input" value="{{ patient.patient_code }}" disabled title="The patient code is generated and never editable."></div>
+                {% set name_locked_msg = "Name is locked unless the visit is still a draft, or the patient is a married female." %}
+                {% set name_unlockable = latest_visit.status == 'draft' or (patient.sex == 'Female' and patient.civil_status == 'Married') %}
+                <div class="field-group"><label class="field-label">Last Name</label><input type="text" id="fv_lastName" class="field-input{{ ' editable-field' if name_unlockable else '' }}" data-field="patient.last_name" value="{{ patient.last_name }}" disabled {% if not name_unlockable %}title="{{ name_locked_msg }}"{% endif %}></div>
+                {% if latest_visit.status == 'draft' %}
+                <div class="field-group"><label class="field-label">First Name</label><input type="text" class="field-input editable-field" data-field="patient.first_name" value="{{ patient.first_name }}" disabled></div>
+                {% else %}
+                <div class="field-group"><label class="field-label">First Name</label><input type="text" class="field-input" value="{{ patient.first_name }}" disabled title="Name changes are only allowed while a visit is still a draft."></div>
+                {% endif %}
+                <div class="field-group"><label class="field-label">Middle Name</label><input type="text" class="field-input editable-field" data-field="patient.middle_name" value="{{ patient.middle_name or '' }}" disabled></div>
+                <div class="field-group" id="fv_maidenNameGroup" style="display:{% if patient.sex == 'Female' and patient.civil_status == 'Married' %}block{% else %}none{% endif %};">
+                    <label class="field-label">Maiden Last Name
+                        <span class="field-tooltip" data-tip="Patient's surname before marriage. Leave blank if not applicable.">?</span>
+                    </label>
+                    <input type="text" class="field-input editable-field" data-field="patient.maiden_name" value="{{ patient.maiden_name or '' }}" disabled>
+                </div>
             </div>
             <div class="grid-5">
-                <div class="field-group"><label class="field-label">Father's Last Name</label><input type="text" class="field-input" value="{{ patient.father_last_name or '' }}" disabled></div>
-                <div class="field-group"><label class="field-label">Father's First Name</label><input type="text" class="field-input" value="{{ patient.father_first_name or '' }}" disabled></div>
-                <div class="field-group"><label class="field-label">Mother's Last Name</label><input type="text" class="field-input" value="{{ patient.mother_last_name or '' }}" disabled></div>
-                <div class="field-group"><label class="field-label">Mother's First Name</label><input type="text" class="field-input" value="{{ patient.mother_first_name or '' }}" disabled></div>
-                <div class="field-group"><label class="field-label">Contact Number</label><input type="text" class="field-input" value="{{ patient.contact_number or '' }}" disabled></div>
+                <div class="field-group"><label class="field-label">Father's Last Name</label><input type="text" class="field-input editable-field" data-field="patient.father_last_name" value="{{ patient.father_last_name or '' }}" disabled></div>
+                <div class="field-group"><label class="field-label">Father's First Name</label><input type="text" class="field-input editable-field" data-field="patient.father_first_name" value="{{ patient.father_first_name or '' }}" disabled></div>
+                <div class="field-group"><label class="field-label">Mother's Last Name</label><input type="text" class="field-input editable-field" data-field="patient.mother_last_name" value="{{ patient.mother_last_name or '' }}" disabled></div>
+                <div class="field-group"><label class="field-label">Mother's First Name</label><input type="text" class="field-input editable-field" data-field="patient.mother_first_name" value="{{ patient.mother_first_name or '' }}" disabled></div>
+                <div class="field-group"><label class="field-label">Contact Number</label><input type="text" class="field-input editable-field" data-field="patient.contact_number" value="{{ patient.contact_number or '' }}" disabled></div>
             </div>
             <div class="grid-2">
-                <div class="field-group"><label class="field-label">Spouse's Last Name</label><input type="text" class="field-input" value="{{ patient.spouse_last_name or '' }}" disabled></div>
-                <div class="field-group"><label class="field-label">Spouse's First Name</label><input type="text" class="field-input" value="{{ patient.spouse_first_name or '' }}" disabled></div>
+                <div class="field-group"><label class="field-label">Spouse's Last Name</label><input type="text" class="field-input editable-field" data-field="patient.spouse_last_name" value="{{ patient.spouse_last_name or '' }}" disabled></div>
+                <div class="field-group"><label class="field-label">Spouse's First Name</label><input type="text" class="field-input editable-field" data-field="patient.spouse_first_name" value="{{ patient.spouse_first_name or '' }}" disabled></div>
             </div>
             <div class="grid-5">
-                <div class="field-group"><label class="field-label">Date of Assessment</label><input type="text" class="field-input" value="{{ latest_visit.assessment_date if latest_visit else '—' }}" disabled></div>
-                <div class="field-group"><label class="field-label">Date of Birth</label><input type="text" class="field-input" value="{{ patient.birthdate_display }}" disabled></div>
+                <div class="field-group"><label class="field-label">Date of Assessment</label><input type="date" class="field-input editable-field" data-field="visit.assessment_date" value="{{ latest_visit.assessment_date[:10] if latest_visit.assessment_date else '' }}" disabled></div>
+                <div class="field-group"><label class="field-label">Date of Birth</label><input type="date" class="field-input editable-field" data-field="patient.birthdate" value="{{ patient.birthdate[:10] if patient.birthdate else '' }}" disabled></div>
                 <div class="field-group"><label class="field-label">Age</label><input type="text" class="field-input" value="{{ patient.age }} yrs" disabled></div>
-                <div class="field-group"><label class="field-label">Sex</label><input type="text" class="field-input" value="{{ patient.sex }}" disabled></div>
-                <div class="field-group"><label class="field-label">Civil Status</label><input type="text" class="field-input" value="{{ patient.civil_status or '' }}" disabled></div>
+                <div class="field-group">
+                    <label class="field-label">Sex</label>
+                    <select id="fv_sex" class="field-input editable-field" data-field="patient.sex" disabled>
+                        <option value="">Select</option>
+                        <option {% if patient.sex == 'Male' %}selected{% endif %}>Male</option>
+                        <option {% if patient.sex == 'Female' %}selected{% endif %}>Female</option>
+                    </select>
+                </div>
+                <div class="field-group">
+                    <label class="field-label">Civil Status</label>
+                    <select id="fv_civilStatus" class="field-input editable-field" data-field="patient.civil_status" disabled>
+                        <option value="">Select</option>
+                        {% for opt in ['Single','Married','Annulled','Widow/Widower','Separated'] %}
+                        <option {% if patient.civil_status == opt %}selected{% endif %}>{{ opt }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
             </div>
             <div class="grid-4">
-                <div class="field-group"><label class="field-label">Religion</label><input type="text" class="field-input" value="{{ patient.religion or '' }}" disabled></div>
-                <div class="field-group"><label class="field-label">Occupation</label><input type="text" class="field-input" value="{{ patient.occupation or '' }}" disabled></div>
-                <div class="field-group"><label class="field-label">Educational Attainment</label><input type="text" class="field-input" value="{{ patient.education or '' }}" disabled></div>
-                <div class="field-group"><label class="field-label">Barangay</label><input type="text" class="field-input" value="{{ patient.barangay or '' }}" disabled></div>
+                <div class="field-group"><label class="field-label">Religion</label><input type="text" class="field-input editable-field" data-field="patient.religion" value="{{ patient.religion or '' }}" disabled></div>
+                <div class="field-group"><label class="field-label">Occupation</label><input type="text" class="field-input editable-field" data-field="patient.occupation" value="{{ patient.occupation or '' }}" disabled></div>
+                <div class="field-group">
+                    <label class="field-label">Educational Attainment</label>
+                    <select class="field-input editable-field" data-field="patient.education" disabled>
+                        <option value="">Select Education</option>
+                        {% for opt in ['No Schooling','Elementary','High School','Vocational','College degree, post graduate'] %}
+                        <option {% if patient.education == opt %}selected{% endif %}>{{ opt }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
             </div>
-            <div class="field-group"><label class="field-label">Complete Address</label><input type="text" class="field-input" value="{{ patient.address or '' }}" disabled></div>
+
+            <!-- Region / City / Barangay PSGC cascade, same behavior as nurse_intake. -->
+            <div class="grid-4">
+                <div class="field-group">
+                    <label class="field-label">Region
+                        <span class="field-tooltip" data-tip="Select the patient's region first — city/municipality and barangay choices are filtered from this.">?</span>
+                    </label>
+                    <select id="fv_region" class="field-input editable-field" disabled>
+                        <option value="">Select Region</option>
+                    </select>
+                </div>
+                <div class="field-group">
+                    <label class="field-label">City / Municipality</label>
+                    <select id="fv_city" class="field-input editable-field" disabled>
+                        <option value="">Select Region first</option>
+                    </select>
+                </div>
+                <div class="field-group">
+                    <label class="field-label">Barangay</label>
+                    <select id="fv_barangay" class="field-input editable-field" disabled>
+                        <option value="">Select City first</option>
+                    </select>
+                    <input type="text" id="fv_barangayManual" class="field-input editable-field"
+                           style="display:none; margin-top:0.4rem;"
+                           placeholder="Barangay not listed — type it here" disabled>
+                </div>
+                <div class="field-group"><label class="field-label">Complete Address</label><input type="text" class="field-input editable-field" data-field="patient.address" value="{{ patient.address or '' }}" disabled></div>
+            </div>
         </div>
     </div>
 
     <!-- membership -->
     <div class="form-card">
-        <div class="card-header">2. PHIC Membership</div>
-        <div class="card-body">
+        <div class="card-header section-toggle collapsed" data-section="2">2. PHIC Membership<span class="section-toggle-icon"></span></div>
+        <div class="card-body collapsible collapsed">
             <div class="grid-2">
-                <div class="field-group"><label class="field-label">Membership Type</label><input type="text" class="field-input" value="{{ patient.phic_membership or '' }}" disabled></div>
-                <div class="field-group"><label class="field-label">Category</label><input type="text" class="field-input" value="{{ patient.phic_type or '' }}" disabled></div>
+                <div class="field-group">
+                    <label class="field-label">Membership Type</label>
+                    <select class="field-input editable-field" data-field="patient.phic_membership" disabled>
+                        <option value="">Select</option>
+                        {% for opt in ['Member','Dependent','Non-Member'] %}
+                        <option {% if patient.phic_membership == opt %}selected{% endif %}>{{ opt }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="field-group">
+                    <label class="field-label">Category</label>
+                    <select class="field-input editable-field" data-field="patient.phic_type" disabled>
+                        <option value="">Select</option>
+                        {% for opt in ['Sponsored - NHTS','Sponsored - LGU','Sponsored - NGA','IPP - Organized Group','IPP - OFW','IPP - Private','Employed - Government','Employed - Private','Lifetime'] %}
+                        <option {% if patient.phic_type == opt %}selected{% endif %}>{{ opt }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
             </div>
         </div>
     </div>
 
     <!-- past med histo -->
     <div class="form-card">
-        <div class="card-header">3. Past Medical History</div>
-        <div class="card-body">
-            {% if conditions.pmh %}
-                <div class="radio-card-wrapper">
-                    {% for code in conditions.pmh %}
-                    <div class="radio-card"><input type="checkbox" checked disabled><label>{{ code }}</label></div>
-                    {% endfor %}
-                </div>
-            {% else %}
-                <p style="font-size:0.85rem; color:var(--text-muted);">None reported.</p>
-            {% endif %}
-            <div class="field-group" style="margin-top:1rem;"><label class="field-label">Past Surgical History</label><input type="text" class="field-input" value="{{ latest_visit.past_surgical_history if latest_visit and latest_visit.past_surgical_history else 'None' }}" disabled></div>
+        <div class="card-header section-toggle collapsed" data-section="3">3. Past Medical History<span class="section-toggle-icon"></span></div>
+        <div class="card-body collapsible collapsed">
+            <div class="radio-card-wrapper">
+                {% for code in pmh_options %}
+                <div class="radio-card"><input type="checkbox" class="editable-field cond-pmh" value="{{ code }}" {% if code in conditions.pmh %}checked{% endif %} disabled><label>{{ code }}</label></div>
+                {% endfor %}
+            </div>
+            <div class="field-group" style="margin-top:1rem;"><label class="field-label">Past Surgical History</label><input type="text" class="field-input editable-field" data-field="visit.past_surgical_history" value="{{ latest_visit.past_surgical_history if latest_visit.past_surgical_history else '' }}" disabled></div>
         </div>
     </div>
 
     <!-- fam histo -->
     <div class="form-card">
-        <div class="card-header">4. Family History (1st Degree Relative)</div>
-        <div class="card-body">
-            {% if conditions.family_history %}
-                <div class="radio-card-wrapper">
-                    {% for code in conditions.family_history %}
-                    <div class="radio-card"><input type="checkbox" checked disabled><label>{{ code }}</label></div>
-                    {% endfor %}
-                </div>
-            {% else %}
-                <p style="font-size:0.85rem; color:var(--text-muted);">None reported.</p>
-            {% endif %}
+        <div class="card-header section-toggle collapsed" data-section="4">4. Family History (1st Degree Relative)<span class="section-toggle-icon"></span></div>
+        <div class="card-body collapsible collapsed">
+            <div class="radio-card-wrapper">
+                {% for code, label in fh_options %}
+                <div class="radio-card"><input type="checkbox" class="editable-field cond-family_history" value="{{ code }}" {% if code in conditions.family_history %}checked{% endif %} disabled><label>{{ label }}</label></div>
+                {% endfor %}
+            </div>
         </div>
     </div>
 
     <!-- cvd -->
     <div class="form-card">
-        <div class="card-header">5. CVD Questionnaire</div>
-        <div class="card-body">
+        <div class="card-header section-toggle collapsed" data-section="5">5. CVD Questionnaire<span class="section-toggle-icon"></span></div>
+        <div class="card-body collapsible collapsed">
             <div class="grid-2">
-                {% for key, label in cvd_questions %}
+                {% for key, label, no_label, yes_label in cvd_questions %}
                 <div class="field-group">
                     <label class="field-label">{{ label }}</label>
-                    <input type="text" class="field-input" value="{{ 'Yes' if cvd_responses and cvd_responses[key] else 'No' }}" disabled>
+                    <select class="field-input editable-field cvd-field" data-cvd="{{ key }}" disabled>
+                        <option value="0" {% if not (cvd_responses and cvd_responses[key]) %}selected{% endif %}>{{ no_label }}</option>
+                        <option value="1" {% if cvd_responses and cvd_responses[key] %}selected{% endif %}>{{ yes_label }}</option>
+                    </select>
                 </div>
                 {% endfor %}
             </div>
@@ -226,70 +376,101 @@
 
     <!-- lifestyle -->
     <div class="form-card">
-        <div class="card-header">6. Personal / Social History &amp; Lifestyle Factors</div>
-        <div class="card-body">
+        <div class="card-header section-toggle collapsed" data-section="6">6. Personal / Social History &amp; Lifestyle Factors<span class="section-toggle-icon"></span></div>
+        <div class="card-body collapsible collapsed">
             <div class="grid-3">
-                <div class="field-group"><label class="field-label">Smoking</label><input type="text" class="field-input" value="{{ latest_visit.smoking_status if latest_visit and latest_visit.smoking_status else '—' }}" disabled></div>
-                <div class="field-group"><label class="field-label">Alcohol Intake</label><input type="text" class="field-input" value="{{ latest_visit.alcohol_intake if latest_visit and latest_visit.alcohol_intake else '—' }}" disabled></div>
-                <div class="field-group"><label class="field-label">Physical Activity</label><input type="text" class="field-input" value="{{ latest_visit.physical_activity if latest_visit and latest_visit.physical_activity else '—' }}" disabled></div>
+                <div class="field-group">
+                    <label class="field-label">Smoking</label>
+                    <select class="field-input editable-field" data-field="visit.smoking_status" disabled>
+                        <option value="">Select</option>
+                        {% for opt in ['Never smoked','Stopped > 1 year','Current Smoker','Stopped < 1 year','Passive Smoker'] %}
+                        <option {% if latest_visit.smoking_status == opt %}selected{% endif %}>{{ opt }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="field-group">
+                    <label class="field-label">Alcohol Intake</label>
+                    <select class="field-input editable-field" data-field="visit.alcohol_intake" disabled>
+                        <option value="">Select</option>
+                        {% for opt in ['Never Consumed','Yes','Yes (Binge: 5+ drinks in one occasion past month)'] %}
+                        <option {% if latest_visit.alcohol_intake == opt %}selected{% endif %}>{{ opt }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="field-group">
+                    <label class="field-label">Illicit Drug Use</label>
+                    <select class="field-input editable-field" data-field="visit.illicit_drug_use" disabled>
+                        <option value="">Select</option>
+                        {% for opt in ['No','Yes'] %}
+                        <option {% if latest_visit.illicit_drug_use == opt %}selected{% endif %}>{{ opt }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="grid-3" style="margin-top:0.75rem;">
+                <div class="field-group">
+                    <label class="field-label">Physical Activity</label>
+                    <select class="field-input editable-field" data-field="visit.physical_activity" disabled>
+                        <option value="">Select</option>
+                        {% for opt in ['Does NOT meet 2.5 hours/week','Meets at least 2.5 hours/week moderate activity'] %}
+                        <option {% if latest_visit.physical_activity == opt %}selected{% endif %}>{{ opt }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
             </div>
             <label class="field-label" style="margin-top:1rem;">Dietary Factors</label>
-            {% if conditions.diet %}
-                <div class="radio-card-wrapper">
-                    {% for code in conditions.diet %}
-                    <div class="radio-card"><input type="checkbox" checked disabled><label>{{ code }}</label></div>
-                    {% endfor %}
-                </div>
-            {% else %}
-                <p style="font-size:0.85rem; color:var(--text-muted);">None reported.</p>
-            {% endif %}
+            <div class="radio-card-wrapper">
+                {% for code, label in diet_options %}
+                <div class="radio-card"><input type="checkbox" class="editable-field cond-diet" value="{{ code }}" {% if code in conditions.diet %}checked{% endif %} disabled><label>{{ label }}</label></div>
+                {% endfor %}
+            </div>
         </div>
     </div>
 
     <!-- dia histo -->
     <div class="form-card">
-        <div class="card-header">7. Diabetes History</div>
-        <div class="card-body">
-            <div class="field-group"><label class="field-label">Was patient diagnosed as having diabetes?</label><input type="text" class="field-input" value="{{ latest_visit.diabetes_diagnosis if latest_visit and latest_visit.diabetes_diagnosis else '—' }}" disabled></div>
-            <label class="field-label" style="margin-top:1rem;">Symptoms</label>
-            {% if conditions.dm_symptom %}
-                <div class="radio-card-wrapper">
-                    {% for code in conditions.dm_symptom %}
-                    <div class="radio-card"><input type="checkbox" checked disabled><label>{{ code }}</label></div>
+        <div class="card-header section-toggle collapsed" data-section="7">7. Diabetes History<span class="section-toggle-icon"></span></div>
+        <div class="card-body collapsible collapsed">
+            <div class="field-group">
+                <label class="field-label">Was patient diagnosed as having diabetes?</label>
+                <select class="field-input editable-field" data-field="visit.diabetes_diagnosis" disabled>
+                    <option value="">Select</option>
+                    {% for opt in ['No / Do not know','Yes (with medications)','Yes (without medications)'] %}
+                    <option {% if latest_visit.diabetes_diagnosis == opt %}selected{% endif %}>{{ opt }}</option>
                     {% endfor %}
-                </div>
-            {% else %}
-                <p style="font-size:0.85rem; color:var(--text-muted);">None reported.</p>
-            {% endif %}
+                </select>
+            </div>
+            <label class="field-label" style="margin-top:1rem;">Symptoms</label>
+            <div class="radio-card-wrapper">
+                {% for code, label in dm_sym_options %}
+                <div class="radio-card"><input type="checkbox" class="editable-field cond-dm_symptom" value="{{ code }}" {% if code in conditions.dm_symptom %}checked{% endif %} disabled><label>{{ label }}</label></div>
+                {% endfor %}
+            </div>
         </div>
     </div>
 
     <!-- immuno -->
     <div class="form-card">
-        <div class="card-header">8. Immunizations</div>
-        <div class="card-body">
-            {% if conditions.immunization %}
-                <div class="radio-card-wrapper">
-                    {% for code in conditions.immunization %}
-                    <div class="radio-card"><input type="checkbox" checked disabled><label>{{ code }}</label></div>
-                    {% endfor %}
-                </div>
-            {% else %}
-                <p style="font-size:0.85rem; color:var(--text-muted);">None reported.</p>
-            {% endif %}
+        <div class="card-header section-toggle collapsed" data-section="8">8. Immunizations<span class="section-toggle-icon"></span></div>
+        <div class="card-body collapsible collapsed">
+            <div class="radio-card-wrapper">
+                {% for code in immu_options %}
+                <div class="radio-card"><input type="checkbox" class="editable-field cond-immunization" value="{{ code }}" {% if code in conditions.immunization %}checked{% endif %} disabled><label>{{ code }}</label></div>
+                {% endfor %}
+            </div>
         </div>
     </div>
 
     <!-- mens and preg histo -->
     {% if patient.sex == 'Female' %}
     <div class="form-card">
-        <div class="card-header">9. Menstrual &amp; Pregnancy History</div>
-        <div class="card-body">
+        <div class="card-header section-toggle collapsed" data-section="9">9. Menstrual &amp; Pregnancy History<span class="section-toggle-icon"></span></div>
+        <div class="card-body collapsible collapsed">
             <div class="grid-4">
-                <div class="field-group"><label class="field-label">Age at Menarche</label><input type="text" class="field-input" value="{{ latest_visit.menarche_age if latest_visit and latest_visit.menarche_age else '—' }}" disabled></div>
-                <div class="field-group"><label class="field-label">Last Menstrual Period</label><input type="text" class="field-input" value="{{ latest_visit.lmp_date if latest_visit and latest_visit.lmp_date else '—' }}" disabled></div>
-                <div class="field-group"><label class="field-label">Gravida</label><input type="text" class="field-input" value="{{ latest_visit.gravida if latest_visit and latest_visit.gravida is not none else '—' }}" disabled></div>
-                <div class="field-group"><label class="field-label">Para</label><input type="text" class="field-input" value="{{ latest_visit.para if latest_visit and latest_visit.para is not none else '—' }}" disabled></div>
+                <div class="field-group"><label class="field-label">Age at Menarche</label><input type="number" class="field-input editable-field" data-field="visit.menarche_age" value="{{ latest_visit.menarche_age if latest_visit.menarche_age is not none else '' }}" disabled></div>
+                <div class="field-group"><label class="field-label">Last Menstrual Period</label><input type="date" class="field-input editable-field" data-field="visit.lmp_date" value="{{ latest_visit.lmp_date[:10] if latest_visit.lmp_date else '' }}" disabled></div>
+                <div class="field-group"><label class="field-label">Gravida</label><input type="number" class="field-input editable-field" data-field="visit.gravida" value="{{ latest_visit.gravida if latest_visit.gravida is not none else '' }}" disabled></div>
+                <div class="field-group"><label class="field-label">Para</label><input type="number" class="field-input editable-field" data-field="visit.para" value="{{ latest_visit.para if latest_visit.para is not none else '' }}" disabled></div>
             </div>
         </div>
     </div>
@@ -297,37 +478,46 @@
 
     <!-- vitals and physical exam -->
     <div class="form-card">
-        <div class="card-header">10. Anthropometric Measurements, Vitals &amp; Physical Exam</div>
-        <div class="card-body">
+        <div class="card-header section-toggle collapsed" data-section="10">10. Anthropometric Measurements, Vitals &amp; Physical Exam<span class="section-toggle-icon"></span></div>
+        <div class="card-body collapsible collapsed">
             <div class="grid-3">
-                <div class="field-group"><label class="field-label">Systolic BP</label><input type="text" class="field-input" value="{{ (latest_visit.bp_systolic ~ ' mmHg') if latest_visit and latest_visit.bp_systolic else '—' }}" disabled></div>
-                <div class="field-group"><label class="field-label">Diastolic BP</label><input type="text" class="field-input" value="{{ (latest_visit.bp_diastolic ~ ' mmHg') if latest_visit and latest_visit.bp_diastolic else '—' }}" disabled></div>
-                <div class="field-group"><label class="field-label">Heart Rate</label><input type="text" class="field-input" value="{{ (latest_visit.heart_rate ~ ' bpm') if latest_visit and latest_visit.heart_rate else '—' }}" disabled></div>
+                <div class="field-group"><label class="field-label">Systolic BP (mmHg)</label><input type="number" class="field-input editable-field" data-field="visit.bp_systolic" value="{{ latest_visit.bp_systolic if latest_visit.bp_systolic is not none else '' }}" disabled></div>
+                <div class="field-group"><label class="field-label">Diastolic BP (mmHg)</label><input type="number" class="field-input editable-field" data-field="visit.bp_diastolic" value="{{ latest_visit.bp_diastolic if latest_visit.bp_diastolic is not none else '' }}" disabled></div>
+                <div class="field-group"><label class="field-label">Heart Rate (bpm)</label><input type="text" class="field-input editable-field" data-field="visit.heart_rate" value="{{ latest_visit.heart_rate if latest_visit.heart_rate is not none else '' }}" disabled></div>
             </div>
             <div class="grid-3">
-                <div class="field-group"><label class="field-label">Respiratory Rate</label><input type="text" class="field-input" value="{{ (latest_visit.respiratory_rate ~ ' cpm') if latest_visit and latest_visit.respiratory_rate else '—' }}" disabled></div>
-                <div class="field-group"><label class="field-label">Height (cm)</label><input type="text" class="field-input" value="{{ (latest_visit.height_cm ~ ' cm') if latest_visit and latest_visit.height_cm else '—' }}" disabled></div>
-                <div class="field-group"><label class="field-label">Weight (kg)</label><input type="text" class="field-input" value="{{ (latest_visit.weight_kg ~ ' kg') if latest_visit and latest_visit.weight_kg else '—' }}" disabled></div>
+                <div class="field-group"><label class="field-label">Respiratory Rate (cpm)</label><input type="text" class="field-input editable-field" data-field="visit.respiratory_rate" value="{{ latest_visit.respiratory_rate if latest_visit.respiratory_rate is not none else '' }}" disabled></div>
+                <div class="field-group"><label class="field-label">Height (cm)</label><input type="number" class="field-input editable-field" data-field="visit.height_cm" value="{{ latest_visit.height_cm if latest_visit.height_cm is not none else '' }}" disabled></div>
+                <div class="field-group"><label class="field-label">Weight (kg)</label><input type="number" class="field-input editable-field" data-field="visit.weight_kg" value="{{ latest_visit.weight_kg if latest_visit.weight_kg is not none else '' }}" disabled></div>
             </div>
             <div class="grid-3">
-                <div class="field-group"><label class="field-label">Waist Circ. (cm)</label><input type="text" class="field-input" value="{{ (latest_visit.waist_cm ~ ' cm') if latest_visit and latest_visit.waist_cm else '—' }}" disabled></div>
-                <div class="field-group"><label class="field-label">BMI</label><input type="text" class="field-input" value="{{ (latest_visit.bmi ~ ' kg/m\u00b2') if latest_visit and latest_visit.bmi else '—' }}{{ (' (' ~ latest_visit.obesity_class ~ ')') if latest_visit and latest_visit.obesity_class else '' }}" disabled></div>
-                <div class="field-group"><label class="field-label">Obesity Classification</label><input type="text" class="field-input" value="{{ latest_visit.obesity_class if latest_visit and latest_visit.obesity_class else '—' }}" disabled></div>
+                <div class="field-group"><label class="field-label">Waist Circ. (cm)</label><input type="number" class="field-input editable-field" data-field="visit.waist_cm" value="{{ latest_visit.waist_cm if latest_visit.waist_cm is not none else '' }}" disabled></div>
+                <div class="field-group"><label class="field-label">BMI</label><input type="text" class="field-input" value="{{ (latest_visit.bmi ~ ' kg/m\u00b2') if latest_visit.bmi else '—' }}" disabled title="Auto-calculated at intake from height/weight."></div>
+                <div class="field-group"><label class="field-label">Obesity Classification</label><input type="text" class="field-input" value="{{ latest_visit.obesity_class or '—' }}" disabled></div>
             </div>
             <label class="field-label" style="margin-top:1rem;">Pertinent PE Findings</label>
             <div class="grid-3">
-                <div class="field-group"><label class="field-label">Skin</label><input type="text" class="field-input" value="{{ latest_visit.pe_skin if latest_visit and latest_visit.pe_skin else '—' }}" disabled></div>
-                <div class="field-group"><label class="field-label">HEENT</label><input type="text" class="field-input" value="{{ latest_visit.pe_heent if latest_visit and latest_visit.pe_heent else '—' }}" disabled></div>
-                <div class="field-group"><label class="field-label">Chest/Lungs</label><input type="text" class="field-input" value="{{ latest_visit.pe_chest if latest_visit and latest_visit.pe_chest else '—' }}" disabled></div>
-                <div class="field-group"><label class="field-label">Heart</label><input type="text" class="field-input" value="{{ latest_visit.pe_heart if latest_visit and latest_visit.pe_heart else '—' }}" disabled></div>
-                <div class="field-group"><label class="field-label">Abdomen</label><input type="text" class="field-input" value="{{ latest_visit.pe_abdomen if latest_visit and latest_visit.pe_abdomen else '—' }}" disabled></div>
-                <div class="field-group"><label class="field-label">Extremities</label><input type="text" class="field-input" value="{{ latest_visit.pe_extremities if latest_visit and latest_visit.pe_extremities else '—' }}" disabled></div>
+                <div class="field-group"><label class="field-label">Skin</label><input type="text" class="field-input editable-field" data-field="visit.pe_skin" value="{{ latest_visit.pe_skin or '' }}" disabled></div>
+                <div class="field-group"><label class="field-label">HEENT</label><input type="text" class="field-input editable-field" data-field="visit.pe_heent" value="{{ latest_visit.pe_heent or '' }}" disabled></div>
+                <div class="field-group"><label class="field-label">Chest/Lungs</label><input type="text" class="field-input editable-field" data-field="visit.pe_chest" value="{{ latest_visit.pe_chest or '' }}" disabled></div>
+                <div class="field-group"><label class="field-label">Heart</label><input type="text" class="field-input editable-field" data-field="visit.pe_heart" value="{{ latest_visit.pe_heart or '' }}" disabled></div>
+                <div class="field-group"><label class="field-label">Abdomen</label><input type="text" class="field-input editable-field" data-field="visit.pe_abdomen" value="{{ latest_visit.pe_abdomen or '' }}" disabled></div>
+                <div class="field-group"><label class="field-label">Extremities</label><input type="text" class="field-input editable-field" data-field="visit.pe_extremities" value="{{ latest_visit.pe_extremities or '' }}" disabled></div>
             </div>
+            {% if latest_visit.status == 'draft' %}
+            <div class="field-group" id="markSubmittedGroup" style="margin-top:1rem;">
+                <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.85rem; cursor:pointer;">
+                    <input type="checkbox" id="markSubmittedCheck">
+                    Mark this draft as submitted when I save
+                </label>
+            </div>
+            {% endif %}
         </div>
     </div>
+    </form>
 
     <div class="action-bar" style="justify-content:flex-start; flex-wrap:nowrap; overflow-x:auto; gap:0.5rem; padding-bottom:0.35rem;">
-        <a href="{{ url_for('nurse.nurse_data_management') }}" class="btn btn-secondary" style="text-decoration:none; display:inline-flex; text-align:center; padding:0.625rem 1rem; flex-shrink:0;">← Back to Data Management</a>
+        <a href="{{ back_url }}" class="btn btn-secondary" style="text-decoration:none; display:inline-flex; text-align:center; padding:0.625rem 1rem; flex-shrink:0;">← Back to Data Management</a>
         <button type="button" class="btn btn-secondary" style="padding:0.625rem 1rem; flex-shrink:0;" onclick="window.print()">Print / Save as PDF</button>
         <a href="{{ url_for('nurse.nurse_patient_export_all', patient_id=patient_id) }}" class="btn btn-secondary" style="text-decoration:none; display:inline-flex; text-align:center; padding:0.625rem 1rem; flex-shrink:0;">Export Full History (CSV)</a>
         <a href="{{ url_for('nurse.nurse_patient_export_visit', patient_id=patient_id, visit_id=latest_visit.visit_id) }}" class="btn btn-secondary" style="text-decoration:none; display:inline-flex; text-align:center; padding:0.625rem 1rem; flex-shrink:0;">Export This Visit (CSV)</a>
@@ -335,4 +525,15 @@
         <a href="{{ url_for('nurse.nurse_screening', patient_id=patient_id, visit_id=latest_visit.visit_id) }}" class="btn btn-primary" style="text-decoration:none; display:inline-flex; text-align:center; padding:0.625rem 1rem; flex-shrink:0;">View Screening Result →</a>
     </div>
     {% endif %}
+{% endblock %}
+
+{% block scripts %}
+    <script>
+        // Tiny server-rendered config -- everything else lives in the
+        // external file below so it can be cached/minified like the rest
+        // of static/js/. Jinja can't run inside a static .js file, so the
+        // handful of URLs it needs to build are handed over here instead.
+        window.__psgcUrl = "{{ url_for('nurse.nurse_static_data', filename='psgc_data.json') }}";
+    </script>
+    <script src="{{ url_for('static', filename='js/nurse_patient_file_view.js') }}"></script>
 {% endblock %}

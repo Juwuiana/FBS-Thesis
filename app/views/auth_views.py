@@ -3,7 +3,7 @@ from functools import wraps
 from pathlib import Path
 from urllib.parse import urlparse
 
-from flask import Blueprint, abort, current_app, flash, jsonify, redirect, render_template, request, session, url_for
+from flask import Blueprint, abort, current_app, flash, jsonify, redirect, render_template, request, send_from_directory, session, url_for
 
 from app.controllers import auth_controller
 from app.constants import STATION_MAP
@@ -67,6 +67,19 @@ def require_role_for_blueprint(bp, *roles):
     """
     guard = role_required(*roles)(lambda: None)
     bp.before_request(guard)
+
+
+@auth_bp.route("/auth-data/<path:filename>")
+def auth_static_data(filename):
+    """
+    Serves FBS-Thesis/data/ files (psgc_data.json) to pages that render
+    before login -- signup.html needs the region/city/barangay cascade,
+    but nurse.nurse_static_data is gated behind the nurse blueprint's
+    role guard, so a not-yet-authenticated visitor can't reach it.
+    """
+    project_root = os.path.abspath(os.path.join(current_app.root_path, ".."))
+    data_dir = os.path.join(project_root, "data")
+    return send_from_directory(data_dir, filename)
 
 
 @auth_bp.route("/")
@@ -210,4 +223,3 @@ def upload_avatar():
     user_model.update_avatar(user_id, filename)
     flash("Profile photo updated successfully.", "success")
     return redirect(fallback)
-

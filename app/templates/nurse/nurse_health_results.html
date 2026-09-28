@@ -1,69 +1,320 @@
 {% extends "nurse/nurse_base.html" %}
 
 {% block content %}
+<div class="hr-page">
+
 <div class="page-header">
     <div>
-        <h1 class="page-title">Health Results Deep Dive</h1>
-        <p class="page-subtitle">Epidemiological feature spaces and predictive impact modeling</p>
+        <h1 class="page-title">Health Results</h1>
+        <p class="hr-sub">Screening results, follow-up, and quality checks</p>
     </div>
-    <button onclick="window.print();" class="btn btn-primary" style="height: 40px; font-size: 0.8rem;">
-        Generate Comprehensive System Report
-    </button>
+    <button type="button" class="btn btn-primary" onclick="window.print();">Print summary</button>
 </div>
 
-<div class="form-card" style="margin-bottom: 1.5rem;">
-    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-        <span>Interactive Patient Attribute Profiling Tracker</span>
-        <div>
-            <select id="attributeSelector" class="field-input" style="padding: 0.35rem 0.75rem; font-size: 0.85rem; min-width: 280px; height: 36px; border-color: var(--green-accent); background-color: var(--white);">
-                <option value="fbs">Fasting Blood Sugar Levels</option>
-                <option value="status">Predicted Diabetes Risk Status</option>
-                <option value="age">Age Distribution cohorts</option>
-                <option value="sex">Biological Sex Demographic</option>
-                <option value="bmi">Body Mass Index Classifications</option>
-                <option value="bp">Blood Pressure Segments</option>
-                <option value="hypertension">Hypertension Diagnostic History</option>
-                <option value="waist">Waist Circumference Thresholds</option>
-                <option value="smoking">Smoking Status Metric</option>
-                <option value="family">Family History of Diabetes</option>
-            </select>
-        </div>
-    </div>
-    <div class="card-body">
-        <div class="chart-container-large" style="height: 400px; position: relative;">
-            <canvas id="dynamicAttributeChart"></canvas>
-        </div>
-    </div>
+<div class="hr-print-only hr-audit">
+    Santa Rosa City Health Office &mdash; FBS screening summary &middot; Printed {{ report_date }} by {{ session.get('user_name', 'staff') }}
 </div>
 
-<div class="form-card" style="margin-bottom: 1.5rem;">
-    <div class="card-header">Barangay Stratified Risk Index Map Matrix (All 18 Sectors)</div>
-    <div class="card-body">
-        <div class="chart-container-large" style="height: 380px;">
-            <canvas id="fullBarangayBarChart"></canvas>
-        </div>
-    </div>
+<!-- Headline: what needs attention right now -->
+<p class="hr-headline">
+    {% if referral.at_risk %}
+        <b>{{ referral.at_risk }}</b> patient{{ '' if referral.at_risk == 1 else 's' }} at moderate or high risk.
+        {% if followup.overdue %}<span class="is-alert"><b>{{ followup.overdue }}</b> {{ 'is' if followup.overdue == 1 else 'are' }} overdue for follow-up</span>{% else %}None are overdue for follow-up{% endif %}{% if followup.no_action %}, and <b>{{ followup.no_action }}</b> {{ 'has' if followup.no_action == 1 else 'have' }} no referral recorded{% endif %}.
+    {% else %}
+        No patients are waiting on follow-up.
+    {% endif %}
+</p>
+
+{% if risk_total %}
+<div class="hr-ribbon" role="img" aria-label="Risk mix of {{ risk_total }} screened patients">
+    {% for key, cls in (('Low', 'low'), ('Moderate', 'mod'), ('High', 'high')) %}
+        {% if risk.get(key) %}<span class="{{ cls }}" style="flex-grow: {{ risk[key] }}"></span>{% endif %}
+    {% endfor %}
+</div>
+<div class="hr-ribbon-legend">
+    {% for key, cls in (('Low', 'low'), ('Moderate', 'mod'), ('High', 'high')) %}
+        <span><i class="dot {{ cls }}"></i>{{ key }} <b>{{ risk.get(key, 0) }}</b> ({{ (risk.get(key, 0) / risk_total * 100)|round(0)|int }}%)</span>
+    {% endfor %}
+    {% if risk.get('Pending') %}<span class="hr-muted">Pending <b>{{ risk['Pending'] }}</b></span>{% endif %}
+</div>
+{% endif %}
+
+<div class="hr-tabs" role="tablist" aria-label="Health results sections">
+    <button type="button" class="hr-tab" role="tab" data-tab="overview" aria-selected="true">Overview</button>
+    <button type="button" class="hr-tab" role="tab" data-tab="followup" aria-selected="false">Follow-up{% if referral.at_risk %} <span class="hr-count">{{ referral.at_risk }}</span>{% endif %}</button>
+    <button type="button" class="hr-tab" role="tab" data-tab="barangays" aria-selected="false">Barangays</button>
+    <button type="button" class="hr-tab" role="tab" data-tab="quality" aria-selected="false">Screening quality</button>
+    <button type="button" class="hr-tab" role="tab" data-tab="log" aria-selected="false">Daily log</button>
 </div>
 
-<div class="grid-2" style="margin-bottom: 1.5rem;">
-    <div class="form-card">
-        <div class="card-header">Risk Profile Stratified by Sex Attribute</div>
+<!-- ============ OVERVIEW ============ -->
+<section class="hr-panel is-active" id="panel-overview" role="tabpanel">
+    <div class="dash-grid-mid">
+        <div class="stat-card">
+            <div class="stat-title">No referral recorded</div>
+            <div class="stat-value">{{ followup.no_action }}</div>
+            <div class="stat-trend hr-muted">Moderate or high risk, no action logged</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-title">Follow-up overdue</div>
+            <div class="stat-value {{ 'trend-bad' if followup.overdue }}">{{ followup.overdue }}</div>
+            <div class="stat-trend hr-muted">Date passed, no newer visit</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-title">Chest pain / stroke flags</div>
+            <div class="stat-value {{ 'trend-bad' if red_flags }}">{{ red_flags|length }}</div>
+            <div class="stat-trend"><button type="button" class="hr-link hr-noprint" data-tab-target="followup">Review in Follow-up</button></div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-title">Awaiting lab result</div>
+            <div class="stat-value">{{ followup.awaiting_lab }}</div>
+            <div class="stat-trend hr-muted">Visit saved, no FBS entered</div>
+        </div>
+    </div>
+
+    <div class="dash-grid-bot">
+        <div class="form-card">
+            <div class="card-header">Screenings per month</div>
+            <div class="card-body"><div class="chart-container"><canvas id="monthlyTrendChart"></canvas></div></div>
+        </div>
+        <div class="form-card">
+            <div class="card-header">
+                <span>Patient profile</span>
+                <select id="attributeSelector" class="hr-select hr-noprint" aria-label="Choose what to show">
+                    <option value="fbs">Fasting blood sugar</option>
+                    <option value="age">Age group</option>
+                    <option value="sex">Sex</option>
+                    <option value="bmi">BMI class</option>
+                    <option value="bp">Blood pressure</option>
+                    <option value="hypertension">History of hypertension</option>
+                    <option value="waist">Waist circumference</option>
+                    <option value="smoking">Smoking status</option>
+                    <option value="family">Family history of diabetes</option>
+                </select>
+            </div>
+            <div class="card-body">
+                <p class="hr-note" id="profileNote"></p>
+                <div class="chart-container"><canvas id="dynamicAttributeChart"></canvas></div>
+            </div>
+        </div>
+        <div class="form-card">
+            <div class="card-header">At moderate or high risk, by sex</div>
+            <div class="card-body" id="sexMeters"></div>
+        </div>
+    </div>
+</section>
+
+<!-- ============ FOLLOW-UP ============ -->
+<section class="hr-panel" id="panel-followup" role="tabpanel">
+
+    {% if red_flags %}
+    <div class="form-card hr-redflags">
+        <div class="card-header">Needs clinician review today</div>
         <div class="card-body">
-            <div class="chart-container">
-                <canvas id="riskBySexChart"></canvas>
+            <p class="hr-note">Answered yes to severe chest pain (30+ minutes) or stroke/TIA symptoms on the last screening.</p>
+            <div class="hr-scroll">
+                <table class="data-table">
+                    <thead><tr><th>Patient</th><th>Barangay</th><th>Last visit</th><th>FBS</th><th>Risk</th><th>Flag</th></tr></thead>
+                    <tbody>
+                    {% for f in red_flags %}
+                        <tr>
+                            <td><a class="patient-name-link" href="{{ url_for('nurse.nurse_patient_file_view', patient_id=f.patient_code) }}">{{ f.last_name }}, {{ f.first_name }}</a></td>
+                            <td>{{ f.barangay or '—' }}</td>
+                            <td>{{ f.assessment_date or '—' }}</td>
+                            <td>{{ f.fbs_mg_dl if f.fbs_mg_dl is not none else '—' }}</td>
+                            <td>{% if f.risk %}<span class="risk-badge {{ 'badge-danger' if f.risk == 'High' else ('badge-warning' if f.risk == 'Moderate' else 'badge-success') }}">{{ f.risk }}</span>{% else %}—{% endif %}</td>
+                            <td>{% for t in f.flags %}<span class="hr-pill overdue">{{ t }}</span> {% endfor %}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
+    {% endif %}
+
     <div class="form-card">
-        <div class="card-header">Risk Profile Stratified by Age Class Interval Cohorts</div>
+        <div class="card-header">Referral progress for moderate and high risk</div>
         <div class="card-body">
-            <div class="chart-container">
-                <canvas id="riskByAgeChart"></canvas>
+            {% for row in referral.steps %}
+            <div class="hr-meter-row">
+                <span class="hr-meter-label">{{ row.label }} <small class="hr-muted">({{ row.n }} of {{ referral.at_risk }})</small></span>
+                <div class="hr-meter {{ row.tone }}"><i style="width: {{ row.pct }}%"></i></div>
+                <span class="hr-meter-val">{{ row.pct }}%</span>
+            </div>
+            {% endfor %}
+            {% if referral.destinations %}
+            <p class="hr-note">Referred to: {% for d in referral.destinations %}{{ d.name }} ({{ d.n }}){{ ', ' if not loop.last }}{% endfor %}</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="form-card hr-worklist">
+        <div class="card-header">
+            <span>Patients needing follow-up (<span id="worklistCount">{{ worklist|length }}</span>)</span>
+            <div class="hr-filters hr-noprint">
+                <select id="worklistRisk" class="hr-select" aria-label="Filter by risk">
+                    <option value="">All risk levels</option><option value="High">High</option><option value="Moderate">Moderate</option>
+                </select>
+                <select id="worklistStatus" class="hr-select" aria-label="Filter by status">
+                    <option value="">All statuses</option><option value="overdue">Follow-up overdue</option>
+                    <option value="none">No referral recorded</option><option value="ok">Referred / scheduled</option>
+                </select>
+                <select id="worklistBarangay" class="hr-select" aria-label="Filter by barangay">
+                    <option value="">All barangays</option>
+                    {% for b in worklist_barangays %}<option value="{{ b }}">{{ b }}</option>{% endfor %}
+                </select>
+                <input type="search" id="worklistSearch" class="hr-select" placeholder="Search name or ID" aria-label="Search patients">
+            </div>
+        </div>
+        <div class="card-body hr-scroll tall">
+            <table class="data-table hr-sticky">
+                <thead><tr><th>Patient</th><th>Age / Sex</th><th>Barangay</th><th>Last visit</th><th>FBS</th><th>Risk</th><th>Status</th><th>Follow-up by</th></tr></thead>
+                <tbody id="worklistBody">
+                {% for w in worklist %}
+                    <tr data-risk="{{ w.risk }}" data-status="{{ w.status_key }}" data-barangay="{{ w.barangay or '' }}"
+                        data-search="{{ (w.last_name ~ ' ' ~ w.first_name ~ ' ' ~ w.patient_code)|lower }}">
+                        <td>
+                            <a class="patient-name-link" href="{{ url_for('nurse.nurse_patient_file_view', patient_id=w.patient_code) }}">{{ w.last_name }}, {{ w.first_name }}</a>
+                            <div class="hr-sub">{{ w.patient_code }}</div>
+                        </td>
+                        <td>{{ w.age if w.age is not none else '—' }} / {{ w.sex or '—' }}</td>
+                        <td>{{ w.barangay or '—' }}</td>
+                        <td>{{ w.assessment_date or '—' }}</td>
+                        <td>{{ w.fbs_mg_dl if w.fbs_mg_dl is not none else '—' }}</td>
+                        <td><span class="risk-badge {{ 'badge-danger' if w.risk == 'High' else 'badge-warning' }}">{{ w.risk }}</span></td>
+                        <td>
+                            <span class="hr-pill {{ w.status_key }}">{{ w.status }}</span>
+                            {% if w.referred_to %}<div class="hr-sub">{{ w.referred_to }}</div>{% endif %}
+                        </td>
+                        <td>{{ w.follow_up_date or '—' }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            <p class="hr-empty" id="worklistEmpty" {% if worklist %}hidden{% endif %}>No patients match. Nothing is waiting on follow-up.</p>
+        </div>
+    </div>
+</section>
+
+<!-- ============ BARANGAYS ============ -->
+<section class="hr-panel" id="panel-barangays" role="tabpanel">
+    <div class="form-card">
+        <div class="card-header">
+            <span>Risk by barangay (darker = higher share)</span>
+            <button type="button" class="btn btn-primary hr-noprint" id="barangayCsvBtn">Download CSV</button>
+        </div>
+        <div class="card-body hr-scroll">
+            <table class="data-table" id="barangayTable">
+                <thead><tr><th>Barangay</th><th>Screened</th><th>Low</th><th>Moderate</th><th>High</th><th>% high</th><th>% moderate or high</th></tr></thead>
+                <tbody>
+                {% for r in barangay_rows %}
+                    <tr>
+                        <td>{{ r.barangay }}</td>
+                        <td>{{ r.total }}</td>
+                        <td>{{ r.low }}</td>
+                        <td>{{ r.moderate }}</td>
+                        <td>{{ r.high }}</td>
+                        <td class="hr-heat" style="background: rgba(239, 68, 68, {{ r.heat_high }})">{{ r.pct_high }}%</td>
+                        <td class="hr-heat" style="background: rgba(245, 158, 11, {{ r.heat_risk }})">{{ r.pct_at_risk }}%</td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="7" class="hr-empty">No barangay data yet.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            <p class="hr-note">Percentages from barangays with only a few screenings can swing widely; check the Screened column.</p>
+        </div>
+    </div>
+</section>
+
+<!-- ============ SCREENING QUALITY ============ -->
+<section class="hr-panel" id="panel-quality" role="tabpanel">
+    {% if quality.repeat_n %}
+    <div class="hr-callout">
+        <b>{{ quality.repeat_n }}</b> moderate or high reading{{ '' if quality.repeat_n == 1 else 's' }} without a confirmed 8-hour fast.
+        A non-fasted reading can read higher than the true fasting value, so consider repeating the FBS.
+    </div>
+    {% endif %}
+
+    <div class="dash-grid-bot">
+        <div class="form-card">
+            <div class="card-header">Checklist completed ({{ quality.total }} screenings)</div>
+            <div class="card-body">
+                {% for c in quality.checks %}
+                <div class="hr-meter-row">
+                    <span class="hr-meter-label">{{ c.label }}</span>
+                    <div class="hr-meter {{ c.tone }}"><i style="width: {{ c.pct }}%"></i></div>
+                    <span class="hr-meter-val">{{ c.pct }}%</span>
+                </div>
+                {% endfor %}
+                <p class="hr-note">Imported records that have no checklist data count as not done.</p>
+            </div>
+        </div>
+        <div class="form-card">
+            <div class="card-header">Measurements recorded ({{ quality.fields_total }} patients)</div>
+            <div class="card-body">
+                {% for c in quality.fields %}
+                <div class="hr-meter-row">
+                    <span class="hr-meter-label">{{ c.label }}</span>
+                    <div class="hr-meter {{ c.tone }}"><i style="width: {{ c.pct }}%"></i></div>
+                    <span class="hr-meter-val">{{ c.pct }}%</span>
+                </div>
+                {% endfor %}
+                <p class="hr-note">Based on each patient's latest visit. Waist and blood pressure feed the risk model.</p>
             </div>
         </div>
     </div>
+</section>
+
+<!-- ============ DAILY LOG ============ -->
+<section class="hr-panel" id="panel-log" role="tabpanel">
+    <div class="dash-grid-bot">
+        <div class="form-card">
+            <div class="card-header">Screened per day (last 14 days)</div>
+            <div class="card-body hr-scroll">
+                <table class="data-table">
+                    <thead><tr><th>Date</th><th>Screened</th><th>Low</th><th>Moderate</th><th>High</th><th>Not fasted</th></tr></thead>
+                    <tbody>
+                    {% for d in daily_log %}
+                        <tr><td>{{ d.day }}</td><td>{{ d.screened }}</td><td>{{ d.low }}</td><td>{{ d.moderate }}</td>
+                            <td>{{ d.high }}</td><td>{{ d.not_fasted }}</td></tr>
+                    {% else %}
+                        <tr><td colspan="6" class="hr-empty">No screenings in the last 14 days.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="form-card">
+            <div class="card-header">By staff (last 30 days)</div>
+            <div class="card-body hr-scroll">
+                <table class="data-table">
+                    <thead><tr><th>Staff</th><th>Screened</th><th>High risk</th></tr></thead>
+                    <tbody>
+                    {% for n in nurse_activity %}
+                        <tr><td>{{ n.nurse }}</td><td>{{ n.screened }}</td><td>{{ n.high }}</td></tr>
+                    {% else %}
+                        <tr><td colspan="3" class="hr-empty">No screenings in the last 30 days.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</section>
+
+<p class="hr-note hr-footnote">
+    These are screening results, not a diagnosis. Risk comes from the fasting blood sugar reading, or the nurse's
+    final rating when one was entered. Confirm with a laboratory test and a physician.
+</p>
+
+<div class="hr-print-only hr-signoff">
+    <div><span class="rule"></span>Prepared by (nurse)</div>
+    <div><span class="rule"></span>Reviewed by (health officer)</div>
 </div>
 
+</div>
 {% endblock %}
 
 {% block scripts %}

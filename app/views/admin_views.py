@@ -7,7 +7,7 @@ from app.models.patient_model import _compute_age
 from werkzeug.security import generate_password_hash
 
 from app.controllers import auth_controller, metrics_controller
-from app.constants import BARANGAYS, CSV_IMPORT_COLUMNS, ROLE_MAP, STATION_MAP
+from app.constants import CSV_IMPORT_COLUMNS, ROLE_MAP, STATION_MAP
 from app.db import get_db
 from app.models import audit_model
 from app.models.model_performance_model import list_models, get_best_model
@@ -25,13 +25,18 @@ MAX_IMPORT_BYTES = 1_048_576
 MAX_IMPORT_ROWS = 500
 _ROLE_BY_LABEL = {label.casefold(): value for label, value in ROLE_MAP.items()}
 _STATION_BY_LABEL = {**{label.casefold(): value for label, value in STATION_MAP.items()}, "rhu i": "lhui", "rhu ii": "lhuii"}
-_BARANGAY_BY_VALUE = {value.casefold(): value for value, label in BARANGAYS}
-_BARANGAY_BY_LABEL = {label.casefold(): value for value, label in BARANGAYS}
 
 def _csv_value(value): return (value or "").strip()
 def _normalize_csv_header(header): return "_".join((header or "").strip().lower().split())
 def _csv_row_form(row):
-    return {"first_name":_csv_value(row.get("first_name")),"middle_name":_csv_value(row.get("middle_name")),"last_name":_csv_value(row.get("last_name")),"birthday":auth_controller.normalize_import_birthday(_csv_value(row.get("birthday"))),"sex":_csv_value(row.get("sex")).lower(),"email":_csv_value(row.get("email")),"phone":_csv_value(row.get("phone")),"role":_ROLE_BY_LABEL.get(_csv_value(row.get("role")).casefold(),""),"facility":_STATION_BY_LABEL.get(_csv_value(row.get("station")).casefold(),""),"barangay":_BARANGAY_BY_VALUE.get(_csv_value(row.get("barangay")).casefold(),_BARANGAY_BY_LABEL.get(_csv_value(row.get("barangay")).casefold(),"")),"password":row.get("temporary_password") or "","confirm_password":row.get("temporary_password") or ""}
+    # barangay_name is passed through as-is (no more mapping against the
+    # 18-entry BARANGAYS whitelist) -- validate_profile_fields resolves it
+    # via lookup_model.get_or_create_barangay_by_name, which creates the
+    # row instead of silently blanking anything outside Santa Rosa. This
+    # is still name-only (the CSV template has no code column), so it's
+    # ambiguous nationwide -- fine for now since staff imports are small
+    # and manually reviewed, but worth revisiting if that stops being true.
+    return {"first_name":_csv_value(row.get("first_name")),"middle_name":_csv_value(row.get("middle_name")),"last_name":_csv_value(row.get("last_name")),"birthday":auth_controller.normalize_import_birthday(_csv_value(row.get("birthday"))),"sex":_csv_value(row.get("sex")).lower(),"email":_csv_value(row.get("email")),"phone":_csv_value(row.get("phone")),"role":_ROLE_BY_LABEL.get(_csv_value(row.get("role")).casefold(),""),"facility":_STATION_BY_LABEL.get(_csv_value(row.get("station")).casefold(),""),"barangay_name":_csv_value(row.get("barangay")),"password":row.get("temporary_password") or "","confirm_password":row.get("temporary_password") or ""}
 def _import_error(errors,row_number,message): errors.append({"row":row_number,"message":message})
 STAFF_STATUSES = ["Approved", "Rejected", "Pending"]
 
@@ -472,8 +477,6 @@ def staff_import():
             validation_errors, cleaned, password = auth_controller.validate_profile_fields(
                 form, normalize_phone_input=True
             )
-            if form["barangay"] == "":
-                validation_errors.append("Please select an assigned barangay.")
             for message in validation_errors:
                 _import_error(errors, row_number, message)
             if not validation_errors:
@@ -500,7 +503,7 @@ def staff_import():
 @login_required
 def add_staff():
     from app.models import user as user_model
-    from app.constants import BARANGAYS, ROLE_MAP, STATION_MAP
+    from app.constants import ROLE_MAP, STATION_MAP
 
     if request.method == "POST":
         role_label = request.form.get("role", "").strip()
@@ -516,16 +519,22 @@ def add_staff():
             "phone": request.form.get("contact", ""),
             "role": ROLE_MAP.get(role_label, ""),
             "facility": STATION_MAP.get(station_label, ""),
-            "barangay": request.form.get("barangay", ""),
+            "barangay_code": request.form.get("barangay_code", ""),
+            "barangay_name": request.form.get("barangay_name", ""),
+            "city_code": request.form.get("city_code", ""),
+            "city_name": request.form.get("city_name", ""),
+            "region_code": request.form.get("region_code", ""),
+            "region_name": request.form.get("region_name", ""),
             "password": request.form.get("password", ""),
             "confirm_password": request.form.get("confirm_password", ""),
         }
 
+        # barangay resolution (code-first, PSGC-based) now happens inside
+        # validate_profile_fields via lookup_model -- no separate whitelist
+        # check needed here anymore.
         errors, cleaned, password = auth_controller.validate_profile_fields(
             profile_form, normalize_phone_input=True
         )
-        if profile_form["barangay"] not in {value for value, _ in BARANGAYS}:
-            errors.append("Please select an assigned barangay.")
         if role_label not in STAFF_ROLES:
             errors.append("Please select a valid role.")
         if station_label not in STATIONS:
@@ -541,13 +550,16 @@ def add_staff():
             "contact": request.form.get("contact", "").strip(),
             "role": role_label,
             "station": station_label,
-            "barangay": request.form.get("barangay", "").strip(),
+            "region_code": request.form.get("region_code", "").strip(),
+            "city_code": request.form.get("city_code", "").strip(),
+            "barangay_code": request.form.get("barangay_code", "").strip(),
+            "barangay_name": request.form.get("barangay_name", "").strip(),
         }
 
         if errors:
             return render_template(
                 "admin/add_staff.html",
-                roles=STAFF_ROLES, stations=STATIONS, barangays=BARANGAYS,
+                roles=STAFF_ROLES, stations=STATIONS,
                 today=datetime.utcnow().date().isoformat(),
                 errors=errors, form_data=form_data,
             ), 400
@@ -564,7 +576,7 @@ def add_staff():
                 errors.append("An account with this email already exists.")
                 return render_template(
                     "admin/add_staff.html",
-                    roles=STAFF_ROLES, stations=STATIONS, barangays=BARANGAYS,
+                    roles=STAFF_ROLES, stations=STATIONS,
                     today=datetime.utcnow().date().isoformat(),
                     errors=errors, form_data=form_data,
                 ), 400
@@ -576,7 +588,7 @@ def add_staff():
 
     return render_template(
         "admin/add_staff.html",
-        roles=STAFF_ROLES, stations=STATIONS, barangays=BARANGAYS,
+        roles=STAFF_ROLES, stations=STATIONS,
         today=datetime.utcnow().date().isoformat(),
         errors=[], form_data={},
     )

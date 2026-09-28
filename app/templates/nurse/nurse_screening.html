@@ -54,10 +54,17 @@
                         <span>Fasting Blood Sugar (FBS)</span>
                         <span style="color:var(--text-muted); font-weight:normal; font-size:0.75rem;">* Patient must fast for at least 8 hours</span>
                     </label>
-                    <input type="number" name="fbs_mg_dl" id="fbsInput" class="field-input fbs-display"
-                        placeholder="— mg/dL"
-                        value="{{ existing_screening.fbs_mg_dl if existing_screening else '' }}"
-                        {% if not is_latest %}disabled{% else %}required{% endif %}>
+                    <div style="display:flex; gap:0.5rem; align-items:stretch;">
+                        <input type="number" step="0.1" name="fbs_mg_dl" id="fbsInput" class="field-input fbs-display" style="flex:1;"
+                            placeholder="e.g. 95"
+                            value="{{ existing_screening.fbs_entered_value if existing_screening and existing_screening.fbs_entered_value is not none else (existing_screening.fbs_mg_dl if existing_screening else '') }}"
+                            {% if not is_latest %}disabled{% else %}required{% endif %}>
+                        <select name="fbs_unit" id="fbsUnit" class="field-input" style="max-width:130px;" {% if not is_latest %}disabled{% endif %}>
+                            <option value="mg_dl" {% if not existing_screening or existing_screening.fbs_entered_unit in (None, "mg_dl") %}selected{% endif %}>mg/dL</option>
+                            <option value="mmol_l" {% if existing_screening and existing_screening.fbs_entered_unit == "mmol_l" %}selected{% endif %}>mmol/L</option>
+                        </select>
+                    </div>
+                    <p id="fbsConvertedHint" style="font-size:0.75rem; color:var(--text-muted); margin-top:0.35rem;"></p>
                     <div class="grid-3" style="margin-top:1rem;">
                         <div class="field-group">
                             <label class="field-label">Testing Method</label>
@@ -86,8 +93,13 @@
             <div class="form-card">
                 <div class="card-header">Clinical Notes & Observations</div>
                 <div class="card-body">
-                    <textarea class="field-input" name="clinical_notes" rows="4" style="resize:vertical;"
-                              placeholder="Enter clinical notes, patient complaints, physical observations, or referral notes...">{{ latest_visit.clinical_notes if latest_visit else '' }}</textarea>
+                    <label class="field-label" style="display:flex; justify-content:space-between;">
+                        <span></span>
+                        <span style="color:var(--text-muted); font-weight:normal; font-size:0.75rem;">Required — type "None" if there is nothing to note</span>
+                    </label>
+                    <textarea class="field-input" name="clinical_notes" rows="4" style="resize:vertical;" required
+                              {% if not is_latest %}disabled{% endif %}
+                              placeholder="Enter clinical notes, patient complaints, physical observations, or referral notes... (or type &quot;None&quot;)">{{ latest_visit.clinical_notes if latest_visit else '' }}</textarea>
                 </div>
             </div>
 
@@ -123,15 +135,15 @@
                 <div class="card-body">
                     <div class="grid-2" style="gap: 1rem; font-size: 0.85rem; color: var(--text-secondary);">
                         <label style="display:flex; align-items:center; gap:0.5rem;">
-                            <input type="checkbox" name="fasted_ge_8h" {% if not existing_screening or existing_screening.fasted_ge_8h %}checked{% endif %}> Patient fasted for ≥ 8 hours</label>
+                            <input type="checkbox" name="fasted_ge_8h" {% if existing_screening and existing_screening.fasted_ge_8h %}checked{% endif %}> Patient fasted for ≥ 8 hours</label>
                         <label style="display:flex; align-items:center; gap:0.5rem;">
                             <input type="checkbox" name="identity_verified" {% if existing_screening and existing_screening.identity_verified %}checked{% endif %}> Patient identity verified against ID</label>
                         <label style="display:flex; align-items:center; gap:0.5rem;">
-                            <input type="checkbox" name="glucometer_calibrated" {% if not existing_screening or existing_screening.glucometer_calibrated %}checked{% endif %}> Glucometer calibrated and lot number recorded</label>
+                            <input type="checkbox" name="glucometer_calibrated" {% if existing_screening and existing_screening.glucometer_calibrated %}checked{% endif %}> Glucometer calibrated and lot number recorded</label>
                         <label style="display:flex; align-items:center; gap:0.5rem;">
                             <input type="checkbox" name="capillary_sample_taken" {% if existing_screening and existing_screening.capillary_sample_taken %}checked{% endif %}> Blood sample taken from fingertip (capillary)</label>
                         <label style="display:flex; align-items:center; gap:0.5rem;">
-                            <input type="checkbox" name="consent_signed" {% if not existing_screening or existing_screening.consent_signed %}checked{% endif %}> Consent form signed by patient</label>
+                            <input type="checkbox" name="consent_signed" {% if existing_screening and existing_screening.consent_signed %}checked{% endif %}> Consent form signed by patient</label>
                         <label style="display:flex; align-items:center; gap:0.5rem;">
                             <input type="checkbox" name="result_recorded_within_5min" {% if existing_screening and existing_screening.result_recorded_within_5min %}checked{% endif %}> Result recorded within 5 minutes of test</label>
                     </div>
@@ -171,8 +183,6 @@
 
                         <p style="font-size:0.85rem; font-weight:600;">Recommendation:</p>
                         <p id="recommendationText" style="font-size:0.8rem; background:var(--warning-light); padding:1rem; border-radius:6px; color:#b45309; border-left: 4px solid var(--warning);"></p>
-
-                        <p style="font-size: 0.7rem; color: var(--text-muted); margin-top: 1rem;">⚠ Preliminary threshold-based estimate. Not yet connected to the trained prediction model.</p>
                     </div>
                 </div>
 
@@ -282,8 +292,31 @@ document.addEventListener('DOMContentLoaded', () => {
                   recommendation: 'FBS in the diabetic range. Refer to physician promptly for confirmatory testing and management.' };
     }
 
+    const fbsUnit = document.getElementById('fbsUnit');
+    const fbsConvertedHint = document.getElementById('fbsConvertedHint');
+
+    function toMgDl(rawValue, unit) {
+        if (unit === 'mmol_l') return rawValue * 18.0182;
+        return rawValue;
+    }
+
+    function updateFbsHint() {
+        const raw = parseFloat(fbsInput.value);
+        if (!fbsInput.value || isNaN(raw)) { fbsConvertedHint.textContent = ''; return; }
+        if (fbsUnit.value === 'mmol_l') {
+            fbsConvertedHint.textContent = `≈ ${toMgDl(raw, 'mmol_l').toFixed(1)} mg/dL`;
+        } else {
+            fbsConvertedHint.textContent = `≈ ${(raw / 18.0182).toFixed(1)} mmol/L`;
+        }
+    }
+    if (fbsInput && fbsUnit) {
+        fbsInput.addEventListener('input', updateFbsHint);
+        fbsUnit.addEventListener('change', updateFbsHint);
+        updateFbsHint();
+    }
+
     calculateBtn.addEventListener('click', () => {
-        const fbsValue = parseFloat(fbsInput.value);
+        const fbsValue = toMgDl(parseFloat(fbsInput.value), fbsUnit ? fbsUnit.value : 'mg_dl');
 
         if (!fbsInput.value || isNaN(fbsValue) || fbsValue <= 0) {
             alert('Please enter a valid FBS value (mg/dL) before calculating risk.');
@@ -308,12 +341,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.querySelectorAll('.override-btn').forEach(btn => {
         btn.addEventListener('click', () => {
+            const alreadyActive = btn.classList.contains('override-active');
+
             document.querySelectorAll('.override-btn').forEach(b => {
+                b.classList.remove('override-active');
                 b.style.fontWeight = 'normal';
                 b.style.borderColor = '';
                 b.style.color = '';
                 b.style.background = '';
             });
+
+            if (alreadyActive) {
+                // Clicking the already-selected override again clears it --
+                // this was an accidental-click trap before: once set, there
+                // was no way back to "no override, use the preliminary result".
+                finalRiskLevelInput.value = '';
+                return;
+            }
+
+            btn.classList.add('override-active');
             btn.style.fontWeight = 'bold';
             finalRiskLevelInput.value = btn.dataset.level;
             if (btn.dataset.level === 'Low') {
@@ -330,6 +376,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 btn.style.background = 'var(--danger-light, #fee2e2)';
             }
         });
+        // Reopening a screening that already has a saved override should show
+        // which level is active, not just carry it silently in the hidden
+        // input -- otherwise it looks like nothing is selected until you
+        // click something.
+        if (finalRiskLevelInput.value && btn.dataset.level === finalRiskLevelInput.value) {
+            btn.click();
+        }
     });
 });
 </script>

@@ -2,6 +2,19 @@ document.addEventListener("DOMContentLoaded", () => {
     const form = document.getElementById("intakeForm");
     const patientId = form.dataset.patientId;
 
+    // Name is locked for good once the patient exists (this page is only
+    // ever reached for an EXISTING patient_code — /nurse_new_record/<id>).
+    // Server also ignores these fields on update; this just makes the UI honest.
+    ["lastName", "firstName"].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.readOnly = true;
+            el.title = "Name cannot be edited after the patient record is created.";
+            el.style.background = "var(--bg-muted, #f1f5f9)";
+            el.style.cursor = "not-allowed";
+        }
+    });
+
     const submitBtn = document.getElementById("submitIntakeBtn");
     const draftBtn = document.getElementById("saveDraftBtn");
 

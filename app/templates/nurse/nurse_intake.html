@@ -11,13 +11,19 @@
 
     <form id="intakeForm">
         <div class="form-card">
-            <div class="card-header">1. Patient Demographics <span id="patientIdBadge" style="font-weight:600; text-transform:none;"></span></div>
-            <div class="card-body">
-                <div class="grid-4">
+            <div class="card-header section-toggle" data-section="1">1. Patient Demographics <span id="patientIdBadge" style="font-weight:600; text-transform:none;"></span><span class="section-toggle-icon">&#9660;</span></div>
+            <div class="card-body collapsible">
+                <div class="grid-5">
                     <div class="field-group"><label class="field-label">Patient ID No.</label><input type="text" id="patientId" class="field-input" placeholder="Auto-generated" disabled></div>
-                    <div class="field-group"><label class="field-label">Last Name</label><input type="text" id="lastName" class="field-input" required></div>
-                    <div class="field-group"><label class="field-label">First Name</label><input type="text" id="firstName" class="field-input" required></div>
+                    <div class="field-group"><label class="field-label">Last Name<span class="required-mark">*</span></label><input type="text" id="lastName" class="field-input" required></div>
+                    <div class="field-group"><label class="field-label">First Name<span class="required-mark">*</span></label><input type="text" id="firstName" class="field-input" required></div>
                     <div class="field-group"><label class="field-label">Middle Name</label><input type="text" id="middleName" class="field-input"></div>
+                    <div class="field-group" id="maidenNameGroup" style="display:none;">
+                        <label class="field-label">Maiden Last Name
+                            <span class="field-tooltip" data-tip="Patient's surname before marriage. Leave blank if not applicable.">?</span>
+                        </label>
+                        <input type="text" id="maidenName" class="field-input">
+                    </div>
                 </div>
 
                 <div class="grid-4">
@@ -35,10 +41,10 @@
                 </div>
 
                 <div class="grid-5">
-                    <div class="field-group"><label class="field-label">Date of Birth</label><input type="date" id="birthdate" class="field-input" required></div>
+                    <div class="field-group"><label class="field-label">Date of Birth<span class="required-mark">*</span></label><input type="date" id="birthdate" class="field-input" required></div>
                     <div class="field-group"><label class="field-label">Age</label><input type="text" id="age" class="field-input" placeholder="yrs" readonly></div>
                     <div class="field-group">
-                        <label class="field-label">Sex</label>
+                        <label class="field-label">Sex<span class="required-mark">*</span></label>
                         <select id="sex" class="field-input" required>
                             <option value="">Select</option><option>Male</option><option>Female</option>
                         </select>
@@ -64,21 +70,40 @@
                             <option>College degree, post graduate</option>
                         </select>
                     </div>
+                </div>
+
+                <div class="grid-4">
                     <div class="field-group">
-                        <label class="field-label">Barangay</label>
-                        <select id="barangay" class="field-input">
-                            <option value="">Select Barangay</option>
-                            {% for b in barangays %}<option>{{ b }}</option>{% endfor %}
+                        <label class="field-label">Region
+                            <span class="field-tooltip" data-tip="Select the patient's region first — city/municipality and barangay choices are filtered from this.">?</span>
+                        </label>
+                        <select id="region" class="field-input">
+                            <option value="">Select Region</option>
                         </select>
                     </div>
-                    <div class="field-group"><label class="field-label">Complete Address</label><input type="text" id="address" class="field-input"></div>
+                    <div class="field-group">
+                        <label class="field-label">City / Municipality</label>
+                        <select id="city" class="field-input" disabled>
+                            <option value="">Select Region first</option>
+                        </select>
+                    </div>
+                    <div class="field-group">
+                        <label class="field-label">Barangay</label>
+                        <select id="barangay" class="field-input" disabled>
+                            <option value="">Select City first</option>
+                        </select>
+                        <input type="text" id="barangayManual" class="field-input" style="display:none; margin-top:0.4rem;" placeholder="Barangay not listed — type it here">
+                    </div>
+                    <div class="field-group"><label class="field-label">Complete Address
+                            <span class="field-tooltip" data-tip="House/unit number, street, and subdivision or sitio — the barangay is already captured above, no need to repeat it here.">?</span>
+                        </label><input type="text" id="address" class="field-input"></div>
                 </div>
             </div>
         </div>
 
         <div class="form-card">
-            <div class="card-header">2. PHIC Membership</div>
-            <div class="card-body">
+            <div class="card-header section-toggle collapsed" data-section="2">2. PHIC Membership<span class="section-toggle-icon">&#9660;</span></div>
+            <div class="card-body collapsible collapsed">
                 <div class="grid-2">
                     <div class="field-group">
                         <label class="field-label">Membership Type</label>
@@ -87,7 +112,9 @@
                         </select>
                     </div>
                     <div class="field-group">
-                        <label class="field-label">Category</label>
+                        <label class="field-label">Category
+                            <span class="field-tooltip" data-tip="Sponsored = govt-subsidized (NHTS/LGU/NGA). IPP = Individually Paying Program, self-employed/OFW/private payers. Employed = salary-deducted premiums.">?</span>
+                        </label>
                         <select id="phicType" class="field-input">
                             <option value="">Select</option>
                             <option>Sponsored - NHTS</option><option>Sponsored - LGU</option><option>Sponsored - NGA</option>
@@ -100,8 +127,8 @@
         </div>
 
         <div class="form-card">
-            <div class="card-header">3. Past Medical History</div>
-            <div class="card-body">
+            <div class="card-header section-toggle collapsed" data-section="3">3. Past Medical History<span class="section-toggle-icon">&#9660;</span></div>
+            <div class="card-body collapsible collapsed">
                 <div class="radio-card-wrapper">
                     <div class="radio-card"><input type="checkbox" class="pmh" id="pmh1" value="Allergy"><label for="pmh1">Allergy</label></div>
                     <div class="radio-card"><input type="checkbox" class="pmh" id="pmh2" value="Asthma"><label for="pmh2">Asthma</label></div>
@@ -125,8 +152,8 @@
         </div>
 
         <div class="form-card">
-            <div class="card-header">4. Family History (1st Degree Relative)</div>
-            <div class="card-body">
+            <div class="card-header section-toggle collapsed" data-section="4">4. Family History (1st Degree Relative)<span class="section-toggle-icon">&#9660;</span></div>
+            <div class="card-body collapsible collapsed">
                 <div class="radio-card-wrapper">
                     <div class="radio-card"><input type="checkbox" class="fh" id="fh1" value="Hypertension"><label for="fh1">Hypertension</label></div>
                     <div class="radio-card"><input type="checkbox" class="fh" id="fh2" value="Stroke/Cerebrovascular Disease"><label for="fh2">Stroke</label></div>
@@ -140,27 +167,27 @@
         </div>
 
         <div class="form-card">
-            <div class="card-header">5. CVD Questionnaire (Probable Angina, Heart Attack, Stroke)</div>
-            <div class="card-body">
+            <div class="card-header section-toggle collapsed" data-section="5">5. CVD Questionnaire (Probable Angina, Heart Attack, Stroke)<span class="section-toggle-icon">&#9660;</span></div>
+            <div class="card-body collapsible collapsed">
                 <div class="grid-2">
-                    <div class="field-group"><label class="field-label">1. Pain/discomfort/pressure in chest?</label><select class="field-input cvd-q"><option>No</option><option>Yes</option></select></div>
-                    <div class="field-group"><label class="field-label">2. Pain in center/left chest or left arm?</label><select class="field-input cvd-q"><option>No</option><option>Yes</option></select></div>
-                    <div class="field-group"><label class="field-label">3. Occurs when walking uphill or hurrying?</label><select class="field-input cvd-q"><option>No</option><option>Yes</option></select></div>
-                    <div class="field-group"><label class="field-label">4. Do you slow down if you get it while walking?</label><select class="field-input cvd-q"><option>No</option><option>Yes</option></select></div>
-                    <div class="field-group"><label class="field-label">5. Does pain go away if you stand still or take under-tongue tablet?</label><select class="field-input cvd-q"><option>No</option><option>Yes</option></select></div>
-                    <div class="field-group"><label class="field-label">6. Does pain go away in less than 10 minutes?</label><select class="field-input cvd-q"><option>No</option><option>Yes</option></select></div>
-                    <div class="field-group"><label class="field-label">7. Severe chest pain lasting half an hour or more?</label><select class="field-input cvd-q"><option>No</option><option>Yes</option></select></div>
+                    <div class="field-group"><label class="field-label">1. Pain/discomfort/pressure in chest?</label><select class="field-input cvd-q"><option value="">Select</option><option>No</option><option>Yes</option></select></div>
+                    <div class="field-group"><label class="field-label">2. Pain in center/left chest or left arm?</label><select class="field-input cvd-q"><option value="">Select</option><option>No</option><option>Yes</option></select></div>
+                    <div class="field-group"><label class="field-label">3. Occurs when walking uphill or hurrying?</label><select class="field-input cvd-q"><option value="">Select</option><option>No</option><option>Yes</option></select></div>
+                    <div class="field-group"><label class="field-label">4. Do you slow down if you get it while walking?</label><select class="field-input cvd-q"><option value="">Select</option><option>No</option><option>Yes</option></select></div>
+                    <div class="field-group"><label class="field-label">5. Does pain go away if you stand still or take under-tongue tablet?</label><select class="field-input cvd-q"><option value="">Select</option><option>No</option><option>Yes</option></select></div>
+                    <div class="field-group"><label class="field-label">6. Does pain go away in less than 10 minutes?</label><select class="field-input cvd-q"><option value="">Select</option><option>No</option><option>Yes</option></select></div>
+                    <div class="field-group"><label class="field-label">7. Severe chest pain lasting half an hour or more?</label><select class="field-input cvd-q"><option value="">Select</option><option>No</option><option>Yes</option></select></div>
                     <div class="field-group" style="background: var(--danger-light); padding: 10px; border-radius: 6px;">
                         <label class="field-label" style="color: var(--danger);">8. TIA/Stroke: Difficulty talking, weakness or numbness of arm/leg on one side?</label>
-                        <select class="field-input cvd-q"><option>No</option><option>Yes (Refer to Doctor)</option></select>
+                        <select class="field-input cvd-q"><option value="">Select</option><option>No</option><option>Yes (Refer to Doctor)</option></select>
                     </div>
                 </div>
             </div>
         </div>
 
         <div class="form-card">
-            <div class="card-header">6. Personal / Social History &amp; Lifestyle Factors</div>
-            <div class="card-body">
+            <div class="card-header section-toggle collapsed" data-section="6">6. Personal / Social History &amp; Lifestyle Factors<span class="section-toggle-icon">&#9660;</span></div>
+            <div class="card-body collapsible collapsed">
                 <label class="field-label">Smoking (Tobacco/Cigarette)</label>
                 <div class="radio-card-wrapper" style="margin-bottom: 1.5rem;">
                     <div class="radio-card"><input type="radio" name="smoke" id="sm1" value="Never smoked"><label for="sm1">Never smoked</label></div>
@@ -174,17 +201,17 @@
                     <div class="field-group">
                         <label class="field-label">Alcohol Intake</label>
                         <select id="alcohol" class="field-input">
-                            <option>Never Consumed</option><option>Yes</option><option>Yes (Binge: 5+ drinks in one occasion past month)</option>
+                            <option value="">Select</option><option>Never Consumed</option><option>Yes</option><option>Yes (Binge: 5+ drinks in one occasion past month)</option>
                         </select>
                     </div>
                     <div class="field-group">
                         <label class="field-label">Illicit Drug Use</label>
-                        <select id="illicitDrugs" class="field-input"><option>No</option><option>Yes</option></select>
+                        <select id="illicitDrugs" class="field-input"><option value="">Select</option><option>No</option><option>Yes</option></select>
                     </div>
                     <div class="field-group">
                         <label class="field-label">Physical Activity</label>
                         <select id="physicalActivity" class="field-input">
-                            <option>Does NOT meet 2.5 hours/week</option><option>Meets at least 2.5 hours/week moderate activity</option>
+                            <option value="">Select</option><option>Does NOT meet 2.5 hours/week</option><option>Meets at least 2.5 hours/week moderate activity</option>
                         </select>
                     </div>
                 </div>
@@ -199,13 +226,13 @@
         </div>
 
         <div class="form-card">
-            <div class="card-header">7. Diabetes History</div>
-            <div class="card-body">
+            <div class="card-header section-toggle collapsed" data-section="7">7. Diabetes History<span class="section-toggle-icon">&#9660;</span></div>
+            <div class="card-body collapsible collapsed">
                 <div class="grid-2">
                     <div class="field-group">
                         <label class="field-label">Was patient diagnosed as having diabetes?</label>
                         <select id="diabetesDiagnosis" class="field-input">
-                            <option>No / Do not know</option><option>Yes (with medications)</option><option>Yes (without medications)</option>
+                            <option value="">Select</option><option>No / Do not know</option><option>Yes (with medications)</option><option>Yes (without medications)</option>
                         </select>
                     </div>
                     <div class="field-group">
@@ -221,8 +248,8 @@
         </div>
 
         <div class="form-card">
-            <div class="card-header">8. Immunizations</div>
-            <div class="card-body">
+            <div class="card-header section-toggle collapsed" data-section="8">8. Immunizations<span class="section-toggle-icon">&#9660;</span></div>
+            <div class="card-body collapsible collapsed">
                 <div class="radio-card-wrapper">
                     <div class="radio-card"><input type="checkbox" class="immu" id="im1" value="BCG"><label for="im1">BCG</label></div>
                     <div class="radio-card"><input type="checkbox" class="immu" id="im2" value="OPV/IPV Series"><label for="im2">OPV/IPV Series</label></div>
@@ -239,20 +266,24 @@
         </div>
 
         <div class="form-card" id="obGyneCard">
-            <div class="card-header">9. Menstrual &amp; Pregnancy History <span style="font-weight:600; text-transform:none;">(for female patients)</span></div>
-            <div class="card-body">
+            <div class="card-header section-toggle collapsed" data-section="9">9. Menstrual &amp; Pregnancy History <span style="font-weight:600; text-transform:none;">(for female patients)</span><span class="section-toggle-icon">&#9660;</span></div>
+            <div class="card-body collapsible collapsed">
                 <div class="grid-4">
                     <div class="field-group"><label class="field-label">Age at Menarche</label><input type="number" id="menarcheAge" class="field-input"></div>
                     <div class="field-group"><label class="field-label">Last Menstrual Period</label><input type="date" id="lmp" class="field-input"></div>
-                    <div class="field-group"><label class="field-label">Gravida (no. of pregnancy)</label><input type="number" id="gravida" class="field-input"></div>
-                    <div class="field-group"><label class="field-label">Para (no. of delivery)</label><input type="number" id="para" class="field-input"></div>
+                    <div class="field-group"><label class="field-label">Gravida (no. of pregnancy)
+                            <span class="field-tooltip" data-tip="Total number of pregnancies, regardless of outcome (live birth, miscarriage, or stillbirth).">?</span>
+                        </label><input type="number" id="gravida" class="field-input"></div>
+                    <div class="field-group"><label class="field-label">Para (no. of delivery)
+                            <span class="field-tooltip" data-tip="Number of pregnancies carried to a viable gestational age and delivered, live or stillborn.">?</span>
+                        </label><input type="number" id="para" class="field-input"></div>
                 </div>
             </div>
         </div>
 
         <div class="form-card">
-            <div class="card-header">10. Anthropometric Measurements, Vitals &amp; Physical Exam</div>
-            <div class="card-body">
+            <div class="card-header section-toggle collapsed" data-section="10">10. Anthropometric Measurements, Vitals &amp; Physical Exam<span class="section-toggle-icon">&#9660;</span></div>
+            <div class="card-body collapsible collapsed">
                 <div class="grid-5">
                     <div class="field-group"><label class="field-label">Systolic BP (mmHg)</label><input type="number" id="bpSystolic" class="field-input" placeholder="e.g. 120"></div>
                     <div class="field-group"><label class="field-label">Diastolic BP (mmHg)</label><input type="number" id="bpDiastolic" class="field-input" placeholder="e.g. 80"></div>
@@ -262,10 +293,14 @@
                 </div>
                 <div class="grid-3">
                     <div class="field-group"><label class="field-label">Weight (kg)</label><input type="number" id="weight" class="field-input"></div>
-                    <div class="field-group"><label class="field-label">Waist Circ. (cm)</label><input type="number" id="waist" class="field-input" placeholder="Central Adiposity"></div>
+                    <div class="field-group"><label class="field-label">Waist Circ. (cm)
+                            <span class="field-tooltip" data-tip="Measured at the midpoint between the lowest rib and the top of the hip bone. Used as a marker of central/abdominal adiposity, a CVD risk factor independent of BMI.">?</span>
+                        </label><input type="number" id="waist" class="field-input" placeholder="Central Adiposity"></div>
                     <div class="field-group"><label class="field-label">BMI (Auto-calculated)</label><input type="text" id="bmi" class="field-input" readonly placeholder="— kg/m²"></div>
                 </div>
-                <div class="field-group"><label class="field-label">Obesity Classification</label><input type="text" id="obesityClass" class="field-input" readonly></div>
+                <div class="field-group"><label class="field-label">Obesity Classification
+                        <span class="field-tooltip" data-tip="Auto-classified from BMI using the Asia-Pacific cutoffs: Underweight &lt;18.5, Normal 18.5–22.9, Overweight 23–24.9, Obese I 25–29.9, Obese II ≥30.">?</span>
+                    </label><input type="text" id="obesityClass" class="field-input" readonly></div>
 
                 <label class="field-label" style="margin-top:1rem;">Pertinent PE Findings</label>
                 <div class="grid-3">
@@ -287,5 +322,56 @@
 {% endblock %}
 
 {% block scripts %}
+    <style>
+        /* Kill the base stylesheet's hover tooltip on .field-tooltip (it gets
+           clipped by the collapsible section's overflow:hidden). Covers the
+           two common ways it might be implemented. */
+        .field-tooltip:hover::after,
+        .field-tooltip:hover::before,
+        .field-tooltip::after,
+        .field-tooltip::before {
+            content: none !important;
+            display: none !important;
+        }
+
+        /* Floating replacement, appended to <body> so it's never clipped. */
+        .floating-field-tooltip {
+            position: fixed;
+            z-index: 9999;
+            max-width: 280px;
+            background: var(--text-primary, #1f2a1f);
+            color: #fff;
+            font-size: 0.8rem;
+            line-height: 1.35;
+            padding: 0.5rem 0.65rem;
+            border-radius: 6px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+            opacity: 0;
+            transform: translateY(-2px);
+            transition: opacity 0.12s ease, transform 0.12s ease;
+            pointer-events: none;
+        }
+        .floating-field-tooltip.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .floating-field-tooltip::before {
+            content: "";
+            position: absolute;
+            top: -5px;
+            left: var(--arrow-left, 10px);
+            width: 10px;
+            height: 10px;
+            background: inherit;
+            transform: translateX(-50%) rotate(45deg);
+        }
+    </style>
+    <script>
+        // Option A (file moved into app/static/data/): use the line below.
+        // window.__psgcUrl = "{{ url_for('static', filename='data/psgc_data.json') }}";
+        // Option B (file stays in FBS-Thesis/data/, served via the route added
+        // to nurse_controller.py): use this line instead.
+        window.__psgcUrl = "{{ url_for('nurse.nurse_static_data', filename='psgc_data.json') }}";
+    </script>
     <script src="{{ url_for('static', filename='js/nurse_intake.js') }}"></script>
 {% endblock %}

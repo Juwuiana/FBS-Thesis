@@ -11,7 +11,7 @@ from flask import current_app
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.db import get_db
-from app.models import audit_model, settings as settings_model, user as user_model
+from app.models import audit_model, lookup_model, settings as settings_model, user as user_model
 
 PH_MOBILE_RE = re.compile(r"^9\d{9}$")
 NAME_RE = re.compile(r"^[A-Za-z\s.\-]+$")
@@ -69,7 +69,18 @@ def validate_profile_fields(form, require_terms=False, normalize_phone_input=Fal
     sex = _clean(form, "sex")
     role = _clean(form, "role")
     facility = _clean(form, "facility")
-    barangay = _clean(form, "barangay")
+    # Region/city/barangay come from the PSGC cascade (psgc_cascade.js) --
+    # barangay_code is authoritative; barangay_name alone is only trusted
+    # for the "type it in" fallback used when a city has no PSGC barangay
+    # list. Resolving by bare name otherwise is unsafe: barangay names
+    # collide constantly nationwide (e.g. over 600 barangays are named
+    # "Poblacion"), so a name with no code can never safely identify one.
+    barangay_code = _clean(form, "barangay_code")
+    barangay_name = _clean(form, "barangay_name")
+    city_code = _clean(form, "city_code")
+    city_name = _clean(form, "city_name")
+    region_code = _clean(form, "region_code")
+    region_name = _clean(form, "region_name")
     password = form.get("password") or ""
     confirm_password = form.get("confirm_password") or ""
     terms = form.get("terms")
@@ -106,7 +117,17 @@ def validate_profile_fields(form, require_terms=False, normalize_phone_input=Fal
         errors.append("Please select a valid role.")
     if not facility:
         errors.append("Please select a health facility.")
-    if not barangay:
+
+    barangay_id = None
+    if barangay_code and barangay_name:
+        barangay_id = lookup_model.get_or_create_barangay(
+            barangay_code, barangay_name, city_code, city_name, region_code, region_name
+        )
+    elif barangay_name:
+        # Manual-entry fallback (no PSGC code available) -- also used by
+        # the staff CSV bulk import, which only ever has a bare name.
+        barangay_id = lookup_model.get_or_create_barangay_by_name(barangay_name)
+    if barangay_id is None:
         errors.append("Please select an assigned barangay.")
 
     if len(password) < MIN_PASSWORD_LENGTH:
@@ -131,7 +152,8 @@ def validate_profile_fields(form, require_terms=False, normalize_phone_input=Fal
         "phone": phone,
         "role": role,
         "facility": facility,
-        "barangay": barangay,
+        "barangay_id": barangay_id,
+        "barangay": barangay_name or None,  # legacy text column, display-only now
     }
     return errors, cleaned, password
 
