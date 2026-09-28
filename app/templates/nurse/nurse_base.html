@@ -6,6 +6,7 @@
     <title>FBS Diabetes Risk Prediction</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='vendor/fontawesome/all.min.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/nurse_base.css') }}">
+    <script>try{if(localStorage.getItem('sbPinned:nurse')==='1')document.documentElement.classList.add('sb-pinned');}catch(e){}</script>
 {% block extra_css %}{% endblock %}
 </head>
 <body>
@@ -20,17 +21,21 @@
     {% endwith %}
     <div class="mobile-overlay" id="mobileOverlay"></div>
     <aside class="sidebar" id="sidebar">
+        <button type="button" class="sb-pin" id="sidebarPin" aria-pressed="false" title="Pin sidebar">
+        <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6M10 3v6l-3 4v2h10v-2l-3-4V3M12 15v6"/></svg>
+        <span class="sb-label"><span class="pin-off">Pin sidebar</span><span class="pin-on">Unpin sidebar</span></span>
+    </button>
         <div class="user-menu-wrapper">
             <div class="sidebar-user" id="userMenuToggle" role="button" tabindex="0" title="Account options">
                 <div class="user-avatar-wrap">
-                    <img id="userAvatarPreview" src="{{ url_for('static', filename='uploads/avatars/' + current_user_avatar) if current_user_avatar else '' }}" alt="User avatar" style="{{ 'display:block;' if current_user_avatar else 'display:none;' }} width:38px; height:38px; border-radius:50%; object-fit:cover;">
-                    <div class="user-avatar" id="userAvatarFallback" style="{{ 'display:none;' if current_user_avatar else '' }}"></div>
+                    <img id="userAvatarPreview" src="{{ url_for('static', filename='uploads/avatars/' + current_user_avatar) if current_user_avatar else '' }}" alt="User avatar" style="{{ 'display:block;' if current_user_avatar else 'display:none;' }} width:34px; height:34px; border-radius:50%; object-fit:cover; border:2px solid #66bb6a;">
+                    {% set _n = (signed_in_user_name or 'Nurse').split() %}<div class="user-avatar" id="userAvatarFallback" style="{{ 'display:none;' if current_user_avatar else '' }}">{{ (_n[0][0] ~ (_n[1][0] if _n|length > 1 else ''))|upper }}</div>
                 </div>
-                <div style="flex:1; min-width:0;">
-                    <div style="font-weight:700; font-size:0.85rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ signed_in_user_name or 'Health Officer' }}</div>
-                    <div style="font-size:0.75rem; opacity:0.7;">{{ signed_in_user_name or 'LHU Santa Rosa' }}</div>
+                <div class="sb-label" style="flex:1; min-width:0;">
+                    <div style="font-weight:600; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ signed_in_user_name or 'Nurse' }}</div>
+                    <div style="font-size:11px; opacity:0.7;">Nurse</div>
                 </div>
-                <span class="user-menu-caret" id="userMenuCaret">▲</span>
+                <span class="user-menu-caret sb-label" id="userMenuCaret">▲</span>
             </div>
             <div class="user-dropdown" id="userDropdown">
                 <form id="avatarUploadForm" method="POST" action="{{ url_for('auth.upload_avatar') }}" enctype="multipart/form-data">
@@ -43,17 +48,15 @@
         </div>
 
         <nav class="sidebar-nav">
-            <a href="{{ url_for('nurse.nurse_dashboard') }}" class="nav-item {{ 'active' if active_page == 'dashboard' else '' }}">Dashboard</a>
-            <a href="{{ url_for('nurse.nurse_intake') }}" class="nav-item {{ 'active' if active_page == 'intake' else '' }}">Patients Screening</a>
-            <a href="{{ url_for('nurse.nurse_health_results') }}" class="nav-item {{ 'active' if active_page == 'health_results' else '' }}">Health Result</a>
-            <a href="{{ url_for('nurse.nurse_data_management') }}" class="nav-item {{ 'active' if active_page == 'data_management' else '' }}">Data Management</a>
-            <a href="{{ url_for('nurse.nurse_privacy_security') }}" class="nav-item {{ 'active' if active_page == 'privacy' else '' }}">Privacy and Security</a>
+            <a href="{{ url_for('nurse.nurse_dashboard') }}" class="nav-item {{ 'active' if active_page == 'dashboard' else '' }}" title="Dashboard"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21.2 15.9A10 10 0 1 1 8 2.8"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg><span class="sb-label">Dashboard</span></a>
+            <a href="{{ url_for('nurse.nurse_intake') }}" class="nav-item {{ 'active' if active_page == 'intake' else '' }}" title="Patients Screening"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M9 12h6M9 16h6"/></svg><span class="sb-label">Patients Screening</span></a>
+            <a href="{{ url_for('nurse.nurse_health_results') }}" class="nav-item {{ 'active' if active_page == 'health_results' else '' }}" title="Health Result"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg><span class="sb-label">Health Result</span></a>
+            <a href="{{ url_for('nurse.nurse_data_management') }}" class="nav-item {{ 'active' if active_page == 'data_management' else '' }}" title="Data Management"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.7-4 3-9 3s-9-1.3-9-3"/><path d="M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5"/></svg><span class="sb-label">Data Management</span></a>
+            <a href="{{ url_for('nurse.nurse_privacy_security') }}" class="nav-item {{ 'active' if active_page == 'privacy' else '' }}" title="Privacy and Security"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><span class="sb-label">Privacy and Security</span></a>
         </nav>
 
         <div class="sidebar-footer">
-            <a href="{{ safe_url_for('auth.logout') }}" class="user-dropdown-item user-dropdown-signout">
-                 Sign Out
-            </a>
+            <a href="{{ safe_url_for('auth.logout') }}" class="user-dropdown-item user-dropdown-signout" title="Sign Out"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg><span class="sb-label">Sign Out</span></a>
         </div>
     </aside>
 
@@ -68,6 +71,20 @@
         {% endblock %}
     </main>
 
+    <script>
+    (function () {
+        var btn = document.getElementById('sidebarPin');
+        if (!btn) return;
+        var root = document.documentElement, key = 'sbPinned:nurse';
+        function sync() { btn.setAttribute('aria-pressed', root.classList.contains('sb-pinned') ? 'true' : 'false'); }
+        sync();
+        btn.addEventListener('click', function () {
+            var on = root.classList.toggle('sb-pinned');
+            try { localStorage.setItem(key, on ? '1' : '0'); } catch (e) {}
+            sync();
+        });
+    })();
+    </script>
     <script src="{{ url_for('static', filename='js/nurse_base.js') }}"></script>
 
     {% block scripts %}

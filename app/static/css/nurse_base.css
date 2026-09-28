@@ -43,7 +43,6 @@ body { display: flex; min-height: 100vh; background: var(--bg); color: var(--t1)
 
 .main-wrapper  { flex: 1; margin-left: var(--sidebar-w); padding: 2rem 2.5rem; min-width: 0; }
 .topbar {display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem;}
-/* page header para kita sa mobile */
 .page-header {
     display: flex;
     justify-content: space-between;
@@ -197,8 +196,7 @@ textarea.field-input   { height: auto; padding: 0.625rem 0.875rem; resize: verti
     .action-bar { flex-direction: column-reverse; }
     .action-bar .btn { width: 100%; }
 }
-/* Header action buttons (Data Management: Recalculate + Recycle Bin).
-   Uses .page-header rather than .topbar because .topbar is hidden on phones. */
+
 .header-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 .header-actions form { margin: 0; }
 .header-actions .btn { text-align: center; justify-content: center; }
@@ -288,7 +286,6 @@ textarea.field-input   { height: auto; padding: 0.625rem 0.875rem; resize: verti
 
 
 @media print {
-    /* Hide everything that isn't part of the record itself */
     .sidebar, .mobile-header, .mobile-overlay, .topbar .breadcrumbs,
     .action-bar, .hub-toggle-bar, .back-to-top,
     button, .btn { display: none !important; }
@@ -363,7 +360,6 @@ textarea.field-input   { height: auto; padding: 0.625rem 0.875rem; resize: verti
         font-size: 0.7rem !important;
     }
 }
-/* ---- Collapsible section headers (intake form accordion) ---- */
 .card-header.section-toggle { cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; }
 .card-header.section-toggle:hover { background: #e7f2e9; }
 .section-toggle-icon { font-size: 0.7rem; transition: transform 0.2s; margin-left: 0.5rem; flex-shrink: 0; }
@@ -371,10 +367,8 @@ textarea.field-input   { height: auto; padding: 0.625rem 0.875rem; resize: verti
 .card-body.collapsible { overflow: hidden; }
 .card-body.collapsible.collapsed { display: none; }
 
-/* ---- Required field marker ---- */
 .field-label .required-mark { color: var(--danger); margin-left: 0.2rem; font-weight: 700; }
 
-/* ---- Hover tooltip ---- */
 .field-tooltip {
     display: inline-flex; align-items: center; justify-content: center;
     width: 14px; height: 14px; border-radius: 50%;
@@ -400,13 +394,8 @@ textarea.field-input   { height: auto; padding: 0.625rem 0.875rem; resize: verti
 .field-tooltip:hover::after, .field-tooltip:hover::before { opacity: 1; visibility: visible; }
 .field-label { display: flex; align-items: center; }
 
-/* ---- Address cascade loading state ---- */
 .field-input.field-loading { color: var(--text-muted, var(--t2)); font-style: italic; }
 
-
-/* ==========================================================================
-   Health Results page (.hr-page) -- risk colours mean risk and nothing else
-   ========================================================================== */
 .hr-page { --risk-low: #27ae60; --risk-mod: #f59e0b; --risk-high: #ef4444; }
 .hr-muted { color: var(--t3); font-weight: 400; }
 .hr-sub   { font-size: 0.75rem; color: var(--t3); margin-top: 0.15rem; }
@@ -426,7 +415,6 @@ textarea.field-input   { height: auto; padding: 0.625rem 0.875rem; resize: verti
 .hr-ribbon .high, .dot.high { background: var(--risk-high); }
 .hr-ribbon-legend { display: flex; gap: 1.25rem; flex-wrap: wrap; justify-content: center; font-size: 0.8rem; }
 
-/* The one moment of motion on the page: the risk ribbon draws in once. Skipped when the device asks for reduced motion. */
 @media (prefers-reduced-motion: no-preference) {
     .hr-ribbon { animation: hr-ribbon-in 0.6s ease-out both; }
 }
@@ -492,3 +480,50 @@ textarea.field-input   { height: auto; padding: 0.625rem 0.875rem; resize: verti
     .hr-ribbon, .hr-ribbon span, .hr-meter, .hr-meter i, .hr-heat, .hr-callout { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .hr-scroll, .hr-scroll.tall { max-height: none; overflow: visible; }
 }
+
+.nav-item { display: flex; align-items: center; gap: 12px; }
+.nav-icon { width: 24px; flex-shrink: 0; text-align: center; font-size: 1rem; }
+.sb-label { white-space: nowrap; overflow: hidden; }
+.sb-pin { display: none; }
+.sb-pin .pin-on { display: none; }
+.sidebar-footer .user-dropdown-signout { gap: 12px; padding-left: 21px; }
+
+@media (min-width: 769px) {
+    :root { --sidebar-w: 68px; --sidebar-w-open: 200px; }
+    html.sb-pinned { --sidebar-w: 200px; }
+
+    .sidebar { width: var(--sidebar-w); overflow-x: hidden; transition: width .2s ease, box-shadow .2s ease; }
+    html:not(.sb-pinned) .sidebar:hover { width: var(--sidebar-w-open); box-shadow: 4px 0 16px rgba(0,0,0,.25); }
+    .main-wrapper { transition: margin-left .2s ease; }
+
+    .sb-label { max-width: 160px; transition: opacity .15s ease, max-width .2s ease; }
+    html:not(.sb-pinned) .sidebar:not(:hover) .sb-label { opacity: 0; max-width: 0; }
+    html:not(.sb-pinned) .sidebar:not(:hover) .user-dropdown { max-height: 0 !important; }
+
+    .nav-item { padding-left: 18px; }
+
+    .sb-pin {
+        display: flex; align-items: center; gap: 12px; width: 100%;
+        padding: 12px 0 12px 22px; background: none; border: none;
+        border-bottom: 1px solid rgba(255,255,255,0.08);
+        color: rgba(255,255,255,0.6); cursor: pointer; font: inherit; font-size: 12px; text-align: left;
+    }
+    .sb-pin:hover { color: #fff; background: rgba(0,0,0,0.15); }
+    .sb-pin .nav-icon { transform: rotate(45deg); transition: transform .2s ease, color .2s ease; }
+    html.sb-pinned .sb-pin { color: #fff; }
+    html.sb-pinned .sb-pin .nav-icon { transform: none; color: #8fd18f; }
+    html.sb-pinned .sb-pin .pin-off { display: none; }
+    html.sb-pinned .sb-pin .pin-on { display: inline; }
+}
+
+svg.nav-icon { height: 24px; padding: 2px; box-sizing: border-box; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+.sidebar-user:focus { outline: none; }
+.sidebar-user:focus-visible { outline: 2px solid rgba(255,255,255,0.35); outline-offset: -2px; }
+
+.sidebar-user { background: transparent; border-bottom: none; }
+.sidebar-user:hover { background: rgba(255,255,255,0.05); }
+.user-avatar { width: 34px; height: 34px; background: #4caf50; color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; border: 2px solid #66bb6a; }
+.user-dropdown { background: var(--g-mid); }
+.user-menu-caret { color: rgba(255,255,255,0.65); }
+.user-dropdown { border-bottom: 0; }
