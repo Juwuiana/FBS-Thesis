@@ -3,6 +3,10 @@
 
 {% block content %}
 
+{% macro arrow(t, unit='') -%}
+{%- if t -%}<span class="trend-arrow trend-{{ t.dir }}" title="{{ 'Up' if t.dir == 'up' else 'Down' }} {{ t.diff }}{{ unit }} since {{ t.prev_date }} (was {{ t.prev }}{{ unit }})">{% if t.dir == 'up' %}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V4"/><path d="M5 11l7-7 7 7"/></svg>{% else %}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16"/><path d="M5 13l7 7 7-7"/></svg>{% endif %}{{ t.diff }}</span>{%- endif -%}
+{%- endmacro %}
+
 <div class="results-header">
     <div>
         <h1 class="results-title">My Results</h1>
@@ -26,12 +30,12 @@
     </div>
     <div class="rs-divider"></div>
     <div class="rs-item">
-        <span class="rs-value moderate-text">{{ latest.risk_level }}</span>
+        <span class="rs-value {{ {'Low Risk':'low','Moderate Risk':'moderate','High Risk':'high'}.get(latest.risk_level,'moderate') }}-text">{{ latest.risk_level }}</span>
         <span class="rs-label">Latest Risk Level</span>
     </div>
     <div class="rs-divider"></div>
     <div class="rs-item">
-        <span class="rs-value">{{ latest.fbs_score }} mg/dL</span>
+        <span class="rs-value">{{ latest.fbs_score }} mg/dL{{ arrow(latest.trend.fbs_score, " mg/dL") }}</span>
         <span class="rs-label">Latest FBS</span>
     </div>
     <div class="rs-divider"></div>
@@ -46,15 +50,30 @@
     </div>
 </div>
 
-<div class="results-body">
+<nav class="results-tabs" role="tablist">
+    <button type="button" class="rtab" role="tab" data-view="history">Screening History <span class="rtab-count">{{ history|length }}</span></button>
+    <button type="button" class="rtab" role="tab" data-view="trend">FBS Trend</button>
+</nav>
+
+<div class="trend-panel" id="trendView" style="display:none;">
+    <div class="ds-label">FBS Trend</div>
+    {% if trend|length > 1 %}
+    <div class="trend-chart-wrap">
+        <canvas id="fbsTrend"></canvas>
+    </div>
+    {% else %}
+    <p style="margin-top:0.75rem;">Not enough screenings yet to show a trend. It appears after your second screening.</p>
+    {% endif %}
+</div>
+
+<div class="results-body" id="historyView">
 
     <div class="history-list-panel">
-        <h2 class="panel-title">Screening History</h2>
         {% for v in history %}
         <div class="screening-card {{ 'active' if loop.first }}" data-id="visit-{{ v.visit_id }}">
             <div class="sc-date">{{ v.date }}</div>
             <div class="sc-row">
-                <div class="sc-fbs">{{ v.fbs_score if v.fbs_score is not none else "—" }} <span>mg/dL</span></div>
+                <div class="sc-fbs">{{ v.fbs_score if v.fbs_score is not none else "—" }} <span>mg/dL</span>{{ arrow(v.trend.fbs_score, " mg/dL") }}</div>
                 {% if v.fbs_band == 'Normal' %}<span class="range-badge normal">Normal</span>
                 {% elif v.fbs_band == 'Pre-Diabetic' %}<span class="range-badge pre-diabetic">Pre-Diabetic</span>
                 {% elif v.fbs_band == 'Diabetic' %}<span class="range-badge diabetic">Diabetic</span>
@@ -66,7 +85,7 @@
     </div>
 
     <div class="detail-panel" id="detailPanel">
-        <button class="back-btn" id="backToListBtn" style="display:none;"><i class="fas fa-arrow-left"></i> Back to History</button>
+        <button class="back-btn" id="backToListBtn" style="display:none;"><svg class="ui-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="M11 6l-6 6 6 6"/></svg> Back to History</button>
 
         {% for v in history %}
         <div class="detail-view {{ 'active' if loop.first }}" id="detail-visit-{{ v.visit_id }}">
@@ -85,7 +104,7 @@
             <div class="detail-cards-row">
                 <div class="detail-metric-card {{ 'warn-card' if v.fbs_band != 'Normal' else '' }}">
                     <div class="dm-label">FBS Reading</div>
-                    <div class="dm-value">{{ v.fbs_score if v.fbs_score is not none else "—" }} <span>mg/dL</span></div>
+                    <div class="dm-value">{{ v.fbs_score if v.fbs_score is not none else "—" }} <span>mg/dL</span>{{ arrow(v.trend.fbs_score, " mg/dL") }}</div>
                     <div class="dm-badge">
                         {% if v.fbs_band == 'Normal' %}<span class="range-badge normal">Normal</span>
                         {% elif v.fbs_band == 'Pre-Diabetic' %}<span class="range-badge pre-diabetic">Pre-Diabetic</span>
@@ -110,8 +129,9 @@
                 </div>
             </div>
 
-            <div class="detail-section">
-                <div class="ds-label">1. Patient Demographics</div>
+            <details class="detail-section detail-collapse">
+                <summary><span class="ds-label">1. Patient Demographics</span></summary>
+                <div class="collapse-body">
                 <div class="detail-data-grid">
                     <div class="dd-item"><span class="dd-key">Full Name</span><span class="dd-val">{{ patient.last_name }}, {{ patient.first_name }}</span></div>
                     <div class="dd-item"><span class="dd-key">Patient ID</span><span class="dd-val">{{ patient.patient_code }}</span></div>
@@ -122,10 +142,12 @@
                     <div class="dd-item"><span class="dd-key">Occupation</span><span class="dd-val">{{ patient.occupation or "—" }}</span></div>
                     <div class="dd-item"><span class="dd-key">Barangay</span><span class="dd-val">{{ patient.barangay or "—" }}</span></div>
                 </div>
-            </div>
+                </div>
+            </details>
 
-            <div class="detail-section">
-                <div class="ds-label">2. Family History (1st Degree Relative)</div>
+            <details class="detail-section detail-collapse">
+                <summary><span class="ds-label">2. Family History (1st Degree Relative)</span></summary>
+                <div class="collapse-body">
                 <div class="risk-factors-grid">
                     {% for code in v.conditions.family_history %}
                     <div class="rf-pill danger-pill">⛔ {{ code }}</div>
@@ -133,10 +155,12 @@
                     <div class="rf-pill ok-pill">✓ No family history reported</div>
                     {% endfor %}
                 </div>
-            </div>
+                </div>
+            </details>
 
-            <div class="detail-section">
-                <div class="ds-label">3. CVD Questionnaire</div>
+            <details class="detail-section detail-collapse">
+                <summary><span class="ds-label">3. CVD Questionnaire</span></summary>
+                <div class="collapse-body">
                 <div class="cvd-table">
                     {% set cvd_labels = {
                         "q1_chest_discomfort": "1. Pain/discomfort/pressure in chest?",
@@ -156,10 +180,12 @@
                     </div>
                     {% endfor %}
                 </div>
-            </div>
+                </div>
+            </details>
 
-            <div class="detail-section">
-                <div class="ds-label">4. Lifestyle Factors</div>
+            <details class="detail-section detail-collapse">
+                <summary><span class="ds-label">4. Lifestyle Factors</span></summary>
+                <div class="collapse-body">
                 <div class="detail-data-grid" style="margin-bottom:0.75rem;">
                     <div class="dd-item"><span class="dd-key">Smoking Status</span><span class="dd-val">{{ v.smoking_status or "—" }}</span></div>
                     <div class="dd-item"><span class="dd-key">Alcohol Intake</span><span class="dd-val">{{ v.alcohol_intake or "—" }}</span></div>
@@ -173,10 +199,12 @@
                     <div class="rf-pill ok-pill">✓ No diet risk factors reported</div>
                     {% endfor %}
                 </div>
-            </div>
+                </div>
+            </details>
 
-            <div class="detail-section">
-                <div class="ds-label">5. Diabetes History</div>
+            <details class="detail-section detail-collapse">
+                <summary><span class="ds-label">5. Diabetes History</span></summary>
+                <div class="collapse-body">
                 <div class="detail-data-grid" style="margin-bottom:0.75rem;">
                     <div class="dd-item" style="grid-column:1/-1;">
                         <span class="dd-key">Previously Diagnosed with Diabetes</span>
@@ -191,28 +219,33 @@
                     <div class="rf-pill ok-pill">✓ No symptoms reported</div>
                     {% endfor %}
                 </div>
-            </div>
+                </div>
+            </details>
 
-            <div class="detail-section">
-                <div class="ds-label">6. Anthropometric Measurements &amp; Vitals</div>
+            <details class="detail-section detail-collapse" open>
+                <summary><span class="ds-label">6. Anthropometric Measurements &amp; Vitals</span></summary>
+                <div class="collapse-body">
                 <div class="detail-data-grid">
-                    <div class="dd-item"><span class="dd-key">Blood Pressure</span><span class="dd-val">{{ v.bp_systolic or "—" }}/{{ v.bp_diastolic or "—" }} mmHg</span></div>
+                    <div class="dd-item"><span class="dd-key">Blood Pressure</span><span class="dd-val">{{ v.bp_systolic or "—" }}/{{ v.bp_diastolic or "—" }} mmHg{{ arrow(v.trend.bp, " mmHg") }}</span></div>
                     <div class="dd-item"><span class="dd-key">Height</span><span class="dd-val">{{ v.height_cm or "—" }} cm</span></div>
-                    <div class="dd-item"><span class="dd-key">Weight</span><span class="dd-val">{{ v.weight_kg or "—" }} kg</span></div>
-                    <div class="dd-item"><span class="dd-key">BMI</span><span class="dd-val">{{ v.bmi or "—" }} kg/m²</span></div>
-                    <div class="dd-item"><span class="dd-key">Waist Circumference</span><span class="dd-val">{{ v.waist_cm or "—" }} cm</span></div>
+                    <div class="dd-item"><span class="dd-key">Weight</span><span class="dd-val">{{ v.weight_kg or "—" }} kg{{ arrow(v.trend.weight_kg, " kg") }}</span></div>
+                    <div class="dd-item"><span class="dd-key">BMI</span><span class="dd-val">{{ v.bmi or "—" }} kg/m²{{ arrow(v.trend.bmi) }}</span></div>
+                    <div class="dd-item"><span class="dd-key">Waist Circumference</span><span class="dd-val">{{ v.waist_cm or "—" }} cm{{ arrow(v.trend.waist_cm, " cm") }}</span></div>
                     <div class="dd-item"><span class="dd-key">Obesity Classification</span><span class="dd-val">{{ v.obesity_class or "—" }}</span></div>
                 </div>
-            </div>
+                </div>
+            </details>
 
-            <div class="detail-section">
-                <div class="ds-label">Follow-up &amp; Referral</div>
+            <details class="detail-section detail-collapse" open>
+                <summary><span class="ds-label">Follow-up &amp; Referral</span></summary>
+                <div class="collapse-body">
                 <div class="detail-data-grid">
                     <div class="dd-item"><span class="dd-key">Next Follow-up</span><span class="dd-val followup-date">{{ v.follow_up_date or "Not scheduled" }}</span></div>
                     <div class="dd-item"><span class="dd-key">Referred To</span><span class="dd-val">{{ v.referred_to or "—" }}</span></div>
                     <div class="dd-item"><span class="dd-key">Facility</span><span class="dd-val">LHU, Sta. Rosa</span></div>
                 </div>
-            </div>
+                </div>
+            </details>
 
             <div class="detail-footer">
                 <button class="btn btn-outline" data-print-id="visit-{{ v.visit_id }}">Print This Result</button>
@@ -228,9 +261,69 @@
 <div id="printArea" style="display:none;"></div>
 
 <footer class="patient-footer">
-    <span>© 2026 Santa Rosa City Health Office — FBS Diabetes Risk System</span>
+    <span>© FBS Diabetes Risk System</span>
     <div class="footer-links">
         <a href="#">Privacy Policy</a><span>·</span><a href="#">Help</a>
     </div>
 </footer>
+{% endblock %}
+
+{% block scripts %}
+{% if history %}
+<script src="{{ url_for('static', filename='vendor/chartjs/chart.umd.min.js') }}"></script>
+<script>
+(function () {
+    var trend = {{ trend | tojson }};
+    var historyView = document.getElementById('historyView');
+    var trendView = document.getElementById('trendView');
+    var buttons = document.querySelectorAll('.rtab');
+    var chartDrawn = false;
+
+    function drawChart() {
+        var canvas = document.getElementById('fbsTrend');
+        if (chartDrawn || !canvas || typeof Chart === 'undefined') return;
+        chartDrawn = true;
+        var top = Math.max.apply(null, trend.map(function (t) { return t.fbs; }));
+        new Chart(canvas, {
+            type: 'line',
+            data: {
+                labels: trend.map(function (t) { return t.date; }),
+                datasets: [
+                    { label: 'FBS (mg/dL)', data: trend.map(function (t) { return t.fbs; }),
+                      borderColor: '#2e7d32', backgroundColor: '#2e7d32', tension: 0.3, pointRadius: 4 },
+                    { label: 'Normal limit (100)', data: trend.map(function () { return 100; }),
+                      borderColor: '#f59e0b', borderDash: [6, 6], borderWidth: 1.5, pointRadius: 0 },
+                    { label: 'Diabetic threshold (126)', data: trend.map(function () { return 126; }),
+                      borderColor: '#ef4444', borderDash: [6, 6], borderWidth: 1.5, pointRadius: 0 }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: { y: { suggestedMin: 60, suggestedMax: Math.max(140, top + 10),
+                               title: { display: true, text: 'mg/dL' } } },
+                plugins: { legend: { position: 'bottom', labels: { boxWidth: 14 } } }
+            }
+        });
+    }
+
+    function show(view) {
+        var isTrend = view === 'trend';
+        historyView.style.display = isTrend ? 'none' : '';
+        trendView.style.display = isTrend ? '' : 'none';
+        buttons.forEach(function (b) {
+            var on = b.dataset.view === view;
+            b.classList.toggle('active', on);
+            b.setAttribute('aria-selected', on ? 'true' : 'false');
+        });
+        if (isTrend) drawChart();   // draw only once visible, so it gets a real size
+    }
+
+    buttons.forEach(function (b) {
+        b.addEventListener('click', function () { show(b.dataset.view); });
+    });
+    show(new URLSearchParams(location.search).get('view') === 'trend' ? 'trend' : 'history');
+})();
+</script>
+{% endif %}
 {% endblock %}

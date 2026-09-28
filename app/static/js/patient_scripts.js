@@ -151,13 +151,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (printAllBtn)    printAllBtn.addEventListener('click',    () => window.print());
     if (downloadAllBtn) downloadAllBtn.addEventListener('click', () => window.print());
 
-    // Auto-select card from URL ?date= param
     const params = new URLSearchParams(window.location.search);
-    const dateParam = params.get('date');
-    const dateMap = { '2025-05-27': 'sc1', '2025-01-15': 'sc2', '2024-08-20': 'sc3' };
-    if (dateParam && dateMap[dateParam]) showDetail(dateMap[dateParam]);
+    const visitParam = params.get('visit');
+    if (visitParam) showDetail('visit-' + visitParam);
 
-    // Back-to-list button (mobile)
     const backToListBtn = document.getElementById('backToListBtn');
     if (backToListBtn) {
         backToListBtn.addEventListener('click', () => {
@@ -308,7 +305,10 @@ function showDetail(id) {
 function printDetail(id) {
     const el = document.getElementById('detail-' + id);
     if (!el) return;
-    const content = el.innerHTML;
+    // Clone so collapsed <details> sections are expanded in the printed report
+    const clone = el.cloneNode(true);
+    clone.querySelectorAll('details').forEach(d => d.setAttribute('open', ''));
+    const content = clone.innerHTML;
     const win = window.open('', '_blank');
     win.document.write(`<!DOCTYPE html><html lang="en"><head>
         <meta charset="UTF-8">
@@ -365,6 +365,12 @@ function printDetail(id) {
             .cvd-a { font-weight:700; padding:.15rem .5rem; border-radius:4px; font-size:.72rem; }
             .cvd-no  { background:#e8f5e9; color:#133c20; }
             .cvd-yes { background:#fee2e2; color:#ef4444; }
+            summary { list-style:none; }
+            summary::-webkit-details-marker { display:none; }
+            .detail-collapse { border-top:1px solid #e2e8f0; padding:.5rem 0; }
+            .trend-arrow { display:inline-flex; align-items:center; gap:.15rem; font-size:.7rem; font-weight:700; margin-left:.3rem; }
+            .trend-arrow svg { width:1.15em; height:1.15em; fill:none; stroke:currentColor; stroke-width:2.6; stroke-linecap:round; stroke-linejoin:round; }
+            .trend-up { color:#ef4444; } .trend-down { color:#27ae60; }
         </style></head>
         <body>${content}</body></html>`);
     win.document.close();

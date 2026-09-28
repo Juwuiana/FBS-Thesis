@@ -7,8 +7,7 @@
 <div class="flash-messages">
     <div class="flash-warning">
         <span>
-            <strong>Action needed:</strong> You're still using the temporary password from your health worker.
-            Please set a new password to secure your account.
+            <strong>Action needed:</strong> You're still using the temporary password from your health worker. Please set a new password to secure your account.
         </span>
         <a href="{{ url_for('patient.patient_settings', force_change=1) }}" class="btn-warning-action">
             Change Password
@@ -16,6 +15,22 @@
     </div>
 </div>
 {% endif %}
+
+{% if not result.has_data %}
+
+<section class="hero-section">
+    <div class="hero-left">
+        <p class="hero-greeting">Welcome, {{ patient.first_name }}!</p>
+        <h1 class="hero-title">Know Your<br><span class="hero-accent">Diabetes Risk.</span></h1>
+        <p class="hero-desc">No screening results yet.<br>Your results will appear here after your first visit to the LHU.</p>
+    </div>
+</section>
+
+{% else %}
+
+{% set risk = result.risk_level %}
+{% set rk = {'High Risk': 'high', 'Low Risk': 'low', 'Moderate Risk': 'moderate'}.get(risk, 'pending') %}
+{% set tone = rk if rk != 'pending' else 'moderate' %}
 
 <section class="hero-section">
     <div class="hero-circles">
@@ -25,39 +40,29 @@
     </div>
 
     <div class="hero-left">
-        <p class="hero-greeting">Welcome back!</p>
+        <p class="hero-greeting">Welcome back, {{ patient.first_name }}!</p>
         <h1 class="hero-title">Know Your<br><span class="hero-accent">Diabetes Risk.</span></h1>
         <p class="hero-desc">Your latest FBS screening results are ready.<br>Stay informed and take control of your health.</p>
-        <a href="{{ url_for('patient.patient_health_results') }}" class="btn-hero">View Full Health Report →</a>
+        <a href="{{ url_for('patient.patient_health_results') }}" class="btn-hero">View Full Health Report <svg class="arrow-icon" aria-hidden="true"><use href="#icon-arrow"/></svg></a>
     </div>
 
     <div class="hero-right">
         <div class="result-card">
-            <div class="result-card-top
-                {% if result.risk_level == 'High Risk' %}high-card-top
-                {% elif result.risk_level == 'Low Risk' %}low-card-top
-                {% else %}moderate-card-top{% endif %}">
-                <div class="result-dot
-                    {% if result.risk_level == 'High Risk' %}high-dot
-                    {% elif result.risk_level == 'Low Risk' %}low-dot
-                    {% else %}moderate-dot{% endif %}"></div>
+            <div class="result-card-top {{ tone }}-card-top">
+                <div class="result-dot {{ tone }}-dot"></div>
                 <div>
-                    <div class="result-risk-label
-                        {% if result.risk_level == 'High Risk' %}high-label
-                        {% elif result.risk_level == 'Low Risk' %}low-label
-                        {% else %}moderate-label{% endif %}">
-                        {{ result.risk_level | upper }}
-                    </div>
-                    <div class="result-meta">Last screened: May 27, 2026 · SRCHO-2025-0165</div>
+                    <div class="result-risk-label {{ tone }}-label">{{ risk | upper }}</div>
+                    <div class="result-meta">Last screened: {{ result.latest_visit_date }} · {{ patient.patient_code }}</div>
                 </div>
             </div>
             <div class="result-card-body">
                 <div class="fbs-label">Latest FBS Reading</div>
                 <div class="fbs-display">
-                    <span class="fbs-number">{{ result.fbs_score }}</span>
+                    <span class="fbs-number">{{ result.fbs_score if result.fbs_score is not none else "-" }}</span>
                     <span class="fbs-unit">mg/dL</span>
                 </div>
 
+                {% if result.fbs_score is not none %}
                 <div class="range-label">Your position on the FBS range:</div>
                 <div class="fbs-range-bar">
                     <div class="range-track">
@@ -65,19 +70,20 @@
                         <div class="range-pre"></div>
                         <div class="range-diabetic"></div>
                         {% set marker_pct = ((result.fbs_score - 70) / (180 - 70) * 100) | round(1) %}
-                        <div class="range-marker" style="left: {{ [marker_pct, 2] | max }}%">▲</div>
+                        <div class="range-marker" style="left: {{ [[marker_pct, 2] | max, 100] | min }}%">▲</div>
                     </div>
                     <div class="range-labels">
-                        <span class="rl-normal">Normal &lt; 100</span>
+                        <span class="rl-normal">Normal < 100</span>
                         <span class="rl-pre">Pre-diabetic 100–125</span>
                         <span class="rl-diabetic">Diabetic ≥ 126</span>
                     </div>
                 </div>
+                {% endif %}
 
                 <div class="followup-block">
                     <strong>Next follow-up:</strong>
-                    <span class="followup-date">June 10, 2026</span><br>
-                    Referred to: Dr. Velandres<br>
+                    <span class="followup-date">{{ result.follow_up_date or 'Not scheduled' }}</span>{% if result.follow_up_overdue %} <span class="range-badge pre-diabetic">Overdue</span>{% endif %}<br>
+                    Referred to: {{ result.referred_to or "-" }}<br>
                     LHU, Sta. Rosa
                 </div>
             </div>
@@ -88,36 +94,36 @@
 <!-- STATS BAR -->
 <div class="stats-bar">
     <div class="stat-item">
-        <div class="stat-value">3</div>
+        <div class="stat-value">{{ result.total_screenings }}</div>
         <div class="stat-label">Total Screenings</div>
     </div>
     <div class="stat-divider"></div>
     <div class="stat-item">
-        <div class="stat-value moderate-text">{{ result.risk_level.split(' ')[0] }}</div>
+        <div class="stat-value {{ tone }}-text">{{ {'high':'High','moderate':'Moderate','low':'Low'}.get(rk, 'Pending') }}</div>
         <div class="stat-label">Current Risk Level</div>
     </div>
     <div class="stat-divider"></div>
     <div class="stat-item">
-        <div class="stat-value">{{ result.fbs_score }} mg/dL</div>
+        <div class="stat-value">{{ result.fbs_score if result.fbs_score is not none else "-" }} mg/dL</div>
         <div class="stat-label">Latest FBS</div>
     </div>
     <div class="stat-divider"></div>
     <div class="stat-item">
-        <div class="stat-value">June 10</div>
+        <div class="stat-value">{{ result.follow_up_date or "-" }}</div>
         <div class="stat-label">Next Follow-up</div>
     </div>
 </div>
 
-<!-- BOTTOM GRID -->
+<!-- RECENT + QUICK ACTIONS -->
 <div class="bottom-grid">
 
-    <!-- Recent Screenings Table -->
     <div class="patient-card">
         <div class="patient-card-header">
             <span>Recent Screenings</span>
-            <a href="{{ url_for('patient.patient_health_results') }}" class="btn btn-outline btn-sm">View All →</a>        </div>
-        <div class="patient-card-body" style="padding:0; overflow-x:auto; -webkit-overflow-scrolling:touch;">
-            <table class="screening-table" style="min-width:480px;">
+            <a href="{{ url_for('patient.patient_health_results') }}" class="btn btn-outline btn-sm">View All <svg class="arrow-icon" aria-hidden="true"><use href="#icon-arrow"/></svg></a>
+        </div>
+        <div class="patient-card-body table-wrap">
+            <table class="screening-table">
                 <thead>
                     <tr>
                         <th>Date</th>
@@ -129,68 +135,61 @@
                     </tr>
                 </thead>
                 <tbody>
+                    {% for v in history[:5] %}
                     <tr>
-                        <td>May 27, 2026</td>
-                        <td>124 mg/dL</td>
-                        <td>Overweight</td>
-                        <td>93.5 cm</td>
-                        <td><span class="range-badge pre-diabetic">Pre-Diabetic</span></td>
-                        <td><a href="{{ url_for('patient.patient_health_results') }}?date=2025-05-27" class="btn-view">View</a></td>
+                        <td>{{ v.date }}</td>
+                        <td>{{ v.fbs_score if v.fbs_score is not none else "-" }} mg/dL{%- set t = v.trend.fbs_score if v.trend else none -%}{%- if t -%}<span class="trend-arrow trend-{{ t.dir }}" title="{{ 'Up' if t.dir == 'up' else 'Down' }} {{ t.diff }} mg/dL since {{ t.prev_date }} (was {{ t.prev }} mg/dL)">{% if t.dir == 'up' %}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V4"/><path d="M5 11l7-7 7 7"/></svg>{% else %}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16"/><path d="M5 13l7 7 7-7"/></svg>{% endif %}{{ t.diff }}</span>{%- endif -%}</td>
+                        <td>{{ v.obesity_class or "-" }}</td>
+                        <td>{{ v.waist_cm or "-" }} cm</td>
+                        <td>
+                            {% if v.fbs_band == 'Normal' %}<span class="range-badge normal">Normal</span>
+                            {% elif v.fbs_band == 'Pre-Diabetic' %}<span class="range-badge pre-diabetic">Pre-Diabetic</span>
+                            {% elif v.fbs_band == 'Diabetic' %}<span class="range-badge diabetic">Diabetic</span>
+                            {% else %}<span class="range-badge">Pending</span>{% endif %}
+                        </td>
+                        <td><a href="{{ url_for('patient.patient_health_results', visit=v.visit_id) }}" class="btn-view">View</a></td>
                     </tr>
-                    <tr>
-                        <td>Jan 15, 2025</td>
-                        <td>118 mg/dL</td>
-                        <td>Overweight</td>
-                        <td>91.0 cm</td>
-                        <td><span class="range-badge pre-diabetic">Pre-Diabetic</span></td>
-                        <td><a href="{{ url_for('patient.patient_health_results') }}?date=2025-01-15" class="btn-view">View</a></td>
-                    </tr>
-                    <tr>
-                        <td>Aug 20, 2024</td>
-                        <td>92 mg/dL</td>
-                        <td>Normal</td>
-                        <td>88.0 cm</td>
-                        <td><span class="range-badge normal">Normal</span></td>
-                        <td><a href="{{ url_for('patient.patient_health_results') }}?date=2024-08-20" class="btn-view">View</a></td>
-                    </tr>
+                    {% endfor %}
                 </tbody>
             </table>
         </div>
     </div>
 
-    <!-- Quick Actions -->
     <div class="patient-card quick-actions-panel">
         <div class="patient-card-header">Quick Actions</div>
         <div class="actions-list">
             <a href="{{ url_for('patient.patient_health_results') }}" class="action-item">
                 <div class="action-text">
                     <span class="action-title">View Full Health Report</span>
-                    <span class="action-sub">All screening details</span>
+                    <span class="action-sub">Details, why this result &amp; FBS trend</span>
                 </div>
-                <span class="action-arrow">›</span>
+                <span class="action-arrow"><svg class="arrow-icon" aria-hidden="true"><use href="#icon-arrow"/></svg></span>
             </a>
             <button class="action-item" id="downloadPdfBtn">
                 <div class="action-text">
                     <span class="action-title">Download Latest Result</span>
                     <span class="action-sub">Save as PDF</span>
                 </div>
-                <span class="action-arrow">›</span>
+                <span class="action-arrow"><svg class="arrow-icon" aria-hidden="true"><use href="#icon-arrow"/></svg></span>
             </button>
             <a href="{{ url_for('patient.patient_settings') }}" class="action-item">
                 <div class="action-text">
                     <span class="action-title">Account Settings</span>
-                    <span class="action-sub">Profile &amp; password</span>
+                    <span class="action-sub">Profile & password</span>
                 </div>
-                <span class="action-arrow">›</span>
+                <span class="action-arrow"><svg class="arrow-icon" aria-hidden="true"><use href="#icon-arrow"/></svg></span>
             </a>
         </div>
     </div>
 
 </div>
 
+{% endif %}
+
 <!-- FOOTER -->
 <footer class="patient-footer">
-    <span>© 2026 Santa Rosa City Health Office — FBS Diabetes Risk System</span>
+    <span>© FBS Diabetes Risk System<br>
+    Your health data is confidential and protected.</span>
     <div class="footer-links">
         <a href="#">Privacy Policy</a>
         <span>·</span>
@@ -199,4 +198,3 @@
 </footer>
 
 {% endblock %}
-

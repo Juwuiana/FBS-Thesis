@@ -2,6 +2,7 @@
 eto yung nakikita ng patients
 """
 import bisect
+from datetime import date, datetime
 from app.models import visit_model, lab_model
 
 _RISK_LABEL_MAP = {"Low": "Low Risk", "Moderate": "Moderate Risk", "High": "High Risk"}
@@ -13,6 +14,32 @@ _FBS_BAND_LABELS = ["Normal", "Pre-Diabetic", "Diabetic"]
 def classify_fbs_band(fbs_score: float) -> str:
     idx = bisect.bisect_right(_FBS_BAND_UPPER_BOUNDS, fbs_score)
     return _FBS_BAND_LABELS[idx]
+
+
+def _parse_date(value):
+    """Handles ISO (2026-03-20) and DD/MM/YYYY strings. Returns date or None."""
+    if not value:
+        return None
+    if isinstance(value, (date, datetime)):
+        return value if isinstance(value, date) and not isinstance(value, datetime) else value.date()
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M:%S"):
+        try:
+            return datetime.strptime(str(value), fmt).date()
+        except ValueError:
+            continue
+    return None
+
+
+def _screened_visits(patient_id: int) -> list[dict]:
+    """
+    Only visits that actually have an FBS result (drafts / awaiting-lab visits
+    are not "screenings" the patient should see or be counted), newest first.
+    Sorted by assessment date, not visit id -- CSV imports create visits in
+    file order, so id order can differ from date order.
+    """
+    visits = [v for v in visit_model.list_visits_for_patient(patient_id) if v["fbs"] is not None]
+    visits.sort(key=lambda v: (_parse_date(v["date"]) or date.min, v["visit_id"]), reverse=True)
+    return visits
 
 
 def get_current_patient_id():
@@ -36,42 +63,43 @@ def get_patient_dashboard_data(patient_id: int) -> dict:
     no visits yet, has_data is False and the template should show an
     empty/first-visit state instead of crashing on missing fields.
     """
-    visits = visit_model.list_visits_for_patient(patient_id)
+    visits = _screened_visits(patient_id)
 
     if not visits:
         return {"has_data": False, "visits": []}
 
-    screened_visits = [v for v in visits if v["fbs"] is not None]
-    latest = screened_visits[0] if screened_visits else visits[0]
+    latest = visits[0]
+    latest_visit_detail = visit_model.get_visit_by_id(latest["visit_id"]) or {}
+    latest_screening = lab_model.get_lab_screening_for_visit(latest["visit_id"]) or {}
 
-    latest_visit_detail = visit_model.get_visit_by_id(latest["visit_id"])
-    latest_screening = lab_model.get_lab_screening_for_visit(latest["visit_id"])
+    risk_level = _RISK_LABEL_MAP.get(latest["risk"], "Pending")
 
-    risk_raw = latest["risk"]
-    risk_level = _RISK_LABEL_MAP.get(risk_raw, "Pending")
+    follow_up_date = latest_screening.get("follow_up_date")
+    fu = _parse_date(follow_up_date)
 
     return {
         "has_data": True,
         "risk_level": risk_level,
         "fbs_score": latest["fbs"],
-        "fbs_band": classify_fbs_band(latest["fbs"]) if latest["fbs"] is not None else None,
+        "fbs_band": classify_fbs_band(latest["fbs"]),
         "total_screenings": len(visits),
         "latest_visit_date": latest["date"],
-        "bmi": latest_visit_detail.get("bmi") if latest_visit_detail else None,
-        "waist_cm": latest_visit_detail.get("waist_cm") if latest_visit_detail else None,
-        "obesity_class": latest_visit_detail.get("obesity_class") if latest_visit_detail else None,
-        "follow_up_date": latest_screening.get("follow_up_date") if latest_screening else None,
-        "referred_to": latest_screening.get("referred_to") if latest_screening else None,
+        "bmi": latest_visit_detail.get("bmi"),
+        "waist_cm": latest_visit_detail.get("waist_cm"),
+        "obesity_class": latest_visit_detail.get("obesity_class"),
+        "follow_up_date": follow_up_date,
+        "follow_up_overdue": bool(fu and fu < date.today()),
+        "referred_to": latest_screening.get("referred_to"),
         "visits": visits,
     }
 
 
-def get_full_screening_history(patient_id: int) -> list[dict]:
+def get_full_screening_history(patient_id: int, sex: str | None = None) -> list[dict]:
     """
     One entry per visit, shaped for patient_health_results.html
     (screening-card + detail-view per visit).
     """
-    visits = visit_model.list_visits_for_patient(patient_id)
+    visits = _screened_visits(patient_id)
     history = []
     for v in visits:
         visit_detail = visit_model.get_visit_by_id(v["visit_id"]) or {}
@@ -85,7 +113,7 @@ def get_full_screening_history(patient_id: int) -> list[dict]:
         }
 
         fbs = v["fbs"]
-        history.append({
+        entry = {
             "visit_id": v["visit_id"],
             "date": v["date"],
             "fbs_score": fbs,
@@ -108,5 +136,92 @@ def get_full_screening_history(patient_id: int) -> list[dict]:
             "follow_up_date": screening.get("follow_up_date") if screening else None,
             "referred_to": screening.get("referred_to") if screening else None,
             "referral_action": screening.get("referral_action") if screening else None,
-        })
+        }
+        entry["reasons"] = explain_result(entry, sex)
+        history.append(entry)
+    _add_changes(history)
     return history
+
+
+_TRACKED_KEYS = ("fbs_score", "bmi", "weight_kg", "waist_cm")
+
+
+def _change(cur: dict, prev: dict, key: str):
+    """Change of `key` from the previous (older) screening, or None if unknown/unchanged."""
+    a, b = cur.get(key), prev.get(key)
+    if a is None or b is None:
+        return None
+    diff = round(float(a) - float(b), 1)
+    if diff == 0:
+        return None
+    return {"dir": "up" if diff > 0 else "down", "diff": abs(diff),
+            "prev": b, "prev_date": prev["date"]}
+
+
+def _fmt_bp(v: dict) -> str:
+    s, d = v.get("bp_systolic"), v.get("bp_diastolic")
+    return f"{s:g}/{d:g}" if s is not None and d is not None else "-"
+
+
+def _add_changes(history: list[dict]) -> None:
+    """
+    history is newest-first, so the previous screening is the next item.
+    Adds entry["trend"] = {"fbs_score": {...}, "bmi": {...}, "weight_kg": {...},
+    "waist_cm": {...}, "bp": {...}}; a key is missing when there is no change.
+    """
+    for i, cur in enumerate(history):
+        prev = history[i + 1] if i + 1 < len(history) else None
+        changes = {}
+        if prev:
+            for key in _TRACKED_KEYS:
+                c = _change(cur, prev, key)
+                if c:
+                    changes[key] = c
+            bp = _change(cur, prev, "bp_systolic") or _change(cur, prev, "bp_diastolic")
+            if bp:
+                bp["prev"] = _fmt_bp(prev)
+                changes["bp"] = bp
+        cur["trend"] = changes
+
+
+def build_trend(history: list[dict]) -> list[dict]:
+    """Oldest -> newest FBS points for the trend chart."""
+    return [{"date": h["date"], "fbs": h["fbs_score"]}
+            for h in reversed(history) if h["fbs_score"] is not None]
+
+def explain_result(v: dict, sex: str | None) -> list[str]:
+    """Plain-language reasons from one history entry (shape of get_full_screening_history)."""
+    reasons = []
+    fbs = v.get("fbs_score")
+    if fbs is not None and fbs >= 126:
+        reasons.append(f"Your fasting blood sugar was {fbs} mg/dL, which is in the diabetic range (126 or higher).")
+    elif fbs is not None and fbs >= 100:
+        reasons.append(f"Your fasting blood sugar was {fbs} mg/dL. Normal is below 100, so yours is slightly high.")
+
+    obesity = (v.get("obesity_class") or "").lower()
+    if "overweight" in obesity or "obese" in obesity:
+        reasons.append("Your weight is above the healthy range, which raises diabetes risk.")
+
+    waist = v.get("waist_cm")
+    limit = 80 if (sex or "").lower() == "female" else 90
+    if waist and waist >= limit:
+        reasons.append("Your waist size is larger than recommended.")
+
+    if v["conditions"].get("family_history"):
+        reasons.append("A close family member has diabetes or a related condition.")
+    if v["conditions"].get("dm_symptom"):
+        reasons.append("You reported symptoms that can go with high blood sugar.")
+    if (v.get("bp_systolic") or 0) >= 130:
+        reasons.append("Your blood pressure was a bit high.")
+
+    return reasons or ["No major risk factors were found in this screening."]
+
+
+def get_dashboard_extras(patient_id: int, sex: str | None) -> dict:
+    history = get_full_screening_history(patient_id, sex)
+    screened = [h for h in history if h["fbs_score"] is not None]
+    return {
+        "history": history,
+        "reasons": explain_result(screened[0], sex) if screened else [],
+        "trend": [{"date": h["date"], "fbs": h["fbs_score"]} for h in reversed(screened)],
+    }
