@@ -241,6 +241,126 @@ def get_dashboard_summary() -> dict:
     }
 
 
+def _summary_as_of(cutoff_iso: str) -> dict:
+    """
+    Same numbers as get_dashboard_summary(), but each patient's state as it
+    stood on `cutoff_iso` (YYYY-MM-DD): their latest visit whose lab test
+    happened on or before that day. Used to compare "now" against a past date.
+    """
+    conn = get_connection()
+    row = conn.execute(f"""
+        SELECT
+            COUNT(*) AS total_screened,
+            SUM(CASE WHEN {_RISK} IN ('Moderate','High') THEN 1 ELSE 0 END) AS at_risk,
+            SUM(CASE WHEN {_RISK} = 'High' THEN 1 ELSE 0 END) AS high_risk,
+            AVG(ls.fbs_mg_dl) AS avg_fbs
+        FROM patients p
+        LEFT JOIN visits v ON v.id = (
+            SELECT v2.id FROM visits v2
+            JOIN lab_screenings l2 ON l2.visit_id = v2.id
+            WHERE v2.patient_id = p.id AND DATE(l2.test_datetime) <= DATE(?)
+            ORDER BY v2.id DESC LIMIT 1
+        )
+        LEFT JOIN lab_screenings ls ON ls.visit_id = v.id
+        WHERE p.deleted_at IS NULL AND ls.fbs_mg_dl IS NOT NULL
+    """, (cutoff_iso,)).fetchone()
+    conn.close()
+    return {
+        "total_screened": row["total_screened"] or 0,
+        "at_risk": row["at_risk"] or 0,
+        "high_risk": row["high_risk"] or 0,
+        "avg_fbs": round(row["avg_fbs"], 1) if row["avg_fbs"] else 0,
+    }
+
+
+def get_dashboard_changes(days: int = 7) -> dict:
+    """
+    Change in each top stat card since `days` days ago, for the up/down arrows:
+    {"at_risk": {"dir": "up"|"down"|"flat", "diff": 5}, ...}
+    Returns {} when nothing had been screened yet back then (no baseline to
+    compare against, so no arrow is better than a misleading one).
+    """
+    from datetime import date, timedelta
+    today = date.today()
+    now = _summary_as_of(today.isoformat())
+    before = _summary_as_of((today - timedelta(days=days)).isoformat())
+    if not before["total_screened"]:
+        return {}
+    changes = {}
+    for key in ("total_screened", "at_risk", "high_risk", "avg_fbs"):
+        diff = round(now[key] - before[key], 1)
+        if key != "avg_fbs":
+            diff = int(diff)
+        changes[key] = {
+            "dir": "up" if diff > 0 else ("down" if diff < 0 else "flat"),
+            "diff": abs(diff),
+        }
+    return changes
+
+
+def get_actual_vs_predicted(months: int = 6) -> dict:
+    """
+    Actual vs model-predicted risk, for the nurse dashboard.
+      actual    = final_risk_level (nurse-confirmed) if set, else the FBS-based
+                  preliminary_risk_level
+      predicted = model_predicted_risk_level
+    Only screenings that have BOTH are counted. Returns:
+      monthly: [{month, total, agree, actual_at_risk, predicted_at_risk,
+                 actual_high, predicted_high}, ...] (last `months` months, oldest first)
+      matrix:  {actual: {predicted: n}} over all time
+      total, agree, agree_pct, high_total, high_caught
+    """
+    conn = get_connection()
+    rows = conn.execute("""
+        SELECT STRFTIME('%Y-%m', ls.test_datetime) AS month,
+               COALESCE(ls.final_risk_level, ls.preliminary_risk_level) AS actual,
+               ls.model_predicted_risk_level AS predicted,
+               COUNT(*) AS n
+        FROM lab_screenings ls
+        JOIN visits v ON v.id = ls.visit_id
+        JOIN patients p ON p.id = v.patient_id
+        WHERE p.deleted_at IS NULL AND ls.test_datetime IS NOT NULL
+          AND ls.model_predicted_risk_level IN ('Low','Moderate','High')
+          AND COALESCE(ls.final_risk_level, ls.preliminary_risk_level) IN ('Low','Moderate','High')
+        GROUP BY month, actual, predicted
+    """).fetchall()
+    conn.close()
+
+    levels = ("Low", "Moderate", "High")
+    matrix = {a: {p: 0 for p in levels} for a in levels}
+    by_month = {}
+    for r in rows:
+        a, p, n, m = r["actual"], r["predicted"], r["n"], r["month"]
+        matrix[a][p] += n
+        if not m:
+            continue
+        d = by_month.setdefault(m, {"month": m, "total": 0, "agree": 0, "actual_at_risk": 0,
+                                    "predicted_at_risk": 0, "actual_high": 0, "predicted_high": 0})
+        d["total"] += n
+        if a == p:
+            d["agree"] += n
+        if a != "Low":
+            d["actual_at_risk"] += n
+        if p != "Low":
+            d["predicted_at_risk"] += n
+        if a == "High":
+            d["actual_high"] += n
+        if p == "High":
+            d["predicted_high"] += n
+
+    total = sum(sum(row.values()) for row in matrix.values())
+    agree = sum(matrix[l][l] for l in levels)
+    return {
+        "monthly": [by_month[k] for k in sorted(by_month)][-months:],
+        "matrix": matrix,
+        "total": total,
+        "agree": agree,
+        "agree_pct": round(agree / total * 100) if total else 0,
+        "high_total": sum(matrix["High"].values()),
+        "high_caught": matrix["High"]["High"],
+    }
+
+
 def get_screening_volume_timeline(days: int = 14) -> dict:
     """Screenings per day, last N days -- feeds the line chart."""
     conn = get_connection()

@@ -30,6 +30,15 @@ document.addEventListener('DOMContentLoaded', async function () {
         }[character]));
     }
 
+    // FBS value coloured by clinical range (same cut-offs as the legend)
+    function fbsCell(value) {
+        const n = Number(value);
+        if (value === null || value === undefined || value === '' || Number.isNaN(n)) return '—';
+        const cls = n >= 126 ? 'fbs-diabetic' : n >= 100 ? 'fbs-pre' : 'fbs-normal';
+        const tip = n >= 126 ? 'Diabetic range (126 or higher)' : n >= 100 ? 'Pre-diabetic range (100 to 125)' : 'Normal range (below 100)';
+        return `<span class="fbs-val ${cls} has-tip" tabindex="0" data-tip="${tip}">${escapeHtml(value)}</span>`;
+    }
+
     function renderBarangayPatients(patients) {
         if (!patients.length) {
             barangayPatientList.innerHTML = '<p style="font-size:0.8rem; color:var(--text-muted);">No patients found in this barangay yet.</p>';
@@ -45,19 +54,17 @@ document.addEventListener('DOMContentLoaded', async function () {
                 : `<span style="color:var(--text-muted);">${escapeHtml(patient.risk || 'Pending')}</span>`;
             return `<tr>
                 <td><a class="patient-name-link" href="${patientUrl}">${escapeHtml(patient.last_name)}, ${escapeHtml(patient.first_name)}</a></td>
-                <td>${escapeHtml(patient.age)} / ${escapeHtml(patient.sex)}</td>
-                <td>${escapeHtml(patient.date || '—')}</td>
-                <td>${escapeHtml(patient.fbs ?? '—')}</td>
+                <td class="col-hide-sm">${escapeHtml(patient.age)} / ${escapeHtml(patient.sex)}</td>
+                <td class="col-hide-sm">${escapeHtml(patient.date || '—')}</td>
+                <td>${fbsCell(patient.fbs)}</td>
                 <td>${risk}</td>
             </tr>`;
         }).join('');
 
-        barangayPatientList.innerHTML = `<div style="overflow-x:auto;">
-            <table class="data-table" style="min-width:520px;">
-                <thead><tr><th>Name</th><th>Age / Sex</th><th>Date</th><th>FBS</th><th>Risk</th></tr></thead>
+        barangayPatientList.innerHTML = `<table class="data-table dash-table">
+                <thead><tr><th>Name</th><th class="col-hide-sm">Age / Sex</th><th class="col-hide-sm">Date</th><th>FBS</th><th>Risk</th></tr></thead>
                 <tbody>${rows}</tbody>
-            </table>
-        </div>`;
+            </table>`;
     }
 
     if (barangaySelect && barangayPatientList) {
@@ -110,7 +117,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     if (typeof Chart === 'undefined') return;
 
     if (window.__dashboardData) {
-        const { riskData, timeline, topBarangays } = window.__dashboardData;
+        const { riskData, timeline, topBarangays, actualPredicted } = window.__dashboardData;
 
         const ctxDonut = document.getElementById('riskDonutChart');
         if (ctxDonut) {
@@ -143,6 +150,37 @@ document.addEventListener('DOMContentLoaded', async function () {
                     scales: { y: { beginAtZero: true, grid: { color: '#e2e8f0' } }, x: { grid: { display: false } } }
                 }
             });
+        }
+
+        // Actual (solid) vs model-predicted (dashed), per month
+        const ctxAvp = document.getElementById('avpLineChart');
+        if (ctxAvp && actualPredicted && actualPredicted.monthly && actualPredicted.monthly.length) {
+            const months = actualPredicted.monthly;
+            const metrics = {
+                at_risk: { label: 'at risk', color: yellow, actual: 'actual_at_risk', predicted: 'predicted_at_risk' },
+                high:    { label: 'high risk', color: red,  actual: 'actual_high',    predicted: 'predicted_high' },
+            };
+            const avpChart = new Chart(ctxAvp, {
+                type: 'line',
+                data: { labels: months.map(m => m.month), datasets: [] },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8, font: { size: 11 } } } },
+                    scales: { y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#e2e8f0' } }, x: { grid: { display: false } } }
+                }
+            });
+            function drawAvp(key) {
+                const m = metrics[key] || metrics.at_risk;
+                avpChart.data.datasets = [
+                    { label: 'Actual ' + m.label, data: months.map(r => r[m.actual]), borderColor: m.color, backgroundColor: m.color, tension: 0.3, borderWidth: 2, pointRadius: 3 },
+                    { label: 'Predicted ' + m.label, data: months.map(r => r[m.predicted]), borderColor: m.color, backgroundColor: '#ffffff', borderDash: [6, 4], tension: 0.3, borderWidth: 2, pointRadius: 4 },
+                ];
+                avpChart.update();
+            }
+            drawAvp('at_risk');
+            const avpSelect = document.getElementById('avpMetric');
+            if (avpSelect) avpSelect.addEventListener('change', e => drawAvp(e.target.value));
         }
 
         const ctxBar = document.getElementById('barangayBarChart');

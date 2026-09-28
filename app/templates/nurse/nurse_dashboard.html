@@ -1,55 +1,135 @@
 {% extends "nurse/nurse_base.html" %}
 
+{# ---------- helpers ---------- #}
+{% macro fbs_cls(v) -%}
+{{ 'fbs-diabetic' if v >= 126 else ('fbs-pre' if v >= 100 else 'fbs-normal') }}
+{%- endmacro %}
+
+{% macro fbs_tip(v) -%}
+{{ 'Diabetic range (126 or higher)' if v >= 126 else ('Pre-diabetic range (100 to 125)' if v >= 100 else 'Normal range (below 100)') }}
+{%- endmacro %}
+
+{# Arrow beside a stat: c = {"dir","diff"}; up_is_bad decides green vs red #}
+{% macro chg(c, up_is_bad, meaning, label) -%}
+{% if c %}
+    {% set tone = 'flat' if c.dir == 'flat' else ('bad' if (c.dir == 'up') == up_is_bad else 'good') %}
+    {% if c.dir == 'flat' %}
+        {% set tip = 'No change ' ~ label ~ '. ' ~ meaning %}
+    {% else %}
+        {% set tip = ('Up ' if c.dir == 'up' else 'Down ') ~ c.diff ~ ' ' ~ label ~ '. ' ~ meaning %}
+    {% endif %}
+    <span class="stat-change {{ tone }} has-tip" tabindex="0" data-tip="{{ tip }}">
+        {% if c.dir == 'up' %}
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+        {% elif c.dir == 'down' %}
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>
+        {% else %}
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg>
+        {% endif %}
+        {{ c.diff if c.dir != 'flat' else '' }}<span class="sc-label">{{ label }}</span>
+    </span>
+{% else %}
+    <span class="stat-change flat has-tip" tabindex="0" data-tip="Total for all recorded patients. A week-over-week arrow appears once there is a screening from about a week ago to compare with.">all time</span>
+{% endif %}
+{%- endmacro %}
+
 {% block content %}
-<header class="topbar">
+<div class="dash-fit">
+
+<header class="topbar dash-head">
     <div>
         <h1 class="page-title">Dashboard</h1>
         <p class="page-subtitle">Santa Rosa City Health Office — Diabetes Risk Overview</p>
     </div>
+
+    {# Colour guide: what each colour means and its range. Hover a chip for the meaning. #}
+    <div class="range-legend" aria-label="Colour guide">
+        <div class="rl-group">
+            <span class="rl-title">Fasting blood sugar</span>
+            <span class="range-chip normal has-tip" tabindex="0" data-tip="Normal: the body is handling sugar well. Routine re-screening only.">Normal · below 100</span>
+            <span class="range-chip pre has-tip" tabindex="0" data-tip="Pre-diabetic: higher than normal but not yet diabetic. Lifestyle advice and a re-check are recommended.">Pre-diabetic · 100–125</span>
+            <span class="range-chip diabetic has-tip" tabindex="0" data-tip="Diabetic range: 126 or higher. Needs confirmation and referral to a physician.">Diabetic · 126+</span>
+            <span class="info-dot has-tip" tabindex="0" data-tip="All values are fasting blood sugar in mg/dL (fasted at least 8 hours).">i</span>
+        </div>
+    </div>
 </header>
 
+{# ---------- Top stats, each with an up/down arrow vs last week ---------- #}
 <div class="dash-grid-top">
     <div class="stat-card">
-        <div class="stat-title">Total Screened</div>
-        <div class="stat-value">{{ summary.total_screened }}</div>
+        <div class="stat-title">Total Screened
+            <span class="info-dot has-tip" tabindex="0" data-tip="Patients with at least one completed fasting blood sugar test.">i</span>
+        </div>
+        <div class="stat-row">
+            <div class="stat-value">{{ summary.total_screened }}</div>
+            {{ chg(summary_changes.get('total_screened'), false, 'More patients reached.', change_label) }}
+        </div>
     </div>
     <div class="stat-card">
-        <div class="stat-title">At Risk (Moderate + High)</div>
-        <div class="stat-value">{{ summary.at_risk }}</div>
+        <div class="stat-title">At Risk (Moderate + High)
+            <span class="info-dot has-tip" tabindex="0" data-tip="Patients whose latest risk level is Moderate or High. A rise means more people need follow-up.">i</span>
+        </div>
+        <div class="stat-row">
+            <div class="stat-value">{{ summary.at_risk }}</div>
+            {{ chg(summary_changes.get('at_risk'), true, 'More at-risk patients is worse.', change_label) }}
+        </div>
     </div>
     <div class="stat-card">
-        <div class="stat-title">High Risk</div>
-        <div class="stat-value">{{ summary.high_risk }}</div>
+        <div class="stat-title">High Risk
+            <span class="info-dot has-tip" tabindex="0" data-tip="Patients whose latest risk level is High (FBS 126 or higher, unless a nurse changed it).">i</span>
+        </div>
+        <div class="stat-row">
+            <div class="stat-value" style="color:var(--fbs-diabetic);">{{ summary.high_risk }}</div>
+            {{ chg(summary_changes.get('high_risk'), true, 'More high-risk patients is worse.', change_label) }}
+        </div>
     </div>
     <div class="stat-card">
-        <div class="stat-title">Avg. FBS (mg/dL)</div>
-        <div class="stat-value">{{ summary.avg_fbs }}</div>
+        <div class="stat-title">Avg. FBS (mg/dL)
+            <span class="info-dot has-tip" tabindex="0" data-tip="Average of each patient's latest fasting blood sugar. The colour shows which range the average falls in.">i</span>
+        </div>
+        <div class="stat-row">
+            {% if summary.avg_fbs %}
+            <div class="stat-value {{ fbs_cls(summary.avg_fbs) }} has-tip" tabindex="0" data-tip="Average is in the {{ fbs_tip(summary.avg_fbs)|lower }}">{{ summary.avg_fbs }}</div>
+            {% else %}
+            <div class="stat-value">—</div>
+            {% endif %}
+            {{ chg(summary_changes.get('avg_fbs'), true, 'A higher average means worse overall glucose control.', change_label) }}
+        </div>
     </div>
 </div>
 
-<div class="dash-grid-mid">
-    <div class="form-card">
-    <div class="card-header">Risk Profile Distribution</div>
+{# ---------- Row 1: three charts ---------- #}
+<div class="dash-cards">
+    <div class="form-card span-4">
+        <div class="card-header">Risk Profile Distribution
+            <span class="info-dot has-tip" tabindex="0" data-tip="Green = Low (FBS below 100). Amber = Moderate (100 to 125). Red = High (126 or higher).">i</span>
+        </div>
         <div class="card-body">
             <div class="chart-container">
                 <canvas id="riskDonutChart"></canvas>
             </div>
-            <p style="font-size:0.72rem; color:var(--text-muted); text-align:center; margin-top:0.5rem;">
+            <p class="card-note">
                 Based on {{ risk_total }} completed screening{{ 's' if risk_total != 1 else '' }}
                 (Low: {{ risk_counts.Low }}, Moderate: {{ risk_counts.Moderate }}, High: {{ risk_counts.High }})
             </p>
         </div>
     </div>
-    <div class="form-card">
-        <div class="card-header">Screening Volume Timeline</div>
+
+    <div class="form-card span-4">
+        <div class="card-header">Screening Volume Timeline
+            <span class="info-dot has-tip" tabindex="0" data-tip="Number of screenings done per day over the last 14 days.">i</span>
+        </div>
         <div class="card-body">
             <div class="chart-container">
                 <canvas id="screeningsLineChart"></canvas>
             </div>
         </div>
     </div>
-    <div class="form-card">
-        <div class="card-header">Regional Burden — Top Barangays</div>
+
+    <div class="form-card span-4">
+        <div class="card-header">Regional Burden — Top Barangays
+            <span class="info-dot has-tip" tabindex="0" data-tip="Barangays with the most screenings, so you can see where the workload is.">i</span>
+        </div>
         <div class="card-body">
             <div class="chart-container">
                 <canvas id="barangayBarChart"></canvas>
@@ -58,29 +138,29 @@
     </div>
 </div>
 
-<div class="dash-grid-mid">
-    <div class="form-card">
-        <div class="card-header">Patients by Barangay</div>
+{# ---------- Row 2: patients by barangay | recent registries ---------- #}
+<div class="dash-cards">
+    <div class="form-card span-6">
+        <div class="card-header">Patients by Barangay
+            <span class="info-dot has-tip" tabindex="0" data-tip="Pick a barangay to list its patients (up to 25). Hover an FBS value for its range.">i</span>
+        </div>
         <div class="card-body">
-            <select id="barangayFilterSelect" class="field-input" style="margin-bottom: 0.75rem;">
+            <select id="barangayFilterSelect" class="field-input" style="margin-bottom: 0.5rem;">
                 <option value="">Select a barangay…</option>
                 {% for b in barangays %}
                 <option value="{{ b }}">{{ b }}</option>
                 {% endfor %}
             </select>
-            <div id="barangayPatientList">
+            <div id="barangayPatientList" class="dash-scroll">
                 <p style="font-size:0.8rem; color:var(--text-muted);">Select a barangay to view its patients.</p>
             </div>
         </div>
     </div>
-</div>
 
-<!-- Bottom Row: Recent Screenings Table | Model Radar -->
-<div class="dash-grid-bot">
-    <div class="form-card">
+    <div class="form-card span-6">
         <div class="card-header">Recent Patient Registries</div>
-        <div class="card-body" style="padding:0; overflow-x:auto; -webkit-overflow-scrolling:touch;">
-            <table class="data-table" style="min-width:560px;">
+        <div class="card-body table-wrap" style="padding:0; overflow-x:auto; -webkit-overflow-scrolling:touch;">
+            <table class="data-table reg-table" style="min-width:520px;">
                 <thead>
                     <tr>
                         <th>Patient ID</th>
@@ -97,14 +177,18 @@
                         <td>{{ r.patient_code }}</td>
                         <td>{{ r.last_name }}, {{ r.first_name }}</td>
                         <td>{{ r.age }} / {{ r.sex }}</td>
-                        <td>{{ r.fbs_mg_dl if r.fbs_mg_dl is not none else "—" }}</td>
+                        <td>
+                            {% if r.fbs_mg_dl is not none %}
+                            <span class="fbs-val {{ fbs_cls(r.fbs_mg_dl) }} has-tip" tabindex="0" data-tip="{{ fbs_tip(r.fbs_mg_dl) }}">{{ r.fbs_mg_dl }}</span>
+                            {% else %}—{% endif %}
+                        </td>
                         <td>
                             {% if r.risk == 'High' %}
-                                <span class="risk-badge badge-danger">High</span>
+                                <span class="risk-badge badge-danger has-tip" tabindex="0" data-tip="High: FBS 126 or higher. Refer to a physician.">High</span>
                             {% elif r.risk == 'Moderate' %}
-                                <span class="risk-badge badge-warning">Moderate</span>
+                                <span class="risk-badge badge-warning has-tip" tabindex="0" data-tip="Moderate: FBS 100 to 125. Lifestyle advice and a re-check.">Moderate</span>
                             {% elif r.risk == 'Low' %}
-                                <span class="risk-badge badge-success">Low</span>
+                                <span class="risk-badge badge-success has-tip" tabindex="0" data-tip="Low: FBS below 100. Routine re-screening.">Low</span>
                             {% else %}
                                 <span style="color:var(--text-muted);">Pending</span>
                             {% endif %}
@@ -118,6 +202,8 @@
             </table>
         </div>
     </div>
+</div>
+
 </div>
 {% endblock %}
 

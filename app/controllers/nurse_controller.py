@@ -63,6 +63,8 @@ def nurse_dashboard():
     timeline = health_analytics_model.get_screening_volume_timeline()
     top_barangays = health_analytics_model.get_top_barangays()
     recent = health_analytics_model.get_recent_registries()
+    summary_changes = health_analytics_model.get_dashboard_changes()
+    actual_vs_predicted = health_analytics_model.get_actual_vs_predicted()
 
     risk_counts = {
         "Low": risk_status.get("Low", 0),
@@ -83,6 +85,9 @@ def nurse_dashboard():
     return render_template(
         'nurse/nurse_dashboard.html',
         summary=summary,
+        summary_changes=summary_changes,
+        change_label='vs last week',
+        actual_vs_predicted=actual_vs_predicted,
         risk_data=risk_data,
         risk_counts=risk_counts,  
         risk_total=total,          
