@@ -253,16 +253,6 @@ def list_patients(barangay: str = None, entries_limit: int = None) -> list[dict]
 def update_patient(patient_id: int, data: dict, allow_name_edit: bool = False, allow_last_name_edit: bool = False) -> None:
     if not data:
         return
-    # last_name / first_name are normally locked once a patient record is
-    # created -- a nurse can't quietly rename someone via a follow-up visit.
-    # Exceptions:
-    #  - allow_name_edit: visit is still a draft (never submitted), so a
-    #    correction is just fixing intake, not renaming after the fact.
-    #  - allow_last_name_edit: patient is a married female -- her surname
-    #    legitimately changes (maiden -> married name); first_name still
-    #    isn't included in this exception.
-    # Callers must pass one of these explicitly; the controller decides
-    # which applies based on visit status / sex+civil_status on file.
     allowed = {
         "middle_name", "father_last_name",
         "father_first_name", "mother_last_name", "mother_first_name",

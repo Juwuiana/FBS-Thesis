@@ -29,7 +29,6 @@ def inject_pending_patient_edits():
     except Exception:
         return {"pending_patient_edits_count": 0}
 
-
 @nurse_bp.route('/nurse/patient-edits')
 def nurse_patient_edits():
     """Notification bell dropdown contents: visits a patient has edited
@@ -42,9 +41,14 @@ def nurse_patient_edits():
             "patient_code": e["patient_code"],
             "patient_name": f'{e["first_name"]} {e["last_name"]}',
             "edited_at": e["edited_by_patient_at"],
-            "fields": e["edited_fields"],
+            # Converts ['location'] -> ['Address / location']
+            "fields": [visit_model._field_label(f) for f in (e["edited_fields"] or [])],
             "previous": e["patient_edit_previous_values"],
-            "patient_file_url": url_for('nurse.nurse_patient_file_view', patient_id=e["patient_code"], visit_id=e["visit_id"]),
+            "patient_file_url": url_for(
+                'nurse.nurse_patient_file_view', 
+                patient_id=e["patient_code"], 
+                visit_id=e["visit_id"]
+            ),
         } for e in edits],
     })
 

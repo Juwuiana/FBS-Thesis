@@ -11,8 +11,29 @@ document.addEventListener('DOMContentLoaded', () => {
     let bellLoaded = false;
 
     const escapeHtml = (v) => String(v ?? '').replace(/[&<>'"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c]));
-    const FIELD_LABELS = { bp_systolic: 'BP (systolic)', bp_diastolic: 'BP (diastolic)', heart_rate: 'Heart rate',
-        respiratory_rate: 'Respiratory rate', height_cm: 'Height', weight_kg: 'Weight', bmi: 'BMI', obesity_class: 'BMI class' };
+    
+    // 1. Add all patient profile and demographic fields here:
+    const FIELD_LABELS = { 
+        location: 'Address / location',
+        address: 'Address / location',
+        civil_status: 'Civil status',
+        occupation: 'Occupation',
+        barangay_id: 'Barangay',
+        bp_systolic: 'BP (systolic)', 
+        bp_diastolic: 'BP (diastolic)', 
+        heart_rate: 'Heart rate',
+        respiratory_rate: 'Respiratory rate', 
+        height_cm: 'Height', 
+        weight_kg: 'Weight', 
+        bmi: 'BMI', 
+        obesity_class: 'BMI class',
+        smoking_status: 'Smoking status',
+        alcohol_intake: 'Alcohol intake',
+        illicit_drug_use: 'Illicit drug use',
+        physical_activity: 'Physical activity',
+        diabetes_diagnosis: 'Diabetes diagnosis',
+        past_surgical_history: 'Surgical history'
+    };
 
     function setBadge(n) {
         if (!bellBadge) return;
@@ -27,7 +48,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!bellList) return;
         if (!edits.length) { bellList.innerHTML = '<p class="nurse-bell-empty">No pending updates.</p>'; return; }
         bellList.innerHTML = edits.map(e => {
-            const fields = (e.fields || []).filter(f => FIELD_LABELS[f]).map(f => FIELD_LABELS[f]).join(', ') || 'Vitals';
+            // 2. Map through FIELD_LABELS or humanize unknown keys, avoiding the 'Vitals' default:
+            const rawFields = e.fields || [];
+            const mappedList = [...new Set(rawFields.map(f => FIELD_LABELS[f] || f.replace(/_/g, ' ')))];
+            const fields = mappedList.length > 0 ? mappedList.join(', ') : 'Profile / Details';
+
             const when = e.edited_at ? new Date(e.edited_at.replace(' ', 'T') + 'Z').toLocaleString() : '';
             return `<div class="nurse-bell-item" data-visit-id="${e.visit_id}">
                 <a href="${e.patient_file_url}" style="text-decoration:none; color:inherit; display:block;">
