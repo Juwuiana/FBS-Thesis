@@ -200,6 +200,7 @@
                     <label class="field-label">Status</label>
                     <select class="field-input" name="status" id="filterStatus">
                         <option value="" {% if not request.args.get('status') %}selected{% endif %}>All Statuses</option>
+                        <option value="needs_review" {% if request.args.get('status') == 'needs_review' %}selected{% endif %}>Needs Review (Patient Edited)</option>
                         <option value="awaiting_lab" {% if request.args.get('status') == 'awaiting_lab' %}selected{% endif %}>Awaiting Lab Result</option>
                         <option value="draft" {% if request.args.get('status') == 'draft' %}selected{% endif %}>Draft (Intake Only)</option>
                     </select>
@@ -260,7 +261,16 @@
                     {% for p in patients %}
                     <tr>
                         <td>{{ p.patient_code }}</td>
-                        <td>{{ p.last_name }}, {{ p.first_name }}</td>
+                        <td>
+                            {% if p.pending_edit %}
+                            <a class="edit-flag tip" tabindex="0"
+                            href="{{ url_for('nurse.nurse_patient_file_view', patient_id=p.patient_code) }}"
+                            data-tip="Edited by the patient on {{ p.pending_edit.at[:10] }}: {{ p.pending_edit.fields | join(', ') }}. Open the record to review."
+                            aria-label="Patient edited their record, review needed">
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+                            </a>
+                            {% endif %}{{ p.last_name }}, {{ p.first_name }}
+                        </td>
                         <td>{{ p.age }}</td>
                         <td>{{ p.sex }}</td>
                         <td>{{ (p.fbs ~ " mg/dL") if p.fbs else "—" }}</td>
@@ -277,6 +287,12 @@
                         </td>
                         <td>
                             {{ p.date or "—" }}
+                            {% if p.pending_edit %}
+                            <form method="POST" action="{{ url_for('nurse.nurse_data_management_acknowledge_edits', patient_id=p.patient_code) }}" style="display:inline;">
+                                <input type="hidden" name="return_qs" value="{{ qs }}">
+                                <button type="submit" class="btn btn-secondary" style="padding:0.35rem 0.75rem; font-size:0.75rem;" title="Mark the patient's own changes as reviewed">Mark reviewed</button>
+                            </form>
+                            {% endif %}
                             {% if p.visit_status == "draft" %}
                                 <a href="{{ url_for('nurse.nurse_patient_file_view', patient_id=p.patient_code, return_qs=qs) }}?edit=1"
                                    class="risk-badge draft-continue-btn"

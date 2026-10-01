@@ -7,12 +7,33 @@
 {%- if t -%}<span class="trend-arrow trend-{{ t.dir }}" title="{{ 'Up' if t.dir == 'up' else 'Down' }} {{ t.diff }}{{ unit }} since {{ t.prev_date }} (was {{ t.prev }}{{ unit }})">{% if t.dir == 'up' %}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V4"/><path d="M5 11l7-7 7 7"/></svg>{% else %}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16"/><path d="M5 13l7 7 7-7"/></svg>{% endif %}{{ t.diff }}</span>{%- endif -%}
 {%- endmacro %}
 
+{# Which saved field names belong to which "Edit" section, so each section's
+   pending badge only lists the fields that section actually covers --
+   must mirror visit_model.PATIENT_EDITABLE_VISIT_FIELDS minus the
+   nurse-only fields (status, assessment_date, pe_*, clinical_notes and the
+   anthropometrics height/weight/waist/BMI/obesity class). #}
+   {% set ve_vitals_fields = ['bp_systolic', 'bp_diastolic', 'heart_rate', 'respiratory_rate'] %}
+   {% set ve_lifestyle_fields = ['smoking_status', 'alcohol_intake', 'illicit_drug_use', 'physical_activity'] %}
+   {% set ve_diabetes_fields = ['diabetes_diagnosis', 'past_surgical_history',
+                              'menarche_age', 'lmp_date', 'gravida', 'para'] %}
+
+{% macro pending_badge(changed_fields) -%}
+{%- if changed_fields -%}
+<span class="ve-pending-badge" title="Fields changed: {{ changed_fields | join(', ') }}">
+    <svg class="ve-pending-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg>
+    Pending review by your health worker
+</span>
+{%- endif -%}
+{%- endmacro %}
+
+
 <div class="results-header">
     <div>
         <h1 class="results-title">My Results</h1>
         <p class="results-subtitle">Your complete FBS screening history</p>
     </div>
 </div>
+
 
 {% if not history %}
 <div class="results-body">
@@ -132,7 +153,17 @@
             <details class="detail-section detail-collapse">
                 <summary><span class="ds-label">1. Patient Demographics</span></summary>
                 <div class="collapse-body">
-                <div class="detail-data-grid">
+
+                <div class="ve-bar">
+                    {% set demo_changed = v.patient_edited_fields | select('in', ve_demo_fields) | list if v.patient_edit_pending else [] %}
+                    {{ pending_badge(demo_changed) }}
+                    <button type="button" class="btn btn-outline btn-sm ve-edit-btn" id="veEditBtn-demo-{{ v.visit_id }}" data-view="veView-demo-{{ v.visit_id }}" data-form="veForm-demo-{{ v.visit_id }}">
+                        <svg class="ve-pencil" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                        Edit
+                    </button>
+                </div>
+
+                <div class="detail-data-grid" id="veView-demo-{{ v.visit_id }}">
                     <div class="dd-item"><span class="dd-key">Full Name</span><span class="dd-val">{{ patient.last_name }}, {{ patient.first_name }}</span></div>
                     <div class="dd-item"><span class="dd-key">Patient ID</span><span class="dd-val">{{ patient.patient_code }}</span></div>
                     <div class="dd-item"><span class="dd-key">Date of Assessment</span><span class="dd-val">{{ v.date }}</span></div>
@@ -140,8 +171,60 @@
                     <div class="dd-item"><span class="dd-key">Sex</span><span class="dd-val">{{ patient.sex }}</span></div>
                     <div class="dd-item"><span class="dd-key">Civil Status</span><span class="dd-val">{{ patient.civil_status or "—" }}</span></div>
                     <div class="dd-item"><span class="dd-key">Occupation</span><span class="dd-val">{{ patient.occupation or "—" }}</span></div>
-                    <div class="dd-item"><span class="dd-key">Barangay</span><span class="dd-val">{{ patient.barangay or "—" }}</span></div>
+                    {% set addr_parts = [patient.address, patient.barangay, patient.city_name, patient.region_name] | select | list %}
+                    <div class="dd-item"><span class="dd-key">Address</span><span class="dd-val">{{ addr_parts | join(', ') or "—" }}</span></div>
                 </div>
+
+                <form method="POST" action="{{ url_for('patient.patient_update_demographics') }}" class="ve-form demo-form" id="veForm-demo-{{ v.visit_id }}" style="display:none;"
+                      data-options-url="{{ url_for('patient.patient_location_options') }}"
+                      data-has-provinces="{{ '1' if location_has_provinces else '0' }}"
+                      data-region="{{ patient.region_code or '' }}"
+                      data-province="{{ patient.province_code or '' }}"
+                      data-city="{{ patient.city_code or '' }}"
+                      data-barangay="{{ patient.barangay_code or '' }}">
+                    <p class="ve-note">Name, ID, sex, age and assessment date can only be changed by your health worker. Moved to a new place? Update your address here. Edits are reviewed by your health worker.</p>
+                    <div class="ve-grid">
+                        <div class="ve-field">
+                            <label>Civil Status</label>
+                            <select name="civil_status">
+                                {% for opt in ['Single', 'Married', 'Annulled', 'Widow/Widower', 'Separated'] %}
+                                <option value="{{ opt }}" {{ 'selected' if patient.civil_status == opt }}>{{ opt }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="ve-field">
+                            <label>Occupation</label>
+                            <input type="text" name="occupation" maxlength="100" value="{{ patient.occupation or '' }}">
+                        </div>
+                        <div class="ve-field">
+                            <label>Region</label>
+                            <select name="region_code" class="addr-region"><option value="">Select region…</option></select>
+                        </div>
+                        {% if location_has_provinces %}
+                        <div class="ve-field">
+                            <label>Province</label>
+                            <select name="province_code" class="addr-province"><option value="">Select province…</option></select>
+                        </div>
+                        {% endif %}
+                        <div class="ve-field">
+                            <label>City / Municipality</label>
+                            <select name="city_code" class="addr-city" disabled><option value="">Select city…</option></select>
+                        </div>
+                        <div class="ve-field">
+                            <label>Barangay</label>
+                            <select name="barangay_code" class="addr-barangay" disabled><option value="">Select barangay…</option></select>
+                        </div>
+                        <div class="ve-field">
+                            <label>House no. / Street</label>
+                            <input type="text" name="address" maxlength="200" value="{{ patient.address or '' }}" placeholder="e.g. Blk 5 Lot 12, Mabini St.">
+                        </div>
+                    </div>
+                    <div class="ve-actions">
+                        <button type="button" class="btn btn-outline btn-sm ve-cancel-btn" data-view="veView-demo-{{ v.visit_id }}" data-form="veForm-demo-{{ v.visit_id }}" data-edit-btn="veEditBtn-demo-{{ v.visit_id }}">Cancel</button>
+                        <button type="submit" class="btn btn-sm ve-save-btn">Save Changes</button>
+                    </div>
+                </form>
+
                 </div>
             </details>
 
@@ -186,11 +269,69 @@
             <details class="detail-section detail-collapse">
                 <summary><span class="ds-label">4. Lifestyle Factors</span></summary>
                 <div class="collapse-body">
-                <div class="detail-data-grid" style="margin-bottom:0.75rem;">
+
+                <div class="ve-bar">
+                    {% set lifestyle_changed = v.patient_edited_fields | select('in', ve_lifestyle_fields) | list if v.patient_edit_pending else [] %}
+                    {{ pending_badge(lifestyle_changed) }}
+                    <button type="button" class="btn btn-outline btn-sm ve-edit-btn" id="veEditBtn-lifestyle-{{ v.visit_id }}" data-view="veView-lifestyle-{{ v.visit_id }}" data-form="veForm-lifestyle-{{ v.visit_id }}">
+                        <svg class="ve-pencil" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                        Edit
+                    </button>
+                </div>
+
+                <div class="detail-data-grid" style="margin-bottom:0.75rem;" id="veView-lifestyle-{{ v.visit_id }}">
                     <div class="dd-item"><span class="dd-key">Smoking Status</span><span class="dd-val">{{ v.smoking_status or "—" }}</span></div>
                     <div class="dd-item"><span class="dd-key">Alcohol Intake</span><span class="dd-val">{{ v.alcohol_intake or "—" }}</span></div>
+                    <div class="dd-item"><span class="dd-key">Illicit Drug Use</span><span class="dd-val">{{ v.illicit_drug_use or "—" }}</span></div>
                     <div class="dd-item"><span class="dd-key">Physical Activity</span><span class="dd-val">{{ v.physical_activity or "—" }}</span></div>
                 </div>
+
+                <form method="POST" action="{{ url_for('patient.patient_edit_visit', visit_id=v.visit_id) }}" class="ve-form" id="veForm-lifestyle-{{ v.visit_id }}" style="display:none;">
+                    <p class="ve-note">Edits are reviewed by your health worker before they're final.</p>
+                    <div class="ve-grid">
+                        <div class="ve-field">
+                            <label>Smoking Status</label>
+                            <select name="smoking_status">
+                                <option value="">— No change —</option>
+                                {% for opt in ['Never smoked', 'Stopped > 1 year', 'Stopped < 1 year', 'Current Smoker', 'Passive Smoker'] %}
+                                <option value="{{ opt }}" {{ 'selected' if v.smoking_status == opt }}>{{ opt }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="ve-field">
+                            <label>Alcohol Intake</label>
+                            <select name="alcohol_intake">
+                                <option value="">— No change —</option>
+                                {% for opt in ['Never Consumed', 'Yes', 'Yes (Binge: 5+ drinks in one occasion past month)'] %}
+                                <option value="{{ opt }}" {{ 'selected' if v.alcohol_intake == opt }}>{{ opt }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="ve-field">
+                            <label>Illicit Drug Use</label>
+                            <select name="illicit_drug_use">
+                                <option value="">— No change —</option>
+                                {% for opt in ['No', 'Yes'] %}
+                                <option value="{{ opt }}" {{ 'selected' if v.illicit_drug_use == opt }}>{{ opt }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="ve-field">
+                            <label>Physical Activity</label>
+                            <select name="physical_activity">
+                                <option value="">— No change —</option>
+                                {% for opt in ['Does NOT meet 2.5 hours/week', 'Meets at least 2.5 hours/week moderate activity'] %}
+                                <option value="{{ opt }}" {{ 'selected' if v.physical_activity == opt }}>{{ opt }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="ve-actions">
+                        <button type="button" class="btn btn-outline btn-sm ve-cancel-btn" data-view="veView-lifestyle-{{ v.visit_id }}" data-form="veForm-lifestyle-{{ v.visit_id }}" data-edit-btn="veEditBtn-lifestyle-{{ v.visit_id }}">Cancel</button>
+                        <button type="submit" class="btn btn-sm ve-save-btn">Save Changes</button>
+                    </div>
+                </form>
+
                 <div class="dd-key" style="margin-bottom:0.4rem;">Dietary Factors</div>
                 <div class="risk-factors-grid">
                     {% for code in v.conditions.diet %}
@@ -205,12 +346,42 @@
             <details class="detail-section detail-collapse">
                 <summary><span class="ds-label">5. Diabetes History</span></summary>
                 <div class="collapse-body">
-                <div class="detail-data-grid" style="margin-bottom:0.75rem;">
+
+                <div class="ve-bar">
+                    {% set diabetes_changed = v.patient_edited_fields | select('in', ['diabetes_diagnosis']) | list if v.patient_edit_pending else [] %}
+                    {{ pending_badge(diabetes_changed) }}
+                    <button type="button" class="btn btn-outline btn-sm ve-edit-btn" id="veEditBtn-diabetes-{{ v.visit_id }}" data-view="veView-diabetes-{{ v.visit_id }}" data-form="veForm-diabetes-{{ v.visit_id }}">
+                        <svg class="ve-pencil" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                        Edit
+                    </button>
+                </div>
+
+                <div class="detail-data-grid" style="margin-bottom:0.75rem;" id="veView-diabetes-{{ v.visit_id }}">
                     <div class="dd-item" style="grid-column:1/-1;">
                         <span class="dd-key">Previously Diagnosed with Diabetes</span>
                         <span class="dd-val">{{ v.diabetes_diagnosis or "No / Do not know" }}</span>
                     </div>
                 </div>
+
+                <form method="POST" action="{{ url_for('patient.patient_edit_visit', visit_id=v.visit_id) }}" class="ve-form" id="veForm-diabetes-{{ v.visit_id }}" style="display:none;">
+                    <p class="ve-note">Edits are reviewed by your health worker before they're final.</p>
+                    <div class="ve-grid">
+                        <div class="ve-field" style="grid-column:1/-1;">
+                            <label>Previously Diagnosed with Diabetes</label>
+                            <select name="diabetes_diagnosis">
+                                <option value="">— No change —</option>
+                                {% for opt in ['No / Do not know', 'Yes (with medications)', 'Yes (without medications)'] %}
+                                <option value="{{ opt }}" {{ 'selected' if v.diabetes_diagnosis == opt }}>{{ opt }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="ve-actions">
+                        <button type="button" class="btn btn-outline btn-sm ve-cancel-btn" data-view="veView-diabetes-{{ v.visit_id }}" data-form="veForm-diabetes-{{ v.visit_id }}" data-edit-btn="veEditBtn-diabetes-{{ v.visit_id }}">Cancel</button>
+                        <button type="submit" class="btn btn-sm ve-save-btn">Save Changes</button>
+                    </div>
+                </form>
+
                 <div class="dd-key" style="margin-bottom:0.4rem;">Symptoms Present</div>
                 <div class="risk-factors-grid">
                     {% for code in v.conditions.dm_symptom %}
@@ -222,17 +393,90 @@
                 </div>
             </details>
 
+            <details class="detail-section detail-collapse">
+                <summary><span class="ds-label">5b. Surgical &amp; Reproductive History</span></summary>
+                <div class="collapse-body">
+
+                <div class="ve-bar">
+                    {% set surg_repro_changed = v.patient_edited_fields | select('in', ve_diabetes_fields) | list if v.patient_edit_pending else [] %}
+                    {{ pending_badge(surg_repro_changed) }}
+                    <button type="button" class="btn btn-outline btn-sm ve-edit-btn" id="veEditBtn-surgrepro-{{ v.visit_id }}" data-view="veView-surgrepro-{{ v.visit_id }}" data-form="veForm-surgrepro-{{ v.visit_id }}">
+                        <svg class="ve-pencil" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                        Edit
+                    </button>
+                </div>
+
+                <div class="detail-data-grid" id="veView-surgrepro-{{ v.visit_id }}">
+                    <div class="dd-item" style="grid-column:1/-1;"><span class="dd-key">Past Surgical History</span><span class="dd-val">{{ v.past_surgical_history or "—" }}</span></div>
+                    {% if patient.sex == 'Female' %}
+                    <div class="dd-item"><span class="dd-key">Menarche Age</span><span class="dd-val">{{ v.menarche_age or "—" }}</span></div>
+                    <div class="dd-item"><span class="dd-key">Last Menstrual Period</span><span class="dd-val">{{ v.lmp_date or "—" }}</span></div>
+                    <div class="dd-item"><span class="dd-key">Gravida</span><span class="dd-val">{{ v.gravida if v.gravida is not none else "—" }}</span></div>
+                    <div class="dd-item"><span class="dd-key">Para</span><span class="dd-val">{{ v.para if v.para is not none else "—" }}</span></div>
+                    {% endif %}
+                </div>
+
+                <form method="POST" action="{{ url_for('patient.patient_edit_visit', visit_id=v.visit_id) }}" class="ve-form" id="veForm-surgrepro-{{ v.visit_id }}" style="display:none;">
+                    <p class="ve-note">Edits are reviewed by your health worker before they're final.</p>
+                    <div class="ve-grid">
+                        <div class="ve-field" style="grid-column:1/-1;">
+                            <label>Past Surgical History</label>
+                            <input type="text" name="past_surgical_history" value="{{ v.past_surgical_history or '' }}" placeholder="e.g. Appendectomy 2019">
+                        </div>
+                        {% if patient.sex == 'Female' %}
+                        <div class="ve-field"><label>Menarche Age</label><input type="number" name="menarche_age" value="{{ v.menarche_age or '' }}"></div>
+                        <div class="ve-field"><label>Last Menstrual Period</label><input type="date" name="lmp_date" value="{{ v.lmp_date or '' }}"></div>
+                        <div class="ve-field"><label>Gravida</label><input type="number" name="gravida" value="{{ v.gravida if v.gravida is not none else '' }}"></div>
+                        <div class="ve-field"><label>Para</label><input type="number" name="para" value="{{ v.para if v.para is not none else '' }}"></div>
+                        {% endif %}
+                    </div>
+                    <div class="ve-actions">
+                        <button type="button" class="btn btn-outline btn-sm ve-cancel-btn" data-view="veView-surgrepro-{{ v.visit_id }}" data-form="veForm-surgrepro-{{ v.visit_id }}" data-edit-btn="veEditBtn-surgrepro-{{ v.visit_id }}">Cancel</button>
+                        <button type="submit" class="btn btn-sm ve-save-btn">Save Changes</button>
+                    </div>
+                </form>
+
+                </div>
+            </details>
+
             <details class="detail-section detail-collapse" open>
                 <summary><span class="ds-label">6. Anthropometric Measurements &amp; Vitals</span></summary>
                 <div class="collapse-body">
-                <div class="detail-data-grid">
+
+                <div class="ve-bar">
+                    {% set vitals_changed = v.patient_edited_fields | select('in', ve_vitals_fields) | list if v.patient_edit_pending else [] %}
+                    {{ pending_badge(vitals_changed) }}
+                    <button type="button" class="btn btn-outline btn-sm ve-edit-btn" id="veEditBtn-vitals-{{ v.visit_id }}" data-view="veView-{{ v.visit_id }}" data-form="veForm-{{ v.visit_id }}">
+                        <svg class="ve-pencil" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                        Edit
+                    </button>
+                </div>
+
+                <div class="detail-data-grid" id="veView-{{ v.visit_id }}">
                     <div class="dd-item"><span class="dd-key">Blood Pressure</span><span class="dd-val">{{ v.bp_systolic or "—" }}/{{ v.bp_diastolic or "—" }} mmHg{{ arrow(v.trend.bp, " mmHg") }}</span></div>
+                    <div class="dd-item"><span class="dd-key">Heart Rate</span><span class="dd-val">{{ v.heart_rate or "—" }}{% if v.heart_rate %} bpm{% endif %}</span></div>
+                    <div class="dd-item"><span class="dd-key">Respiratory Rate</span><span class="dd-val">{{ v.respiratory_rate or "—" }}{% if v.respiratory_rate %} br/min{% endif %}</span></div>
                     <div class="dd-item"><span class="dd-key">Height</span><span class="dd-val">{{ v.height_cm or "—" }} cm</span></div>
                     <div class="dd-item"><span class="dd-key">Weight</span><span class="dd-val">{{ v.weight_kg or "—" }} kg{{ arrow(v.trend.weight_kg, " kg") }}</span></div>
                     <div class="dd-item"><span class="dd-key">BMI</span><span class="dd-val">{{ v.bmi or "—" }} kg/m²{{ arrow(v.trend.bmi) }}</span></div>
                     <div class="dd-item"><span class="dd-key">Waist Circumference</span><span class="dd-val">{{ v.waist_cm or "—" }} cm{{ arrow(v.trend.waist_cm, " cm") }}</span></div>
                     <div class="dd-item"><span class="dd-key">Obesity Classification</span><span class="dd-val">{{ v.obesity_class or "—" }}</span></div>
                 </div>
+
+                <form method="POST" action="{{ url_for('patient.patient_edit_visit', visit_id=v.visit_id) }}" class="ve-form" id="veForm-{{ v.visit_id }}" style="display:none;">
+                    <p class="ve-note">FBS, your risk result, and your height, weight, waist and BMI are measured by your health worker and can't be changed here. Other edits are reviewed by your health worker.</p>
+                    <div class="ve-grid">
+                        <div class="ve-field"><label>BP Systolic</label><input type="number" name="bp_systolic" value="{{ v.bp_systolic or '' }}" placeholder="e.g. 120"></div>
+                        <div class="ve-field"><label>BP Diastolic</label><input type="number" name="bp_diastolic" value="{{ v.bp_diastolic or '' }}" placeholder="e.g. 80"></div>
+                        <div class="ve-field"><label>Heart Rate (bpm)</label><input type="number" name="heart_rate" value="{{ v.heart_rate or '' }}"></div>
+                        <div class="ve-field"><label>Respiratory Rate</label><input type="number" name="respiratory_rate" value="{{ v.respiratory_rate or '' }}"></div>
+                    </div>
+                    <div class="ve-actions">
+                        <button type="button" class="btn btn-outline btn-sm ve-cancel-btn" data-view="veView-{{ v.visit_id }}" data-form="veForm-{{ v.visit_id }}" data-edit-btn="veEditBtn-vitals-{{ v.visit_id }}">Cancel</button>
+                        <button type="submit" class="btn btn-sm ve-save-btn">Save Changes</button>
+                    </div>
+                </form>
+
                 </div>
             </details>
 
@@ -326,4 +570,69 @@
 })();
 </script>
 {% endif %}
+<script>
+(function () {
+    var placeholders = { region: 'Select region…', province: 'Select province…', city: 'Select city…', barangay: 'Select barangay…' };
+
+    function init(form) {
+        if (form.dataset.ready) return;
+        form.dataset.ready = '1';
+        var url = form.dataset.optionsUrl;
+        var hasProvinces = form.dataset.hasProvinces === '1';
+        var cur = { region: form.dataset.region, province: form.dataset.province, city: form.dataset.city, barangay: form.dataset.barangay };
+        var sel = {
+            region: form.querySelector('.addr-region'), province: form.querySelector('.addr-province'),
+            city: form.querySelector('.addr-city'), barangay: form.querySelector('.addr-barangay')
+        };
+        var ticket = { region: 0, province: 0, city: 0, barangay: 0 };
+
+        function fill(level, options, selected) {
+            var s = sel[level]; if (!s) return;
+            s.replaceChildren(new Option(placeholders[level], ''));
+            options.forEach(function (o) { s.appendChild(new Option(o.name, o.code, false, o.code === selected)); });
+            s.disabled = options.length === 0 && level !== 'region';
+        }
+        function reset(level) { fill(level, [], ''); }
+        function load(level, parent, selected) {
+            var t = ++ticket[level];
+            var qs = new URLSearchParams({ level: level, parent: parent || '' });
+            return fetch(url + '?' + qs.toString())
+                .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+                .then(function (j) { if (t === ticket[level]) fill(level, j.options || [], selected || ''); })
+                .catch(function (e) { console.error('Could not load ' + level + ' options', e); });
+        }
+        function loadCities() {
+            var parent = (hasProvinces && sel.province && sel.province.value) || sel.region.value;
+            reset('barangay');
+            return parent ? load('city', parent, '') : Promise.resolve(reset('city'));
+        }
+
+        sel.region.addEventListener('change', function () {
+            if (hasProvinces) { reset('province'); if (sel.region.value) load('province', sel.region.value, ''); }
+            loadCities();
+        });
+        if (sel.province) sel.province.addEventListener('change', loadCities);
+        sel.city.addEventListener('change', function () {
+            if (sel.city.value) load('barangay', sel.city.value, ''); else reset('barangay');
+        });
+
+        load('region', '', cur.region).then(function () {
+            if (!cur.region) return;
+            var p = hasProvinces ? load('province', cur.region, cur.province) : Promise.resolve();
+            return p.then(function () {
+                return load('city', (hasProvinces && cur.province) || cur.region, cur.city);
+            }).then(function () {
+                if (cur.city) return load('barangay', cur.city, cur.barangay);
+            });
+        });
+    }
+
+    document.querySelectorAll('.ve-edit-btn').forEach(function (b) {
+        var form = document.getElementById(b.dataset.form);
+        if (form && form.classList.contains('demo-form')) {
+            b.addEventListener('click', function () { init(form); });
+        }
+    });
+})();
+</script>
 {% endblock %}

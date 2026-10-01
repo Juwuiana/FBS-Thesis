@@ -20,6 +20,42 @@ def nurse_static_data(filename):
 require_role_for_blueprint(nurse_bp, "health_worker", "medical_officer")
 
 
+@nurse_bp.app_context_processor
+def inject_pending_patient_edits():
+    """Lets every nurse_base.html-extending page show the notification bell
+    count without each route remembering to pass it in."""
+    try:
+        return {"pending_patient_edits_count": visit_model.count_pending_patient_edits()}
+    except Exception:
+        return {"pending_patient_edits_count": 0}
+
+
+@nurse_bp.route('/nurse/patient-edits')
+def nurse_patient_edits():
+    """Notification bell dropdown contents: visits a patient has edited
+    from the portal that no nurse has acknowledged yet."""
+    edits = visit_model.list_pending_patient_edits()
+    return jsonify({
+        "count": len(edits),
+        "edits": [{
+            "visit_id": e["visit_id"],
+            "patient_code": e["patient_code"],
+            "patient_name": f'{e["first_name"]} {e["last_name"]}',
+            "edited_at": e["edited_by_patient_at"],
+            "fields": e["edited_fields"],
+            "previous": e["patient_edit_previous_values"],
+            "patient_file_url": url_for('nurse.nurse_patient_file_view', patient_id=e["patient_code"], visit_id=e["visit_id"]),
+        } for e in edits],
+    })
+
+
+@nurse_bp.route('/nurse/patient-edits/<int:visit_id>/acknowledge', methods=['POST'])
+def nurse_acknowledge_patient_edit(visit_id):
+    visit_model.acknowledge_patient_edit(visit_id, staff_id=session.get("user_id"))
+    return jsonify({"ok": True})
+
+
+
 def _audit_event(action, severity="Info"):
     audit_model.log_event(
         get_db(), user_id=session.get("user_id"), user_name=session.get("user_name", "unknown"),
@@ -514,6 +550,20 @@ def nurse_health_results():
         report_date=date_cls.today().isoformat(),
     )
 
+def _attach_pending_edits(patients):
+    """Adds p['pending_edit'] = {'date', 'fields'} to patients whose own
+    edits no nurse has acknowledged yet. Reuses the global bell's data."""
+    pending = {}
+    for e in visit_model.list_pending_patient_edits():
+        entry = pending.setdefault(e["patient_code"], {"date": "", "fields": []})
+        entry["date"] = max(entry["date"], str(e["edited_by_patient_at"])[:10])
+        for f in (e["edited_fields"] or []):
+            if f not in entry["fields"]:
+                entry["fields"].append(f)
+    patients = [dict(p) for p in patients]
+    for p in patients:
+        p["pending_edit"] = pending.get(p["patient_code"])
+    return patients
 
 @nurse_bp.route('/nurse/data_management')
 def nurse_data_management():
@@ -548,6 +598,7 @@ def nurse_data_management():
         barangay=barangay, risk=risk, date=date, entries_limit=page_size, q=q, offset=offset, status=status,
         sort=sort, direction=direction,
     )
+    patients = visit_model.attach_pending_patient_edits([dict(p) for p in patients])
 
     # Windowed page numbers so the pager stays a fixed width even with
     # hundreds of pages: first, last, current +/-1, with None marking a
@@ -580,6 +631,22 @@ def nurse_data_management():
         direction=direction,
     )
 
+@nurse_bp.route('/nurse/data_management/acknowledge_edits/<patient_id>', methods=['POST'])
+def nurse_data_management_acknowledge_edits(patient_id):
+    patient = patient_model.get_patient_by_code(patient_id)
+    if patient is None:
+        abort(404)
+    cleared = visit_model.acknowledge_patient_edits_for_patient(
+        patient["id"], staff_id=session.get("user_id")
+    )
+    for e in visit_model.list_pending_patient_edits():
+        if e["patient_code"] == patient_id:
+            visit_model.acknowledge_patient_edit(e["visit_id"], staff_id=session.get("user_id"))
+            cleared += 1
+    _audit_event(f"Patient edits marked reviewed: {patient_id} ({cleared} visit(s))", "Info")
+    qs = request.form.get('return_qs', '')
+    target = url_for('nurse.nurse_data_management')
+    return redirect(f"{target}?{qs}" if qs else target)
 
 @nurse_bp.route('/nurse/dashboard/screening-volume')
 def nurse_dashboard_screening_volume():

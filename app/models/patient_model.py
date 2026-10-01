@@ -146,6 +146,16 @@ def get_patient_code_by_id(patient_id: int) -> str | None:
     conn.close()
     return row["patient_code"] if row else None
 
+def format_location(patient: dict | None) -> str:
+    """'Street, Barangay, City, Region' from a get_patient_by_* row, skipping blanks.
+    Used for the before/after shown to a nurse when a patient changes their address."""
+    if not patient:
+        return ""
+    parts = [patient.get("address"), patient.get("barangay"),
+             patient.get("city_name"), patient.get("region_name")]
+    return ", ".join(str(p).strip() for p in parts if p and str(p).strip())
+
+
 def get_patient_by_code(patient_code: str) -> dict | None:
     conn = get_connection()
     row = conn.execute("""
@@ -313,7 +323,17 @@ def _patient_listing_filters(barangay=None, risk=None, date=None, q=None, status
         # Visit saved (not a draft) but no lab_screenings row yet -- the
         # patient has been assessed but the FBS result hasn't come back.
         conditions.append("v.id IS NOT NULL AND COALESCE(v.status, '') != 'draft' AND ls.id IS NULL")
-
+    elif status == "needs_review":
+        # Any visit for this patient that was edited from the portal
+        # and has not yet been acknowledged by a health worker.
+        conditions.append("""
+            EXISTS (
+                SELECT 1 FROM visits v_rev
+                WHERE v_rev.patient_id = p.id
+                  AND v_rev.edited_by_patient_at IS NOT NULL
+                  AND v_rev.edit_acknowledged_at IS NULL
+            )
+        """)
     return conditions, params
 
 
@@ -376,7 +396,7 @@ def list_patients_with_latest_screening(barangay=None, risk=None, date=None, ent
     conditions, params = _patient_listing_filters(barangay=barangay, risk=risk, date=date, q=q, status=status)
 
     sql = f"""
-        SELECT p.patient_code, p.first_name, p.last_name, p.birthdate, p.sex,
+        SELECT p.id AS patient_id, p.patient_code, p.first_name, p.last_name, p.birthdate, p.sex,
                b.name AS barangay,
                v.assessment_date AS date,
                v.status AS visit_status,

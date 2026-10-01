@@ -1,6 +1,32 @@
 /* PATIENT PORTAL — patient_scripts.js */
 
 document.addEventListener('DOMContentLoaded', () => {
+    // ---- Edit a past screening's editable fields (My Results) ----
+    // Each editable block (vitals, lifestyle, diabetes history, ...) is its
+    // own view/form pair, identified by data-view / data-form ids on the
+    // edit button, and data-edit-btn on the matching cancel button --
+    // so a visit can have several independent edit sections without their
+    // ids colliding.
+    document.querySelectorAll('.ve-edit-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const view = document.getElementById(btn.dataset.view);
+            const form = document.getElementById(btn.dataset.form);
+            if (view) view.style.display = 'none';
+            if (form) form.style.display = '';
+            btn.style.display = 'none';
+        });
+    });
+    document.querySelectorAll('.ve-cancel-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const view = document.getElementById(btn.dataset.view);
+            const form = document.getElementById(btn.dataset.form);
+            const editBtn = document.getElementById(btn.dataset.editBtn);
+            if (form) form.style.display = 'none';
+            if (view) view.style.display = '';
+            if (editBtn) editBtn.style.display = '';
+        });
+    });
+
 
     /* 1. MOBILE SIDEBAR TOGGLE  (all pages)*/
     const menuBtn       = document.getElementById('menuBtn');
@@ -195,10 +221,10 @@ document.addEventListener('DOMContentLoaded', () => {
         pwNewInput.addEventListener('input', () => checkPwStrength(pwNewInput.value));
     }
 
-    // Password change submit
-    const pwChangeBtn = document.getElementById('pwChangeBtn');
-    if (pwChangeBtn) {
-        pwChangeBtn.addEventListener('click', handlePwChange);
+    // Password change submit (real form POST to the server; see handlePwChange)
+    const pwChangeForm = document.getElementById('pwChangeForm');
+    if (pwChangeForm) {
+        pwChangeForm.addEventListener('submit', handlePwChange);
     }
 
     // Save buttons (contact, notifications, emergency contact)
@@ -413,26 +439,36 @@ function checkPwStrength(val) {
     label.style.color     = levels[score].color;
 }
 
-function handlePwChange() {
+// Returns true to allow the real form submit through to the server,
+// false to block it (client-side checks only -- the server re-checks
+// current_password and re-hashes new_password; this just avoids a
+// round trip for an obvious typo).
+function handlePwChange(e) {
     const cur  = document.getElementById('pwCurrent');
     const nw   = document.getElementById('pwNew');
     const conf = document.getElementById('pwConfirm');
     const hint = document.getElementById('pwMatchHint');
-    if (!cur || !nw || !conf) return;
+    if (!cur || !nw || !conf) return true;
     if (!cur.value || !nw.value || !conf.value) {
-        showToast('Please fill in all password fields.', 'warn'); return;
+        if (e) e.preventDefault();
+        showToast('Please fill in all password fields.', 'warn');
+        return false;
     }
     if (nw.value !== conf.value) {
+        if (e) e.preventDefault();
         hint.textContent = 'Passwords do not match.';
-        hint.style.color = 'var(--danger)'; return;
+        hint.style.color = 'var(--danger)';
+        return false;
     }
     if (nw.value.length < 8) {
-        showToast('Password must be at least 8 characters.', 'warn'); return;
+        if (e) e.preventDefault();
+        showToast('Password must be at least 8 characters.', 'warn');
+        return false;
     }
     hint.textContent = '';
-    showToast('Password updated successfully.');
-    [cur, nw, conf].forEach(i => i.value = '');
-    checkPwStrength('');
+    // Let the form submit normally; patient_controller.patient_settings()
+    // re-renders the page with the server's own success/error message.
+    return true;
 }
 
 

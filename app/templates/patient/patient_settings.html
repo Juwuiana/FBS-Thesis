@@ -112,18 +112,21 @@
 
             <div class="settings-section">
                 <div class="section-label">Change Password</div>
-                <div class="settings-form-grid" style="max-width: 480px;">
+                {% if message %}
+                <p class="form-hint" style="color: {{ 'var(--g-accent)' if success else 'var(--danger)' }}; margin-bottom: 0.75rem;">{{ message }}</p>
+                {% endif %}
+                <form method="POST" action="{{ url_for('patient.patient_settings') }}" id="pwChangeForm" class="settings-form-grid" style="max-width: 480px;">
                     <div class="form-group" style="grid-column: 1 / -1;">
                         <label class="form-label">Current Password</label>
                         <div class="pw-field-wrap">
-                            <input class="form-input" type="password" id="pwCurrent" placeholder="Enter current password" autocomplete="current-password">
+                            <input class="form-input" type="password" id="pwCurrent" name="current_password" placeholder="Enter current password" autocomplete="current-password" required>
                             <button class="pw-toggle" data-pw-target="pwCurrent" type="button"><svg class="pw-eye-icon" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M1 10C3.5 5.5 7 3 10 3s6.5 2.5 9 7c-2.5 4.5-6 7-9 7s-6.5-2.5-9-7z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5"/></svg></button>
                         </div>
                     </div>
                     <div class="form-group" style="grid-column: 1 / -1;">
                         <label class="form-label">New Password</label>
                         <div class="pw-field-wrap">
-                            <input class="form-input" type="password" id="pwNew" placeholder="At least 8 characters" autocomplete="new-password">
+                            <input class="form-input" type="password" id="pwNew" name="new_password" placeholder="At least 8 characters" autocomplete="new-password" minlength="8" required>
                             <button class="pw-toggle" data-pw-target="pwNew" type="button"><svg class="pw-eye-icon" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M1 10C3.5 5.5 7 3 10 3s6.5 2.5 9 7c-2.5 4.5-6 7-9 7s-6.5-2.5-9-7z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5"/></svg></button>
                         </div>
                         <div class="pw-strength-bar" id="pwStrengthBar">
@@ -134,15 +137,15 @@
                     <div class="form-group" style="grid-column: 1 / -1;">
                         <label class="form-label">Confirm New Password</label>
                         <div class="pw-field-wrap">
-                            <input class="form-input" type="password" id="pwConfirm" placeholder="Re-enter new password" autocomplete="new-password">
+                            <input class="form-input" type="password" id="pwConfirm" name="confirm_password" placeholder="Re-enter new password" autocomplete="new-password" minlength="8" required>
                             <button class="pw-toggle" data-pw-target="pwConfirm" type="button"><svg class="pw-eye-icon" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M1 10C3.5 5.5 7 3 10 3s6.5 2.5 9 7c-2.5 4.5-6 7-9 7s-6.5-2.5-9-7z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5"/></svg></button>
                         </div>
                         <span class="form-hint" id="pwMatchHint"></span>
                     </div>
-                </div>
-                <div class="form-actions">
-                    <button class="btn-save">Update Password</button>
-                </div>
+                    <div class="form-actions" style="grid-column: 1 / -1;">
+                        <button type="submit" class="btn-save" id="pwChangeBtn">Update Password</button>
+                    </div>
+                </form>
             </div>
 
             <div class="settings-section">

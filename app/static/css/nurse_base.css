@@ -734,3 +734,46 @@ svg.nav-icon { height: 24px; padding: 2px; box-sizing: border-box; fill: none; s
 .data-table th .th-sort:hover .sort-ind { opacity: 0.7; }
 .data-table th .th-sort.active { color: var(--t1); }
 .data-table th .th-sort.active .sort-ind { opacity: 1; color: var(--g-accent); }
+
+/* ===== Notification bell: patient-updated records ===== */
+.nurse-bell-wrap { position: fixed; top: 14px; right: 18px; z-index: 50; }
+.nurse-bell-btn {
+    position: relative; width: 38px; height: 38px; border-radius: 50%;
+    background: var(--white); border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; color: var(--t2);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+.nurse-bell-btn:hover { color: var(--g-accent); border-color: var(--g-accent); }
+.nurse-bell-btn svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.nurse-bell-badge {
+    position: absolute; top: -4px; right: -4px; min-width: 17px; height: 17px;
+    border-radius: 999px; background: var(--danger, #ef4444); color: #fff;
+    font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center;
+    padding: 0 4px; border: 2px solid var(--white);
+}
+.nurse-bell-panel {
+    position: absolute; top: 46px; right: 0; width: 320px; max-height: 420px;
+    overflow-y: auto; background: var(--white); border: 1px solid var(--border);
+    border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+}
+.nurse-bell-header { font-size: 0.78rem; font-weight: 700; color: var(--t2); padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); }
+.nurse-bell-empty { font-size: 0.8rem; color: var(--t3); padding: 1rem; margin: 0; }
+.nurse-bell-item { display: block; padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); text-decoration: none; color: inherit; }
+.nurse-bell-item:last-child { border-bottom: none; }
+.nurse-bell-item:hover { background: var(--bg); }
+.nurse-bell-name { font-size: 0.82rem; font-weight: 600; color: var(--t1); }
+.nurse-bell-code { font-size: 0.7rem; color: var(--t3); margin-left: 0.3rem; font-weight: 400; }
+.nurse-bell-fields { font-size: 0.72rem; color: var(--t3); margin-top: 0.2rem; }
+.nurse-bell-time { font-size: 0.68rem; color: var(--t3); margin-top: 0.2rem; }
+.nurse-bell-ack { font-size: 0.7rem; font-weight: 600; color: var(--g-accent); background: none; border: none; cursor: pointer; padding: 0; margin-top: 0.3rem; }
+.nurse-bell-ack:hover { text-decoration: underline; }
+
+@media (max-width: 768px) {
+    .nurse-bell-wrap { top: 10px; right: 56px; }
+    .nurse-bell-panel { width: calc(100vw - 32px); right: -8px; }
+}
+
+.edit-flag { display: inline-flex; vertical-align: middle; margin-right: 0.4rem; color: #d97706; text-decoration: none; }
+.edit-flag svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.edit-flag:hover, .edit-flag:focus-visible { color: #b45309; }

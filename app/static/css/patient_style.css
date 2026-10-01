@@ -940,3 +940,132 @@ svg.nav-icon { height: 24px; padding: 2px; box-sizing: border-box; fill: none; s
 @media (min-width: 769px) {
     .sidebar-profile { padding: 1rem 0.5rem; }
 }
+
+/* ===== Edit vitals (My Results > Anthropometric Measurements) ===== */
+.ve-bar { display: flex; align-items: center; justify-content: flex-end; gap: 0.6rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
+.ve-edit-btn, .ve-cancel-btn { display: inline-flex; align-items: center; gap: 0.35rem; }
+.ve-pencil { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; margin-right: 0.1rem; }
+.ve-pending-badge {
+    display: inline-flex; align-items: center; gap: 0.35rem;
+    font-size: 0.72rem; font-weight: 600; color: #92400e;
+    background: #fff4d6; border: 1px solid #fcd34d;
+    padding: 0.3rem 0.65rem; border-radius: 999px; margin-right: auto;
+}
+.ve-pending-icon { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.ve-form { margin-top: 0.75rem; padding: 1rem; background: var(--bg, #f3f6f4); border: 1px solid var(--border, #e0e8e0); border-radius: 10px; }
+.ve-note { font-size: 0.75rem; color: var(--t3, #6b7c6b); margin: 0 0 0.85rem; line-height: 1.5; }
+.ve-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
+.ve-field { display: flex; flex-direction: column; gap: 0.3rem; }
+.ve-field label { font-size: 0.72rem; font-weight: 600; color: var(--t2, #475569); }
+.ve-field input {
+    padding: 0.55rem 0.7rem; border: 1px solid var(--border, #e0e8e0); border-radius: 6px;
+    font-family: inherit; font-size: 0.85rem; color: var(--t1, #1a2e1a); background: #fff;
+}
+.ve-field input:focus { outline: none; border-color: var(--g-accent, #27ae60); box-shadow: 0 0 0 3px rgba(39,174,96,0.1); }
+.ve-actions { display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 1rem; }
+.ve-save-btn { background: var(--g-accent, #27ae60); color: #fff; border: none; }
+.ve-save-btn:hover { background: var(--g-dark, #1a2e1a); }
+
+@media (max-width: 600px) {
+    .ve-grid { grid-template-columns: 1fr; }
+    .ve-bar { justify-content: space-between; }
+}
+
+/* --- POPUP FLASH MODAL --- */
+.patient-modal-overlay {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(15, 23, 42, 0.45);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    animation: pmFadeIn 0.2s ease-out;
+}
+
+.patient-modal-card {
+    background: #ffffff;
+    border-radius: 14px;
+    padding: 2rem 1.75rem 1.5rem;
+    max-width: 400px;
+    width: 90%;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+    text-align: center;
+    animation: pmScaleIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.pm-status-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    margin: 0 auto 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+.pm-icon-success {
+    background: #ecfdf5;
+    color: #10b981;
+    border: 2px solid #a7f3d0;
+}
+
+.pm-icon-error {
+    background: #fef2f2;
+    color: #ef4444;
+    border: 2px solid #fecaca;
+}
+
+.pm-title {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+.pm-message {
+    margin: 0 0 1.5rem 0;
+    font-size: 0.925rem;
+    color: #64748b;
+    line-height: 1.5;
+}
+
+.pm-actions {
+    display: flex;
+    justify-content: center;
+}
+
+.btn-patient-ok {
+    background-color: #15803d; /* LHU Theme Green */
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    padding: 0.65rem 2.5rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.15s ease, transform 0.1s ease;
+}
+
+.btn-patient-ok:hover {
+    background-color: #166534;
+}
+
+.btn-patient-ok:active {
+    transform: scale(0.97);
+}
+
+@keyframes pmFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes pmScaleIn {
+    from { opacity: 0; transform: scale(0.94); }
+    to { opacity: 1; transform: scale(1); }
+}

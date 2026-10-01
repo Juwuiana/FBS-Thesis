@@ -258,3 +258,118 @@ def resolve_barangay_from_names(barangay_name, city_name=None, region_name=None)
         f"barangay {barangay_name!r} not found under city {city_name!r} in the "
         "PSGC dataset -- matched/created by name alone."
     )
+
+
+# ---------------------------------------------------------------------------
+# Patient portal: region -> (province) -> city -> barangay address cascade
+# ---------------------------------------------------------------------------
+# Used when a patient relocates and updates their own address. The browser only
+# ever sends PSGC *codes*; names and the barangay row come from the server's own
+# data/psgc_data.json, so a tampered form can't invent or mislabel a location.
+#
+# The dataset is indexed once into hash maps (code -> row, parent code -> rows)
+# so every lookup is O(1) instead of scanning tens of thousands of barangays on
+# each request.
+#
+# Province is optional: patients only get a province step if the dataset has
+# a "provinces" list and cities carry a "provinceCode". The barangays table
+# stores region/city/barangay but not province, so province narrows the
+# dropdowns and is validated, but is not saved on its own.
+
+LOCATION_LEVELS = ("region", "province", "city", "barangay")
+
+_psgc_index = None
+_psgc_index_lock = threading.Lock()
+
+
+def _build_psgc_index():
+    global _psgc_index
+    if _psgc_index is not None:
+        return _psgc_index
+    with _psgc_index_lock:
+        if _psgc_index is None:
+            data = _load_psgc_data()
+            provinces = data.get("provinces") or []
+            has_provinces = bool(provinces) and any(c.get("provinceCode") for c in data["cities"])
+            idx = {
+                "has_provinces": has_provinces,
+                "region": {r["code"]: r for r in data["regions"]},
+                "province": {p["code"]: p for p in provinces},
+                "city": {c["code"]: c for c in data["cities"]},
+                "barangay": {b["code"]: b for b in data["barangays"]},
+                "provinces_by_region": {},
+                "cities_by_region": {},
+                "cities_by_province": {},
+                "barangays_by_city": {},
+            }
+            for p in provinces:
+                idx["provinces_by_region"].setdefault(p.get("regionCode"), []).append(p)
+            for c in data["cities"]:
+                idx["cities_by_region"].setdefault(c.get("regionCode"), []).append(c)
+                if c.get("provinceCode"):
+                    idx["cities_by_province"].setdefault(c["provinceCode"], []).append(c)
+            for b in data["barangays"]:
+                idx["barangays_by_city"].setdefault(b.get("cityCode"), []).append(b)
+            _psgc_index = idx
+    return _psgc_index
+
+
+def psgc_has_provinces() -> bool:
+    try:
+        return _build_psgc_index()["has_provinces"]
+    except (OSError, json.JSONDecodeError):
+        return False
+
+
+def psgc_location_options(level: str, parent_code: str | None = None) -> list[dict]:
+    """[{code, name}] sorted by name for one dropdown of the address cascade.
+    region: no parent. province: parent = region code. city: parent = province
+    code (when the dataset has provinces) or region code. barangay: parent = city code."""
+    if level not in LOCATION_LEVELS:
+        raise ValueError("Unknown location level.")
+    idx = _build_psgc_index()
+    if level == "region":
+        rows = idx["region"].values()
+    elif level == "province":
+        rows = idx["provinces_by_region"].get(parent_code, []) if idx["has_provinces"] else []
+    elif level == "city":
+        if idx["has_provinces"] and parent_code in idx["province"]:
+            rows = idx["cities_by_province"].get(parent_code, [])
+        else:
+            rows = idx["cities_by_region"].get(parent_code, [])
+    else:
+        rows = idx["barangays_by_city"].get(parent_code, [])
+    return sorted(({"code": r["code"], "name": r["name"]} for r in rows),
+                  key=lambda r: r["name"].casefold())
+
+
+def resolve_psgc_location(region_code, city_code, barangay_code, province_code=None):
+    """
+    Validate a submitted region/(province)/city/barangay chain against the PSGC
+    dataset and return (barangay_id, None), or (None, "reason") if any link is
+    unknown or doesn't belong to its parent.
+    """
+    try:
+        idx = _build_psgc_index()
+    except (OSError, json.JSONDecodeError):
+        return None, "Address options are unavailable right now. Please try again later."
+
+    region = idx["region"].get(region_code)
+    city = idx["city"].get(city_code)
+    brgy = idx["barangay"].get(barangay_code)
+    if not (region and city and brgy):
+        return None, "Please choose a region, city and barangay from the lists."
+    if city.get("regionCode") != region["code"]:
+        return None, "That city is not in the selected region."
+    if brgy.get("cityCode") != city["code"]:
+        return None, "That barangay is not in the selected city."
+    if province_code and idx["has_provinces"]:
+        if province_code not in idx["province"] or city.get("provinceCode") != province_code:
+            return None, "That city is not in the selected province."
+
+    barangay_id = get_or_create_barangay(
+        brgy["code"], brgy["name"], city["code"], city["name"], region["code"], region["name"]
+    )
+    if barangay_id is None:
+        return None, "That barangay could not be saved."
+    return barangay_id, None

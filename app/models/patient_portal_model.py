@@ -2,6 +2,7 @@
 eto yung nakikita ng patients
 """
 import bisect
+import json
 from datetime import date, datetime
 from app.models import visit_model, lab_model
 
@@ -125,12 +126,24 @@ def get_full_screening_history(patient_id: int, sex: str | None = None) -> list[
             "waist_cm": visit_detail.get("waist_cm"),
             "bp_systolic": visit_detail.get("bp_systolic"),
             "bp_diastolic": visit_detail.get("bp_diastolic"),
+            "heart_rate": visit_detail.get("heart_rate"),
+            "respiratory_rate": visit_detail.get("respiratory_rate"),
             "height_cm": visit_detail.get("height_cm"),
             "weight_kg": visit_detail.get("weight_kg"),
+            "patient_edit_pending": bool(
+                visit_detail.get("edited_by_patient_at") and not visit_detail.get("edit_acknowledged_at")
+            ),
+            "patient_edited_fields": json.loads(visit_detail["edited_fields"]) if visit_detail.get("edited_fields") else [],
             "smoking_status": visit_detail.get("smoking_status"),
             "alcohol_intake": visit_detail.get("alcohol_intake"),
+            "illicit_drug_use": visit_detail.get("illicit_drug_use"),
             "physical_activity": visit_detail.get("physical_activity"),
             "diabetes_diagnosis": visit_detail.get("diabetes_diagnosis"),
+            "past_surgical_history": visit_detail.get("past_surgical_history"),
+            "menarche_age": visit_detail.get("menarche_age"),
+            "lmp_date": visit_detail.get("lmp_date"),
+            "gravida": visit_detail.get("gravida"),
+            "para": visit_detail.get("para"),
             "conditions": conditions,
             "cvd_responses": cvd,
             "follow_up_date": screening.get("follow_up_date") if screening else None,
