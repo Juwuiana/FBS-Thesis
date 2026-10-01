@@ -170,9 +170,9 @@ def test_disabling_nurse_export_blocks_nurse_but_not_admin_export(app):
     active_session(nurse, nurse_id, "health_worker")
     with nurse.session_transaction() as session:
         session["security_version"] = nurse_version
-    blocked = nurse.post("/nurse_data_management/export", data={})
+    blocked = nurse.post("/nurse/data_management/export", data={})
     assert blocked.status_code == 302
-    assert blocked.headers["Location"].endswith("/nurse_data_management")
+    assert blocked.headers["Location"].endswith("/nurse/data_management")
 
     admin = app.test_client()
     active_session(admin, admin_id)
@@ -193,7 +193,7 @@ def test_force_signout_isolated_by_role(app):
         "/admin/privacy-security/role-force-signout",
         data={"role": "health_worker"},
     ).status_code == 302
-    assert nurse.get("/nurse_dashboard").status_code == 302
+    assert nurse.get("/nurse/dashboard").status_code == 302
     assert admin.get("/admin/privacy-security").status_code == 200
 
     fresh_admin = app.test_client()
@@ -213,7 +213,7 @@ def test_force_signout_isolated_by_role(app):
         data={"role": "medical_officer"},
     ).status_code == 302
     assert fresh_admin.get("/admin/privacy-security").status_code == 200
-    assert fresh_nurse.get("/nurse_dashboard").status_code == 200
+    assert fresh_nurse.get("/nurse/dashboard").status_code == 200
 
 
 def test_patient_login_control_does_not_affect_staff_login(app):
@@ -258,7 +258,7 @@ def test_patient_export_control_does_not_block_nurse_export(app):
     active_session(nurse, nurse_id, "health_worker")
     with nurse.session_transaction() as session:
         session["security_version"] = nurse_version
-    assert nurse.post("/nurse_data_management/export", data={}).status_code == 200
+    assert nurse.post("/nurse/data_management/export", data={}).status_code == 200
 
 
 def test_patient_force_signout_does_not_touch_staff_session(app):

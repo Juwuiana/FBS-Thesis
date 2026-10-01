@@ -76,7 +76,7 @@ document.addEventListener('DOMContentLoaded', async function () {
             }
             barangayPatientList.innerHTML = '<p style="font-size:0.8rem; color:var(--text-muted);">Loading patients…</p>';
             try {
-                const response = await fetch(`/nurse_dashboard/barangay-patients?barangay=${encodeURIComponent(barangay)}`);
+                const response = await fetch(`/nurse/dashboard/barangay-patients?barangay=${encodeURIComponent(barangay)}`);
                 if (!response.ok) throw new Error('Unable to load patients');
                 const data = await response.json();
                 renderBarangayPatients(data.patients || []);
@@ -151,7 +151,7 @@ document.addEventListener('DOMContentLoaded', async function () {
                 const p = new URLSearchParams({ level });
                 if (year) p.set('year', year);
                 if (month) p.set('month', month);
-                return `/nurse_dashboard/screening-volume?${p.toString()}`;
+                return `/nurse/dashboard/screening-volume?${p.toString()}`;
             }
 
             function displayLabels(labels, level) {

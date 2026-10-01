@@ -83,7 +83,7 @@ def test_nurse_change_password_rejects_mismatched_confirmation(app):
     login(client, user_id, "health_worker")
 
     response = client.post(
-        "/nurse_privacy_security/change-password",
+        "/nurse/privacy_security/change-password",
         data={
             "current_password": "OldPassword123!",
             "new_password": "NewPassword123!",

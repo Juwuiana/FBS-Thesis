@@ -46,7 +46,7 @@ def test_nurse_screening_submit_creates_and_links_green_log(app):
     _login(client)
 
     response = client.post(
-        f"/nurse_screening/GREEN-TEST/{visit_id}/submit",
+        f"/nurse/screening/GREEN-TEST/{visit_id}/submit",
         data={
             "fbs_mg_dl": "131",
             "clinical_notes": "None", 

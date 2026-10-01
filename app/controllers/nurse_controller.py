@@ -56,7 +56,7 @@ def _resolve_barangay(patient_data):
     return None
 
 
-@nurse_bp.route('/nurse_dashboard')
+@nurse_bp.route('/nurse/dashboard')
 def nurse_dashboard():
     summary = health_analytics_model.get_dashboard_summary()
     risk_status = health_analytics_model.get_risk_status_distribution()
@@ -97,7 +97,7 @@ def nurse_dashboard():
         barangays=lookup_model.list_barangays(),
         active_page='dashboard',
     )
-@nurse_bp.route('/nurse_intake')
+@nurse_bp.route('/nurse/intake')
 def nurse_intake():
     return render_template('nurse/nurse_intake.html', barangays=lookup_model.list_barangays(), active_page='intake')
 
@@ -235,7 +235,7 @@ def create_followup_record(patient_id):
         "visit_id": visit_id,
     }), 201
 
-@nurse_bp.route('/nurse_screening/<patient_id>/<int:visit_id>/submit', methods=['POST'])
+@nurse_bp.route('/nurse/screening/<patient_id>/<int:visit_id>/submit', methods=['POST'])
 def nurse_screening_submit(patient_id, visit_id):
     patient = patient_model.get_patient_by_code(patient_id)
     if patient is None:
@@ -316,8 +316,8 @@ def nurse_screening_submit(patient_id, visit_id):
     return redirect(url_for('nurse.nurse_data_management', just_saved=1))
 
 
-@nurse_bp.route('/nurse_screening/<patient_id>')
-@nurse_bp.route('/nurse_screening/<patient_id>/<int:visit_id>')
+@nurse_bp.route('/nurse/screening/<patient_id>')
+@nurse_bp.route('/nurse/screening/<patient_id>/<int:visit_id>')
 def nurse_screening(patient_id, visit_id=None):
     patient = patient_model.get_patient_by_code(patient_id)
     if patient is None:
@@ -353,8 +353,8 @@ def nurse_screening(patient_id, visit_id=None):
         active_page='intake',
     )
 
-@nurse_bp.route('/nurse_patient_file_view/<patient_id>')
-@nurse_bp.route('/nurse_patient_file_view/<patient_id>/<int:visit_id>')
+@nurse_bp.route('/nurse/patient_file_view/<patient_id>')
+@nurse_bp.route('/nurse/patient_file_view/<patient_id>/<int:visit_id>')
 def nurse_patient_file_view(patient_id, visit_id=None):
     patient = patient_model.get_patient_by_code(patient_id)
     if patient is None:
@@ -398,7 +398,7 @@ def nurse_patient_file_view(patient_id, visit_id=None):
         return_qs=request.args.get('return_qs', ''),
     )
 
-@nurse_bp.route('/nurse_patient_file_view/<patient_id>/<int:visit_id>/edit', methods=['POST'])
+@nurse_bp.route('/nurse/patient_file_view/<patient_id>/<int:visit_id>/edit', methods=['POST'])
 def nurse_patient_file_edit(patient_id, visit_id):
     """
     Edit endpoint for the Data Management "Patient Record" page. Updates
@@ -478,7 +478,7 @@ def nurse_patient_file_edit(patient_id, visit_id):
     return jsonify({"message": "Record updated."}), 200
 
 
-@nurse_bp.route('/nurse_new_record/<patient_id>')
+@nurse_bp.route('/nurse/new_record/<patient_id>')
 def nurse_new_record(patient_id):
     patient = patient_model.get_patient_by_code(patient_id)
     if patient is None:
@@ -493,7 +493,7 @@ def nurse_new_record(patient_id):
     )
 
 
-@nurse_bp.route('/nurse_health_results')
+@nurse_bp.route('/nurse/health_results')
 def nurse_health_results():
     worklist = health_analytics_model.get_followup_worklist()
     risk = health_analytics_model.get_risk_status_distribution()
@@ -515,7 +515,7 @@ def nurse_health_results():
     )
 
 
-@nurse_bp.route('/nurse_data_management')
+@nurse_bp.route('/nurse/data_management')
 def nurse_data_management():
     barangay = request.args.get('barangay') or None
     risk = request.args.get('risk') or None
@@ -581,7 +581,7 @@ def nurse_data_management():
     )
 
 
-@nurse_bp.route('/nurse_dashboard/screening-volume')
+@nurse_bp.route('/nurse/dashboard/screening-volume')
 def nurse_dashboard_screening_volume():
     """
     Drill-down data for the Screening Volume Timeline.
@@ -626,7 +626,7 @@ def api_screening_trend():
     return jsonify(data)
 
 
-@nurse_bp.route('/nurse_dashboard/barangay-patients')
+@nurse_bp.route('/nurse/dashboard/barangay-patients')
 def nurse_dashboard_barangay_patients():
     barangay = request.args.get('barangay') or None
     if not barangay:
@@ -637,7 +637,7 @@ def nurse_dashboard_barangay_patients():
     return jsonify({"patients": patients})
 
 
-@nurse_bp.route('/nurse_privacy_security')
+@nurse_bp.route('/nurse/privacy_security')
 def nurse_privacy_security():
     audit_logs = audit_model.get_recent_logs_for_user(get_db(), session.get("user_id"))
     return render_template(
@@ -647,7 +647,7 @@ def nurse_privacy_security():
     )
 
 
-@nurse_bp.route('/nurse_privacy_security/change-password', methods=['POST'])
+@nurse_bp.route('/nurse/privacy_security/change-password', methods=['POST'])
 def nurse_change_password():
     errors = auth_controller.change_own_password(session["user_id"], request.form)
     if errors:
@@ -660,7 +660,7 @@ def nurse_change_password():
     return redirect(url_for('nurse.nurse_privacy_security'))
 
 
-@nurse_bp.route('/nurse_patient/<patient_id>/delete', methods=['POST'])
+@nurse_bp.route('/nurse/patient/<patient_id>/delete', methods=['POST'])
 def nurse_patient_delete(patient_id):
     patient = patient_model.get_patient_by_code(patient_id)
     if patient is None:
@@ -676,14 +676,14 @@ def nurse_patient_delete(patient_id):
     return redirect(target)
 
 
-@nurse_bp.route('/nurse_recycle_bin')
+@nurse_bp.route('/nurse/recycle_bin')
 def nurse_recycle_bin():
     patient_model.purge_expired_deleted_patients()
     deleted_patients = patient_model.list_deleted_patients()
     return render_template('nurse/nurse_recycle_bin.html', deleted_patients=deleted_patients, active_page='data_management')
 
 
-@nurse_bp.route('/nurse_patient/<patient_id>/restore', methods=['POST'])
+@nurse_bp.route('/nurse/patient/<patient_id>/restore', methods=['POST'])
 def nurse_patient_restore(patient_id):
     patient = patient_model.get_patient_by_code(patient_id)
     if patient is None:
@@ -693,7 +693,7 @@ def nurse_patient_restore(patient_id):
     return redirect(url_for('nurse.nurse_recycle_bin'))
 
 
-@nurse_bp.route('/nurse_patient/<patient_id>/purge', methods=['POST'])
+@nurse_bp.route('/nurse/patient/<patient_id>/purge', methods=['POST'])
 def nurse_patient_purge(patient_id):
     patient = patient_model.get_patient_by_code(patient_id)
     if patient is None:
@@ -702,7 +702,7 @@ def nurse_patient_purge(patient_id):
     _audit_event(f"Patient permanently purged: {patient_id}", "Critical")
     return redirect(url_for('nurse.nurse_recycle_bin'))
 
-@nurse_bp.route('/nurse_data_management/recalculate_pending', methods=['POST'])
+@nurse_bp.route('/nurse/data_management/recalculate_pending', methods=['POST'])
 @rate_limit(max_calls=5, period_seconds=60)
 def nurse_data_management_recalculate_pending():
     """
@@ -737,7 +737,7 @@ def nurse_data_management_recalculate_pending():
     return redirect(url_for('nurse.nurse_data_management'))
 
 
-@nurse_bp.route('/nurse_data_management/export', methods=['POST'])
+@nurse_bp.route('/nurse/data_management/export', methods=['POST'])
 @rate_limit(max_calls=5, period_seconds=60)
 def nurse_data_management_export():
     from app.models import settings as settings_model
@@ -783,7 +783,7 @@ def nurse_data_management_export():
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
 
-@nurse_bp.route('/nurse_patient/<patient_id>/export')
+@nurse_bp.route('/nurse/patient/<patient_id>/export')
 def nurse_patient_export_all(patient_id):
     patient = patient_model.get_patient_by_code(patient_id)
     if patient is None:
@@ -800,7 +800,7 @@ def nurse_patient_export_all(patient_id):
     )
 
 
-@nurse_bp.route('/nurse_patient/<patient_id>/export/<int:visit_id>')
+@nurse_bp.route('/nurse/patient/<patient_id>/export/<int:visit_id>')
 def nurse_patient_export_visit(patient_id, visit_id):
     patient = patient_model.get_patient_by_code(patient_id)
     if patient is None:
@@ -844,7 +844,7 @@ def api_health_results():
         "monthly_trend": health_analytics_model.get_monthly_risk_trend(),
     })
 
-@nurse_bp.route('/nurse_data_management/import_template')
+@nurse_bp.route('/nurse/data_management/import_template')
 def nurse_data_management_import_template():
     xlsx_bytes = patient_model.generate_import_template_xlsx()
     return Response(
@@ -854,7 +854,7 @@ def nurse_data_management_import_template():
     )
 
 
-@nurse_bp.route('/nurse_data_management/import', methods=['POST'])
+@nurse_bp.route('/nurse/data_management/import', methods=['POST'])
 @rate_limit(max_calls=5, period_seconds=60)
 def nurse_data_management_import():
     file = request.files.get('csv_import')
@@ -906,7 +906,7 @@ def nurse_data_management_import():
     }), 200
 
 
-@nurse_bp.route('/nurse_patient/<patient_id>/issue_portal_credentials', methods=['POST'])
+@nurse_bp.route('/nurse/patient/<patient_id>/issue_portal_credentials', methods=['POST'])
 @rate_limit(max_calls=10, period_seconds=60)
 def nurse_issue_portal_credentials(patient_id):
     patient = patient_model.get_patient_by_code(patient_id)

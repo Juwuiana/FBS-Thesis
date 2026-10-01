@@ -500,11 +500,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         patientIdInput.value = data.patient.patient_code;
         if (redirectAfter) {
-            window.location.href = `/nurse_screening/${data.patient.patient_code}`;
+            window.location.href = `/nurse/screening/${data.patient.patient_code}`;
         } else {
             showDraftSavedDialog({
                 message: `Draft saved. Patient ID: ${data.patient.patient_code}.`,
-                onGo: () => { window.location.href = window.__dataManagementUrl || '/nurse_data_management'; },
+                onGo: () => { window.location.href = window.__dataManagementUrl || '/nurse/data_management'; },
                 onStay: () => { resetIntakeForm(); },
             });
         }

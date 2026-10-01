@@ -166,11 +166,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 draftBtn.disabled = false;
                 showDraftSavedDialog({
                     message: "Draft saved.",
-                    onGo: () => { window.location.href = window.__dataManagementUrl || "/nurse_data_management"; },
+                    onGo: () => { window.location.href = window.__dataManagementUrl || "/nurse/data_management"; },
                     onStay: () => {},
                 });
             } else {
-                window.location.href = `/nurse_screening/${encodeURIComponent(patientId)}`;
+                window.location.href = `/nurse/screening/${encodeURIComponent(patientId)}`;
             }
         } catch (err) {
             console.error(err);

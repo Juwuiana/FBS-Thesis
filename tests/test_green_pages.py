@@ -45,9 +45,9 @@ def test_dashboard_barangay_patients_endpoint_filters_and_handles_empty_query(ap
         ).lastrowid
         conn.commit()
 
-    assert admin.get("/nurse_dashboard/barangay-patients").json == {"patients": []}
+    assert admin.get("/nurse/dashboard/barangay-patients").json == {"patients": []}
     response = admin.get(
-        "/nurse_dashboard/barangay-patients",
+        "/nurse/dashboard/barangay-patients",
         query_string={"barangay": barangay["name"]},
     )
     assert response.status_code == 200
