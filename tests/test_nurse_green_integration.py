@@ -49,6 +49,7 @@ def test_nurse_screening_submit_creates_and_links_green_log(app):
         f"/nurse_screening/GREEN-TEST/{visit_id}/submit",
         data={
             "fbs_mg_dl": "131",
+            "clinical_notes": "None", 
             "test_method": "Capillary (Fingerprick)",
             "test_datetime": "2026-09-23 01:00:00",
             "final_risk_level": "High",
