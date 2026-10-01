@@ -320,12 +320,9 @@ def _patient_listing_filters(barangay=None, risk=None, date=None, q=None, status
     if status == "draft":
         conditions.append("COALESCE(v.status, '') = 'draft'")
     elif status == "awaiting_lab":
-        # Visit saved (not a draft) but no lab_screenings row yet -- the
-        # patient has been assessed but the FBS result hasn't come back.
         conditions.append("v.id IS NOT NULL AND COALESCE(v.status, '') != 'draft' AND ls.id IS NULL")
     elif status == "needs_review":
-        # Any visit for this patient that was edited from the portal
-        # and has not yet been acknowledged by a health worker.
+
         conditions.append("""
             EXISTS (
                 SELECT 1 FROM visits v_rev

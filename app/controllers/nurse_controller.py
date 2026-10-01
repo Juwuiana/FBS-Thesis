@@ -573,8 +573,6 @@ def nurse_data_management():
     q = request.args.get('q') or None
     status = request.args.get('status') or None
 
-    # Column sort (clickable table headers). Only whitelisted keys are honoured;
-    # anything else falls back to the default newest-first order.
     sort = request.args.get('sort')
     if sort not in patient_model.PATIENT_SORT_KEYS:
         sort = None
@@ -600,9 +598,6 @@ def nurse_data_management():
     )
     patients = visit_model.attach_pending_patient_edits([dict(p) for p in patients])
 
-    # Windowed page numbers so the pager stays a fixed width even with
-    # hundreds of pages: first, last, current +/-1, with None marking a
-    # "…" gap between non-adjacent numbers.
     page_numbers = []
     if total_pages <= 7:
         page_numbers = list(range(1, total_pages + 1))
@@ -734,8 +729,6 @@ def nurse_patient_delete(patient_id):
         abort(404)
     patient_model.soft_delete_patient(patient["id"])
     _audit_event(f"Patient soft-deleted: {patient_id}", "Critical")
-    # Return to the same filtered/paged view the delete was clicked from,
-    # instead of resetting Data Management back to page 1 with no filters.
     return_qs = request.form.get('return_qs', '')
     target = url_for('nurse.nurse_data_management')
     if return_qs:
@@ -818,10 +811,6 @@ def nurse_data_management_export():
     risk = request.form.get('risk') or request.args.get('risk') or None
     date = request.form.get('date') or request.args.get('date') or None
     all_visits = request.form.get('all_visits') == 'true'
-
-    # Auto-run risk prediction on any screening that has an FBS reading but
-    # no risk level yet, so the exported CSV never shows "Pending" — it shows
-    # the model's predicted level instead (flagged as such in risk_source).
     pending = patient_model.list_screenings_missing_risk_prediction(barangay=barangay, date=date)
     for item in pending:
         prediction = metrics_controller.run_measured_prediction(
@@ -932,13 +921,6 @@ def nurse_data_management_import():
 
     staff_id = None  # wire ng auth sesh
     result = patient_model.import_patients_from_csv(file.stream, staff_id=staff_id)
-
-    # Run the actual trained model on every row that came in with an FBS
-    # reading, same measured-prediction path the manual screening submit
-    # route uses -- so an imported record shows the model's risk level
-    # immediately instead of sitting on the naive glucose-cutoff
-    # preliminary classification (or "Pending" on pages that key off
-    # model_predicted_risk_level specifically).
     predicted = 0
     for item in result.get("screened_for_prediction", []):
         prediction = metrics_controller.run_measured_prediction(
