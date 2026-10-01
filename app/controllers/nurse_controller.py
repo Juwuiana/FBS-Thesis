@@ -60,7 +60,7 @@ def _resolve_barangay(patient_data):
 def nurse_dashboard():
     summary = health_analytics_model.get_dashboard_summary()
     risk_status = health_analytics_model.get_risk_status_distribution()
-    timeline = health_analytics_model.get_screening_volume_timeline()
+    timeline = health_analytics_model.get_screening_volume_timeline(level="year")
     top_barangays = health_analytics_model.get_top_barangays()
     recent = health_analytics_model.get_recent_registries()
     summary_changes = health_analytics_model.get_dashboard_changes()
@@ -102,6 +102,35 @@ def nurse_intake():
     return render_template('nurse/nurse_intake.html', barangays=lookup_model.list_barangays(), active_page='intake')
 
 
+_REQUIRED_VISIT_FIELDS_ON_SUBMIT = {
+    "smoking_status": "Smoking",
+    "alcohol_intake": "Alcohol Intake",
+    "illicit_drug_use": "Illicit Drug Use",
+    "bp_systolic": "Systolic BP",
+    "bp_diastolic": "Diastolic BP",
+    "heart_rate": "Heart Rate",
+    "respiratory_rate": "Respiratory Rate",
+    "height_cm": "Height",
+    "weight_kg": "Weight",
+    "waist_cm": "Waist Circumference",
+}
+
+
+def _missing_required_visit_fields(visit_data: dict) -> list[str]:
+    """
+    Same required set nurse_intake.js / nurse_new_record.js enforce on
+    submit -- re-checked here so a request that skips the JS (or a bug in
+    it) can't sneak an incomplete "submitted" visit past validation. Only
+    applies when status is "submitted"; a draft is allowed to be incomplete.
+    """
+    if visit_data.get("status") != "submitted":
+        return []
+    return [
+        label for field, label in _REQUIRED_VISIT_FIELDS_ON_SUBMIT.items()
+        if visit_data.get(field) in (None, "")
+    ]
+
+
 @nurse_bp.route('/api/patients', methods=['POST'])
 @rate_limit(max_calls=10, period_seconds=60)
 def create_patient():
@@ -127,6 +156,9 @@ def create_patient():
         return jsonify({"error": f"Missing required patient fields: {', '.join(missing)}"}), 400
     if not visit_data.get("assessment_date"):
         return jsonify({"error": "Missing required visit field: assessment_date"}), 400
+    missing_visit = _missing_required_visit_fields(visit_data)
+    if missing_visit:
+        return jsonify({"error": f"Missing required fields: {', '.join(missing_visit)}"}), 400
 
     barangay_id = _resolve_barangay(patient_data)
     if barangay_id is not None:
@@ -172,6 +204,9 @@ def create_followup_record(patient_id):
 
     if not visit_data.get("assessment_date"):
         return jsonify({"error": "Missing required visit field: assessment_date"}), 400
+    missing_visit = _missing_required_visit_fields(visit_data)
+    if missing_visit:
+        return jsonify({"error": f"Missing required fields: {', '.join(missing_visit)}"}), 400
 
     staff_id = None
 
@@ -210,6 +245,11 @@ def nurse_screening_submit(patient_id, visit_id):
     if not any(v["visit_id"] == visit_id for v in visits):
         abort(404)
 
+    referred_to = (request.form.get("referred_to") or "").strip()
+    if patient_model.is_doctor_like_referral(referred_to):
+        flash("Referred To must be a facility (e.g. SRCHO, LHU I), not a doctor's name.", "error")
+        return redirect(url_for('nurse.nurse_screening', patient_id=patient_id, visit_id=visit_id))
+
     clinical_notes = (request.form.get("clinical_notes") or "").strip()
     if not clinical_notes:
         flash('Clinical Notes is required. Type "None" if there is nothing to note.', "error")
@@ -240,7 +280,7 @@ def nurse_screening_submit(patient_id, visit_id):
         "result_recorded_within_5min": request.form.get("result_recorded_within_5min"),
         "referral_action": request.form.get("referral_action"),
         "follow_up_date": request.form.get("follow_up_date"),
-        "referred_to": request.form.get("referred_to"),
+        "referred_to": referred_to or None,
     }
 
     lab_screening_id = lab_model.create_lab_screening(visit_id, data)
@@ -481,12 +521,20 @@ def nurse_data_management():
     risk = request.args.get('risk') or None
     date = request.args.get('date') or None
     q = request.args.get('q') or None
+    status = request.args.get('status') or None
+
+    # Column sort (clickable table headers). Only whitelisted keys are honoured;
+    # anything else falls back to the default newest-first order.
+    sort = request.args.get('sort')
+    if sort not in patient_model.PATIENT_SORT_KEYS:
+        sort = None
+    direction = 'desc' if request.args.get('dir') == 'desc' else 'asc'
 
     entries = request.args.get('entries', '10')
     page_size = int(entries) if entries.isdigit() else None  # None == "all"
 
     total = patient_model.count_patients_with_latest_screening(
-        barangay=barangay, risk=risk, date=date, q=q
+        barangay=barangay, risk=risk, date=date, q=q, status=status
     )
     total_pages = max(1, -(-total // page_size)) if page_size else 1
 
@@ -497,7 +545,8 @@ def nurse_data_management():
     offset = (page - 1) * page_size if page_size else None
 
     patients = patient_model.list_patients_with_latest_screening(
-        barangay=barangay, risk=risk, date=date, entries_limit=page_size, q=q, offset=offset
+        barangay=barangay, risk=risk, date=date, entries_limit=page_size, q=q, offset=offset, status=status,
+        sort=sort, direction=direction,
     )
 
     # Windowed page numbers so the pager stays a fixed width even with
@@ -527,7 +576,54 @@ def nurse_data_management():
         total_records=total,
         page_numbers=page_numbers,
         entries=entries,
+        sort=sort,
+        direction=direction,
     )
+
+
+@nurse_bp.route('/nurse_dashboard/screening-volume')
+def nurse_dashboard_screening_volume():
+    """
+    Drill-down data for the Screening Volume Timeline.
+      ?level=month&year=2026            -> 12 months of that year
+      ?level=week&year=2026&month=9     -> weeks of that month
+    Returns ordered arrays (not a dict) so JSON key sorting can't scramble
+    the x-axis.
+    """
+    level = request.args.get('level', 'year')
+    try:
+        data = health_analytics_model.get_screening_volume_timeline(
+            level=level,
+            year=request.args.get('year'),
+            month=request.args.get('month'),
+        )
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify({
+        "level": level,
+        "labels": list(data.keys()),
+        "values": list(data.values()),
+    })
+
+
+@nurse_bp.route('/api/analytics/screening_trend')
+def api_screening_trend():
+    """
+    Year > month > day drill-down for the Health Results line chart, three
+    lines (Normal / Prediabetic / Diabetic).
+      ?level=year
+      ?level=month&year=2024
+      ?level=day&year=2024&month=3
+    """
+    try:
+        data = health_analytics_model.get_screening_trend(
+            level=request.args.get('level', 'year'),
+            year=request.args.get('year'),
+            month=request.args.get('month'),
+        )
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify(data)
 
 
 @nurse_bp.route('/nurse_dashboard/barangay-patients')

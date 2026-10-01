@@ -68,14 +68,25 @@
         <div class="stat-card">
             <div class="stat-title">Awaiting lab result</div>
             <div class="stat-value">{{ followup.awaiting_lab }}</div>
-            <div class="stat-trend hr-muted">Visit saved, no FBS entered</div>
+            <div class="stat-trend"><a class="hr-link" href="{{ url_for('nurse.nurse_data_management', status='awaiting_lab') }}">View list in Data Management</a></div>
         </div>
     </div>
 
     <div class="dash-grid-bot">
         <div class="form-card">
-            <div class="card-header">Screenings per month</div>
-            <div class="card-body"><div class="chart-container"><canvas id="monthlyTrendChart"></canvas></div></div>
+            <div class="card-header">Screenings over time
+                <span class="info-dot has-tip" tabindex="0" data-tip="Normal (FBS below 100), Prediabetic (100 to 125), Diabetic (126 or higher). Click a legend item to show or hide that line. Click a point to zoom from year to month to day.">i</span>
+            </div>
+            <div class="card-body">
+                <div class="dash-breadcrumb" id="trendBreadcrumb"></div>
+                {# Dedicated fixed-height box: Chart.js needs a parent whose height does not depend on the chart, or it grows forever #}
+                <div id="trendChartBox" style="position:relative; width:100%; height:300px; overflow:hidden;">
+                    <canvas id="screeningTrendChart"></canvas>
+                </div>
+                <p class="card-note" id="trendHint">Click a point to zoom in. Click a legend item to show or hide a line.</p>
+                {# legacy canvas for nurse_dashboard_charts.js, fully out of layout #}
+                <div style="display:none; width:0; height:0; overflow:hidden;" aria-hidden="true"><canvas id="monthlyTrendChart"></canvas></div>
+            </div>
         </div>
         <div class="form-card">
             <div class="card-header">
@@ -320,4 +331,5 @@
 {% block scripts %}
 <script src="{{ url_for('static', filename='vendor/chartjs/chart.umd.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/nurse_dashboard_charts.js') }}"></script>
+<script src="{{ url_for('static', filename='js/nurse_screening_trend.js') }}"></script>
 {% endblock %}

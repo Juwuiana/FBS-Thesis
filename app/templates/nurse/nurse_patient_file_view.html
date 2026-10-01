@@ -34,7 +34,7 @@
         .section-toggle.collapsed .section-toggle-icon { transform: rotate(-45deg); }
         .collapsible {
             overflow: hidden;
-            max-height: 3000px;
+            max-height: 10000px;
             transition: max-height .2s ease, padding .2s ease;
         }
         .collapsible.collapsed { max-height: 0; padding-top: 0; padding-bottom: 0; }
@@ -98,8 +98,8 @@
     </p>
 
     <div class="form-card">
-        <div class="card-header" style="background:var(--green-light); border-top-color:var(--green-light);">Patient Portal Access</div>
-        <div class="card-body">
+        <div class="card-header section-toggle collapsed" style="background:var(--green-light); border-top-color:var(--green-light);">Patient Portal Access<span class="section-toggle-icon"></span></div>
+        <div class="card-body collapsible collapsed">
             <div class="grid-3">
                 <div class="field-group">
                     <label class="field-label">Status</label>
@@ -118,7 +118,7 @@
             </div>
             <form method="POST"
                 action="{{ url_for('nurse.nurse_issue_portal_credentials', patient_id=patient_id) }}"
-                onsubmit="return confirm('{% if patient.password_hash %}Reset this patient\'s portal password? Their current password will stop working immediately.{% else %}Generate a portal account for this patient?{% endif %}');"
+                data-confirm="{% if patient.password_hash %}Reset this patient's portal password? Their current password will stop working immediately.{% else %}Generate a portal account for this patient?{% endif %}"
                 style="margin-top:1rem;">
                 <button type="submit" class="btn btn-primary" style="padding:0.5rem 1rem; font-size:0.8rem;">
                     {{ 'Reset Portal Password' if patient.password_hash else 'Generate Portal Credentials' }}
@@ -129,8 +129,8 @@
 
     <!-- para kita agad past visits -->
     <div class="form-card">
-        <div class="card-header" style="background:var(--green-light); border-top-color:var(--green-light);">Past Records — Screening History</div>
-        <div class="card-body" style="padding: 0;">
+        <div class="card-header section-toggle collapsed" style="background:var(--green-light); border-top-color:var(--green-light);">Past Records — Screening History<span class="section-toggle-icon"></span></div>
+        <div class="card-body collapsible collapsed" style="padding: 0;">
             <table style="width: 100%; border-collapse: collapse; font-size: 0.8rem;">
                 <tr style="border-bottom: 1px solid var(--border); color: var(--text-muted);">
                     <th style="padding: 1rem; text-align: left; font-weight: 500;">Date</th>
@@ -207,8 +207,8 @@
           data-return-qs="{{ return_qs or '' }}">
     <!-- patient demo -->
     <div class="form-card">
-        <div class="card-header">1. Patient Demographics</div>
-        <div class="card-body">
+        <div class="card-header section-toggle" data-section="1">1. Patient Demographics<span class="section-toggle-icon"></span></div>
+        <div class="card-body collapsible">
             <div class="grid-5">
                 <div class="field-group"><label class="field-label">Patient ID No.</label><input type="text" class="field-input" value="{{ patient.patient_code }}" disabled title="The patient code is generated and never editable."></div>
                 {% set name_locked_msg = "Name is locked unless the visit is still a draft, or the patient is a married female." %}
@@ -535,5 +535,6 @@
         // handful of URLs it needs to build are handed over here instead.
         window.__psgcUrl = "{{ url_for('nurse.nurse_static_data', filename='psgc_data.json') }}";
     </script>
+    <script src="{{ url_for('static', filename='js/nurse_dialog.js') }}"></script>
     <script src="{{ url_for('static', filename='js/nurse_patient_file_view.js') }}"></script>
 {% endblock %}

@@ -16,28 +16,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const patientIdInput = $('patientId');
 
     // ---------------------------------------------------------------
-    // Accordion — one section open at a time
+    // Sections toggle independently: opening one leaves the others as they
+    // are, so a nurse can keep several open while filling out the form.
     // ---------------------------------------------------------------
     document.querySelectorAll('.card-header.section-toggle').forEach((header) => {
         header.addEventListener('click', () => {
             const body = header.nextElementSibling;
             if (!body || !body.classList.contains('card-body')) return;
-            const isCollapsed = header.classList.contains('collapsed');
-
-            if (isCollapsed) {
-                // close all others, open this one
-                document.querySelectorAll('.card-header.section-toggle').forEach((h) => {
-                    if (h === header) return;
-                    h.classList.add('collapsed');
-                    const b = h.nextElementSibling;
-                    if (b) b.classList.add('collapsed');
-                });
-                header.classList.remove('collapsed');
-                body.classList.remove('collapsed');
-            } else {
-                header.classList.add('collapsed');
-                body.classList.add('collapsed');
-            }
+            const nowCollapsed = header.classList.toggle('collapsed');
+            body.classList.toggle('collapsed', nowCollapsed);
         });
     });
 
@@ -48,11 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const header = card.querySelector('.card-header.section-toggle');
         const body = card.querySelector('.card-body');
         if (!header || !body) return;
-        document.querySelectorAll('.card-header.section-toggle').forEach((h) => {
-            h.classList.add('collapsed');
-            const b = h.nextElementSibling;
-            if (b) b.classList.add('collapsed');
-        });
+        // Only open the section holding the invalid field; leave the rest alone.
         header.classList.remove('collapsed');
         body.classList.remove('collapsed');
     }
@@ -241,6 +224,24 @@ document.addEventListener('DOMContentLoaded', () => {
     $('civilStatus').addEventListener('change', toggleMaidenName);
     toggleMaidenName();
 
+    // "None reported" is mutually exclusive with every real condition in its
+    // group -- checking it clears the others, and checking any real condition
+    // clears it, so the group can never end up as "None" + something else.
+    function wireNoneExclusive(groupSelector, noneSelector) {
+        const group = document.querySelectorAll(groupSelector);
+        const none = document.querySelector(noneSelector);
+        if (!none) return;
+        none.addEventListener('change', () => {
+            if (none.checked) group.forEach(cb => { if (cb !== none) cb.checked = false; });
+        });
+        group.forEach(cb => {
+            if (cb === none) return;
+            cb.addEventListener('change', () => { if (cb.checked) none.checked = false; });
+        });
+    }
+    wireNoneExclusive('.pmh', '.pmh-none');
+    wireNoneExclusive('.fh', '.fh-none');
+
     // helpers ito
     function checkedValues(selector) {
         return Array.from(document.querySelectorAll(selector + ':checked')).map(el => el.value);
@@ -307,7 +308,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         const visit = {
-            assessment_date: strOrNull('dateAssessment') || new Date().toISOString().slice(0, 10),
+            assessment_date: strOrNull('dateAssessment'),
             smoking_status: (document.querySelector('input[name="smoke"]:checked') || {}).value || null,
             alcohol_intake: strOrNull('alcohol'),
             illicit_drug_use: strOrNull('illicitDrugs'),
@@ -338,8 +339,8 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         const conditions = {
-            pmh: checkedValues('.pmh'),
-            family_history: checkedValues('.fh'),
+            pmh: checkedValues('.pmh').filter(v => v !== 'None'),
+            family_history: checkedValues('.fh').filter(v => v !== 'None'),
             diet: checkedValues('.diet'),
             immunization: checkedValues('.immu'),
             dm_symptom: checkedValues('.dm-sym'),
@@ -372,16 +373,39 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function clearAllFieldErrors() {
         document.querySelectorAll('.field-input.field-error').forEach(clearFieldError);
+        document.querySelectorAll('.radio-card-wrapper.group-error').forEach(g => {
+            g.classList.remove('group-error');
+            const msg = g.parentElement.querySelector('.group-error-text');
+            if (msg) msg.remove();
+        });
     }
 
-    function validate(patient, visit) {
+    function markGroupError(groupEl, message, clearOnSelector) {
+        groupEl.classList.add('group-error');
+        let msg = groupEl.parentElement.querySelector('.group-error-text');
+        if (!msg) {
+            msg = document.createElement('span');
+            msg.className = 'group-error-text';
+            groupEl.insertAdjacentElement('afterend', msg);
+        }
+        msg.textContent = message;
+        const clearOnce = () => {
+            groupEl.classList.remove('group-error');
+            if (msg) msg.remove();
+            document.querySelectorAll(clearOnSelector).forEach(cb => cb.removeEventListener('change', clearOnce));
+        };
+        document.querySelectorAll(clearOnSelector).forEach(cb => cb.addEventListener('change', clearOnce));
+    }
+
+    function validate(patient, visit, { requireClinicalGroups } = {}) {
         clearAllFieldErrors();
 
         const requiredFields = [
-            { input: $('lastName'),  value: patient.last_name,  message: 'Last name is required.' },
-            { input: $('firstName'), value: patient.first_name, message: 'First name is required.' },
-            { input: birthdateInput, value: patient.birthdate,  message: 'Date of birth is required.' },
-            { input: sexSelect,      value: patient.sex,        message: 'Sex is required.' },
+            { input: $('lastName'),      value: patient.last_name,        message: 'Last name is required.' },
+            { input: $('firstName'),     value: patient.first_name,       message: 'First name is required.' },
+            { input: birthdateInput,     value: patient.birthdate,        message: 'Date of birth is required.' },
+            { input: sexSelect,          value: patient.sex,              message: 'Sex is required.' },
+            { input: $('dateAssessment'), value: visit.assessment_date,   message: 'Date of Assessment is required.' },
         ];
 
         let firstInvalid = null;
@@ -392,10 +416,52 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
+        if (requireClinicalGroups) {
+            const groups = [
+                { wrapper: $('pmhGroup'), selector: '.pmh', message: 'Select at least one, or check "None reported".' },
+                { wrapper: $('fhGroup'),  selector: '.fh',  message: 'Select at least one, or check "None reported".' },
+            ];
+            groups.forEach(({ wrapper, selector, message }) => {
+                if (!wrapper) return;
+                const anyChecked = Array.from(document.querySelectorAll(selector)).some(cb => cb.checked);
+                if (!anyChecked) {
+                    markGroupError(wrapper, message, selector);
+                    if (!firstInvalid) firstInvalid = wrapper;
+                }
+            });
+
+            // Smoking is a radio group (no single input to attach an error
+            // to), so it's checked the same way as PMH/Family History above.
+            const smokeWrapper = document.querySelector('input[name="smoke"]')?.closest('.radio-card-wrapper');
+            if (smokeWrapper && !document.querySelector('input[name="smoke"]:checked')) {
+                markGroupError(smokeWrapper, 'Please select an option.', 'input[name="smoke"]');
+                if (!firstInvalid) firstInvalid = smokeWrapper;
+            }
+
+            const vitalsFields = [
+                { input: $('alcohol'),        value: visit.alcohol_intake,     message: 'Alcohol Intake is required.' },
+                { input: $('illicitDrugs'),   value: visit.illicit_drug_use,   message: 'Illicit Drug Use is required.' },
+                { input: $('bpSystolic'),     value: visit.bp_systolic,        message: 'Systolic BP is required.' },
+                { input: $('bpDiastolic'),    value: visit.bp_diastolic,       message: 'Diastolic BP is required.' },
+                { input: $('hr'),             value: visit.heart_rate,         message: 'Heart Rate is required.' },
+                { input: $('rr'),             value: visit.respiratory_rate,   message: 'Respiratory Rate is required.' },
+                { input: heightInput,         value: visit.height_cm,          message: 'Height is required.' },
+                { input: weightInput,         value: visit.weight_kg,          message: 'Weight is required.' },
+                { input: $('waist'),          value: visit.waist_cm,           message: 'Waist Circumference is required.' },
+            ];
+            vitalsFields.forEach(({ input, value, message }) => {
+                if (!input) return;
+                if (value === null || value === undefined || value === '') {
+                    markFieldError(input, message);
+                    if (!firstInvalid) firstInvalid = input;
+                }
+            });
+        }
+
         if (firstInvalid) {
             openSectionFor(firstInvalid);
             firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            firstInvalid.focus({ preventScroll: true });
+            if (typeof firstInvalid.focus === 'function') firstInvalid.focus({ preventScroll: true });
         }
 
         return firstInvalid !== null; 
@@ -405,7 +471,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const status = redirectAfter ? 'submitted' : 'draft';
     const { patient, visit, conditions, cvd_responses } = buildPayload(status);
 
-    const hasErrors = validate(patient, visit);
+    const hasErrors = validate(patient, visit, { requireClinicalGroups: redirectAfter });
     if (hasErrors) return;
 
     const submitBtn = $('submitIntakeBtn');
@@ -421,7 +487,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         if (res.status === 401) {
-            alert('Your session has expired. Please sign in again.');
+            await nurseAlert('Your session has expired. Please sign in again.');
             window.location.href = '/login';
             return;
         }
@@ -436,7 +502,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (redirectAfter) {
             window.location.href = `/nurse_screening/${data.patient.patient_code}`;
         } else {
-            alert('Draft saved. Patient ID: ' + data.patient.patient_code);
+            showDraftSavedDialog({
+                message: `Draft saved. Patient ID: ${data.patient.patient_code}.`,
+                onGo: () => { window.location.href = window.__dataManagementUrl || '/nurse_data_management'; },
+                onStay: () => { resetIntakeForm(); },
+            });
         }
     } catch (err) {
         console.error(err);
@@ -450,7 +520,83 @@ document.addEventListener('DOMContentLoaded', () => {
 $('submitIntakeBtn').addEventListener('click', () => submitIntake(true));
 $('saveDraftBtn').addEventListener('click', () => submitIntake(false));
 
+    // Draft saved as-is; the nurse is done with this patient for now -- clear
+    // the form so the next patient starts from a blank slate instead of
+    // inheriting the last one's data.
+    function resetIntakeForm() {
+        const form = $('intakeForm') || document.getElementById('intakeForm');
+        if (form) form.reset();
+        clearAllFieldErrors();
+        patientIdInput.value = '';
+        ageInput.value = '';
+        bmiInput.value = '';
+        bmiInput.dataset.raw = '';
+        obesityInput.value = '';
+        toggleObGyne();
+        toggleMaidenName();
+        // form.reset() puts the region/city/barangay selects back to their
+        // first <option>, but doesn't re-run the cascade logic that disables
+        // city/barangay and restores their placeholder text.
+        fillSelect(citySelect, [], 'Select Region first');
+        citySelect.disabled = true;
+        fillSelect(barangaySelect, [], 'Select City first');
+        barangaySelect.disabled = true;
+        barangayManual.style.display = 'none';
+        barangayManual.value = '';
+        // Collapse every section back to the page's original opening state
+        // (section 1 open, everything else closed).
+        document.querySelectorAll('.card-header.section-toggle').forEach((h) => {
+            const isFirst = h.dataset.section === '1';
+            h.classList.toggle('collapsed', !isFirst);
+            const b = h.nextElementSibling;
+            if (b) b.classList.toggle('collapsed', !isFirst);
+        });
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
 });
+
+// ---------------------------------------------------------------------
+// Shared "what next?" dialog after a draft save. Also used by
+// nurse_new_record.js (continuing an existing patient's draft), which is
+// why the preference is stored under one key both pages agree on.
+function showDraftSavedDialog({ message, onGo, onStay }) {
+    const PREF_KEY = 'nurseDraftGoToDataMgmt'; // '' = ask each time, 'always', 'never'
+    const pref = localStorage.getItem(PREF_KEY) || '';
+    if (pref === 'always') { onGo(); return; }
+    if (pref === 'never') { onStay(); return; }
+
+    const overlay = document.createElement('div');
+    overlay.className = 'nurse-modal-overlay';
+    overlay.innerHTML = `
+        <div class="nurse-modal" role="dialog" aria-modal="true" aria-labelledby="draftModalTitle">
+            <div class="nurse-dialog-head">
+                <h3 id="draftModalTitle">What's next?</h3>
+                <button type="button" class="nurse-dialog-x" id="draftModalClose" aria-label="Close">&times;</button>
+            </div>
+            <p>${message} Would you like to go to Data Management now, or stay here?</p>
+            <label class="nurse-modal-remember"><input type="checkbox" id="draftModalRemember"> Don't ask me this again</label>
+            <div class="nurse-modal-actions">
+                <button type="button" class="btn btn-secondary" id="draftModalStay">Stay here</button>
+                <button type="button" class="btn btn-primary" id="draftModalGo">Go to Data Management</button>
+            </div>
+        </div>`;
+    document.body.appendChild(overlay);
+
+    function close(choice) {
+        const remember = overlay.querySelector('#draftModalRemember').checked;
+        if (remember) localStorage.setItem(PREF_KEY, choice === 'go' ? 'always' : 'never');
+        overlay.remove();
+        if (choice === 'go') onGo(); else onStay();
+    }
+    overlay.querySelector('#draftModalGo').addEventListener('click', () => close('go'));
+    overlay.querySelector('#draftModalStay').addEventListener('click', () => close('stay'));
+    overlay.querySelector('#draftModalClose').addEventListener('click', () => close('stay'));
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close('stay'); });
+    document.addEventListener('keydown', function escOnce(ev) {
+        if (ev.key === 'Escape') { close('stay'); document.removeEventListener('keydown', escOnce); }
+    });
+}
 
 // ---------------------------------------------------------------------
 // Floating tooltips for .field-tooltip — appended to <body> and positioned

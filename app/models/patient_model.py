@@ -225,7 +225,7 @@ def list_patients(barangay: str = None, entries_limit: int = None) -> list[dict]
     if barangay:
         sql += " WHERE b.name = ?"
         params.append(barangay)
-    sql += " ORDER BY p.created_at DESC"
+    sql += _patient_order_by(sort, direction)
     if entries_limit:
         sql += " LIMIT ?"
         params.append(entries_limit)
@@ -286,7 +286,7 @@ def update_patient(patient_id: int, data: dict, allow_name_edit: bool = False, a
     finally:
         conn.close()
 
-def _patient_listing_filters(barangay=None, risk=None, date=None, q=None):
+def _patient_listing_filters(barangay=None, risk=None, date=None, q=None, status=None):
     """
     Shared WHERE-clause builder for list_patients_with_latest_screening and
     count_patients_with_latest_screening, so pagination's count and its
@@ -307,6 +307,12 @@ def _patient_listing_filters(barangay=None, risk=None, date=None, q=None):
         conditions.append("(p.last_name LIKE ? OR p.first_name LIKE ? OR p.patient_code LIKE ?)")
         like = f"%{q.strip()}%"
         params.extend([like, like, like])
+    if status == "draft":
+        conditions.append("COALESCE(v.status, '') = 'draft'")
+    elif status == "awaiting_lab":
+        # Visit saved (not a draft) but no lab_screenings row yet -- the
+        # patient has been assessed but the FBS result hasn't come back.
+        conditions.append("v.id IS NOT NULL AND COALESCE(v.status, '') != 'draft' AND ls.id IS NULL")
 
     return conditions, params
 
@@ -324,18 +330,50 @@ _PATIENT_LISTING_JOINS = """
 """
 
 
-def count_patients_with_latest_screening(barangay=None, risk=None, date=None, q=None) -> int:
+def count_patients_with_latest_screening(barangay=None, risk=None, date=None, q=None, status=None) -> int:
     conn = get_connection()
-    conditions, params = _patient_listing_filters(barangay=barangay, risk=risk, date=date, q=q)
+    conditions, params = _patient_listing_filters(barangay=barangay, risk=risk, date=date, q=q, status=status)
     sql = f"SELECT COUNT(*) AS n {_PATIENT_LISTING_JOINS} WHERE " + " AND ".join(conditions)
     row = conn.execute(sql, params).fetchone()
     conn.close()
     return row["n"] if row else 0
 
 
-def list_patients_with_latest_screening(barangay=None, risk=None, date=None, entries_limit=None, q=None, offset=None):
+# Sortable columns for the Data Management table. The URL only ever supplies a
+# KEY from this dict (a whitelist), never SQL, so there is no injection surface.
+# Each value is (ORDER BY expressions, invert_direction). NULLs (e.g. a pending
+# risk or a missing FBS) always sort last, whichever way the column is sorted.
+_RISK_RANK = ("CASE COALESCE(ls.final_risk_level, ls.preliminary_risk_level, "
+              "ls.model_predicted_risk_level) "
+              "WHEN 'Low' THEN 1 WHEN 'Moderate' THEN 2 WHEN 'High' THEN 3 END")
+_PATIENT_SORTS = {
+    "patient_code": (["p.patient_code"], False),
+    "name":         (["p.last_name COLLATE NOCASE", "p.first_name COLLATE NOCASE"], False),
+    "age":          (["p.birthdate"], True),   # older = earlier birthdate, so flip
+    "sex":          (["p.sex"], False),
+    "fbs":          (["ls.fbs_mg_dl"], False),
+    "risk":         ([_RISK_RANK], False),     # Low < Moderate < High, Pending last
+    "date":         (["v.assessment_date"], False),
+}
+PATIENT_SORT_KEYS = frozenset(_PATIENT_SORTS)
+
+
+def _patient_order_by(sort, direction) -> str:
+    """ORDER BY clause for the listing. Unknown sort/direction fall back to the
+    original newest-first order. A unique tie-breaker (p.id) keeps LIMIT/OFFSET
+    pages stable, so a row can't repeat or vanish between pages."""
+    if sort not in _PATIENT_SORTS:
+        return " ORDER BY p.created_at DESC, p.id DESC"
+    exprs, invert = _PATIENT_SORTS[sort]
+    desc = (str(direction).lower() == "desc") != invert
+    d = "DESC" if desc else "ASC"
+    parts = [f"({exprs[0]}) IS NULL", *[f"{e} {d}" for e in exprs]]
+    return " ORDER BY " + ", ".join(parts) + ", p.id ASC"
+
+
+def list_patients_with_latest_screening(barangay=None, risk=None, date=None, entries_limit=None, q=None, offset=None, status=None, sort=None, direction="asc"):
     conn = get_connection()
-    conditions, params = _patient_listing_filters(barangay=barangay, risk=risk, date=date, q=q)
+    conditions, params = _patient_listing_filters(barangay=barangay, risk=risk, date=date, q=q, status=status)
 
     sql = f"""
         SELECT p.patient_code, p.first_name, p.last_name, p.birthdate, p.sex,
@@ -348,7 +386,7 @@ def list_patients_with_latest_screening(barangay=None, risk=None, date=None, ent
     """
 
     sql += " WHERE " + " AND ".join(conditions)
-    sql += " ORDER BY p.created_at DESC"
+    sql += _patient_order_by(sort, direction)
 
     if entries_limit:
         sql += " LIMIT ?"
@@ -776,6 +814,12 @@ SINGLE_VALUE_FIELDS = {
                             "Yes (without medications)"],
     "referral_action": ["Refer for OGTT", "Refer to physician",
                          "Lifestyle counseling only"],
+    # "referred_to" names a FACILITY only, never a physician -- referral_action
+    # above ("Refer to physician") already records that a doctor is involved;
+    # this field says where the patient is being sent, not who will see them.
+    # Adjust this list to match SRCHO's actual referral destinations.
+    "referred_to": ["Santa Rosa City Health Office (SRCHO)", "LHU I", "LHU II",
+                     "Partner Hospital / Referral Center", "Other Facility"],
     # Pre-Screening Checklist (Yes/No per item, same as the screening page's checkboxes)
     "fasted_ge_8h": ["Yes", "No"],
     "identity_verified": ["Yes", "No"],
@@ -784,6 +828,21 @@ SINGLE_VALUE_FIELDS = {
     "consent_signed": ["Yes", "No"],
     "result_recorded_within_5min": ["Yes", "No"],
 }
+
+def is_doctor_like_referral(text) -> bool:
+    """referred_to must name a FACILITY, not a person. Flags the common
+    ways a doctor's name slips in instead (a "Dr" title, or "M.D."/"MD"
+    as a suffix)."""
+    t = (text or "").strip()
+    if not t:
+        return False
+    low = t.casefold()
+    if re.match(r"^dr\.?\s", low) or low == "dr":
+        return True
+    if re.search(r"\bm\.?d\.?$", low):
+        return True
+    return False
+
 
 # Screening-page fields that live on lab_screenings (need an fbs_mg_dl on the
 # same row to be saved) -- checklist + referral & follow-up.
@@ -944,6 +1003,21 @@ if __name__ == "__main__":
           len(check["Codes"]["A"]), "rows on Codes sheet")
 
 
+def _parse_import_date(raw: str) -> str | None:
+    """Best-effort parse of a CSV date cell into YYYY-MM-DD. Accepts the
+    documented ISO format plus the handful of formats a nurse's spreadsheet
+    commonly produces (Excel auto-formats dates as M/D/YYYY by default).
+    Returns None if nothing recognized it -- the caller decides the fallback."""
+    from datetime import datetime as _dt
+    raw = raw.strip()
+    for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%m/%d/%y", "%d/%m/%Y", "%B %d, %Y", "%b %d, %Y"):
+        try:
+            return _dt.strptime(raw, fmt).date().isoformat()
+        except ValueError:
+            continue
+    return None
+
+
 def import_patients_from_csv(file_stream, staff_id: int | None = None) -> dict:
     import csv as csv_module
     from datetime import date as date_module
@@ -1031,7 +1105,17 @@ def import_patients_from_csv(file_stream, staff_id: int | None = None) -> dict:
                 patient_id = create_patient(patient_data, staff_id=staff_id)
                 new_patients += 1
 
-            assessment_date = (row.get("assessment_date") or "").strip() or date_module.today().isoformat()
+            assessment_date_raw = (row.get("assessment_date") or "").strip()
+            if assessment_date_raw:
+                assessment_date = _parse_import_date(assessment_date_raw)
+                if assessment_date is None:
+                    errors.append(
+                        f"Row {i}: assessment_date {assessment_date_raw!r} is not a recognized date "
+                        "format (use YYYY-MM-DD) -- used today's date instead."
+                    )
+                    assessment_date = date_module.today().isoformat()
+            else:
+                assessment_date = date_module.today().isoformat()
             visit_data = {
                 "assessment_date": assessment_date,
                 # No FBS on the row = patient is still awaiting lab results, so
@@ -1077,11 +1161,26 @@ def import_patients_from_csv(file_stream, staff_id: int | None = None) -> dict:
                 ("pmh", "pmh"), ("family_history", "family_history"),
                 ("diet", "diet"), ("immunization", "immunization"), ("dm_symptom", "dm_symptom"),
             ]:
-                codes = multi(row.get(csv_col))
-                if codes:
+                raw_codes = multi(row.get(csv_col))
+                if not raw_codes:
+                    continue
+                catalog = MULTI_VALUE_FIELDS[category]
+                by_lower = {c.casefold(): c for c in catalog}
+                valid_codes, bad_codes = [], []
+                for code in raw_codes:
+                    canonical = by_lower.get(code.casefold())
+                    (valid_codes if canonical else bad_codes).append(canonical or code)
+                if bad_codes:
+                    errors.append(
+                        f"Row {i}: {csv_col} value(s) not recognized, skipped: "
+                        f"{', '.join(bad_codes)}. Recognized values: {', '.join(catalog)}."
+                    )
+                if valid_codes:
                     try:
-                        visit_model.save_visit_conditions(visit_id, category, codes)
+                        visit_model.save_visit_conditions(visit_id, category, valid_codes)
                     except ValueError as ve:
+                        # Only reachable if two rows race on the same visit_id, which
+                        # can't happen here -- kept as a safety net, not expected.
                         errors.append(f"Row {i}: {ve}")
 
             def yes_no(val):
@@ -1090,6 +1189,12 @@ def import_patients_from_csv(file_stream, staff_id: int | None = None) -> dict:
             referral_action = (row.get("referral_action") or "").strip() or None
             follow_up_date = (row.get("follow_up_date") or "").strip() or None
             referred_to = (row.get("referred_to") or "").strip() or None
+            if referred_to and is_doctor_like_referral(referred_to):
+                errors.append(
+                    f"Row {i}: referred_to {referred_to!r} looks like a physician's name -- "
+                    "this field is for the facility referred to, not a doctor. Ignored."
+                )
+                referred_to = None
             if follow_up_date:
                 try:
                     date_module.fromisoformat(follow_up_date)

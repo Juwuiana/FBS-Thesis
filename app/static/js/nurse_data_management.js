@@ -8,7 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // only way to apply a search with JS disabled.
     const filterForm = document.getElementById('filterForm');
     if (filterForm) {
-        ['filterEntries', 'filterBarangay', 'filterRisk', 'filterDate'].forEach(id => {
+        ['filterEntries', 'filterBarangay', 'filterRisk', 'filterDate', 'filterStatus'].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.addEventListener('change', () => filterForm.submit());
         });

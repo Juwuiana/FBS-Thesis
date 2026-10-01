@@ -88,6 +88,10 @@ def index():
         return redirect(_home_for_role(session.get("user_role")))
     return render_template("landing/landing.html")
 
+@auth_bp.route("/about")
+def about():
+    return render_template("landing/about.html")
+
 @auth_bp.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":

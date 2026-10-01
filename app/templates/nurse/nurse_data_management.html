@@ -8,7 +8,7 @@
     </div>
     <div class="header-actions">
         <form method="POST" action="{{ url_for('nurse.nurse_data_management_recalculate_pending') }}"
-              onsubmit="return confirm('Run risk prediction on every screening that currently has no risk level? This may take a moment.');">
+              data-confirm="Run risk prediction on every screening that currently has no risk level? This may take a moment.">
             <button type="submit" class="btn btn-secondary">Recalculate Pending Risk Levels</button>
         </form>
         <a href="{{ url_for('nurse.nurse_recycle_bin') }}" class="btn btn-secondary recycle-btn"
@@ -160,8 +160,9 @@
     <div class="card-header">Patient Records — Filter and Manage</div>
     <div class="card-body">
         <form method="GET" action="{{ url_for('nurse.nurse_data_management') }}" id="filterForm">
+            {% if sort %}<input type="hidden" name="sort" value="{{ sort }}"><input type="hidden" name="dir" value="{{ direction }}">{% endif %}
             <div class="filter-row">
-                <div class="field-group">
+                <div class="field-group filter-wide">
                     <label class="field-label">Search Name</label>
                     <input type="text" class="field-input" name="q" id="filterSearch" placeholder="Last or first name…" value="{{ request.args.get('q', '') }}">
                 </div>
@@ -173,7 +174,7 @@
                         {% endfor %}
                     </select>
                 </div>
-                <div class="field-group">
+                <div class="field-group filter-mid">
                     <label class="field-label">Barangay</label>
                     <select class="field-input" name="barangay" id="filterBarangay">
                         <option value="">All Barangays</option>
@@ -191,29 +192,67 @@
                         <option value="High" {% if request.args.get('risk') == 'High' %}selected{% endif %}>High</option>
                     </select>
                 </div>
-                <div class="field-group">
+                <div class="field-group filter-date">
                     <label class="field-label">Date</label>
                     <input type="date" class="field-input" name="date" id="filterDate" value="{{ request.args.get('date', '') }}">
                 </div>
-                <button type="submit" class="btn btn-primary filter-btn">Apply Filter</button>
-                {% if request.args.get('q') or request.args.get('barangay') or request.args.get('risk') or request.args.get('date') %}
-                    <a href="{{ url_for('nurse.nurse_data_management') }}" class="btn btn-secondary filter-btn" style="text-decoration:none; text-align:center;">Clear Filters</a>
-                {% endif %}
+                <div class="field-group filter-status">
+                    <label class="field-label">Status</label>
+                    <select class="field-input" name="status" id="filterStatus">
+                        <option value="" {% if not request.args.get('status') %}selected{% endif %}>All Statuses</option>
+                        <option value="awaiting_lab" {% if request.args.get('status') == 'awaiting_lab' %}selected{% endif %}>Awaiting Lab Result</option>
+                        <option value="draft" {% if request.args.get('status') == 'draft' %}selected{% endif %}>Draft (Intake Only)</option>
+                    </select>
+                </div>
+                <div class="filter-actions">
+                    <button type="submit" class="btn btn-primary filter-icon-btn tip tip-right" data-tip="Apply filters" aria-label="Apply filters">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+                    </button>
+                    {% if request.args.get('q') or request.args.get('barangay') or request.args.get('risk') or request.args.get('date') or request.args.get('status') %}
+                        <a href="{{ url_for('nurse.nurse_data_management') }}" class="btn btn-secondary filter-icon-btn tip tip-right" data-tip="Clear filters" aria-label="Clear filters">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </a>
+                    {% endif %}
+                </div>
             </div>
         </form>
 
         <div style="overflow-x:auto; -webkit-overflow-scrolling:touch;">
             {% set qs = request.query_string.decode() %}
+            {# Click a header: ascending -> descending -> back to default order. Page resets to 1. #}
+            {% macro sort_th(key, label) -%}
+                {% set active = sort == key %}
+                {% set rest = dict(request.args.to_dict() | dictsort | rejectattr(0, 'in', ['sort', 'dir', 'page']) | list) %}
+                {% if active and direction == 'desc' %}
+                    {% set href = url_for('nurse.nurse_data_management', **rest) %}
+                {% else %}
+                    {% set href = url_for('nurse.nurse_data_management', **dict(rest, sort=key, dir=('desc' if active else 'asc'))) %}
+                {% endif %}
+                <th aria-sort="{{ ('ascending' if direction == 'asc' else 'descending') if active else 'none' }}">
+                    <a class="th-sort{{ ' active' if active }}" href="{{ href }}"
+                       title="Sort by {{ label }}{{ ' (' ~ ('ascending' if direction == 'asc' else 'descending') ~ ')' if active }}">
+                        {{ label }}<span class="sort-ind" aria-hidden="true">
+                            {% if active and direction == 'asc' %}
+                            <svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+                            {% elif active %}
+                            <svg viewBox="0 0 24 24"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>
+                            {% else %}
+                            <svg viewBox="0 0 24 24"><path d="M8 19V5M3 10l5-5 5 5"/><path d="M16 5v14M11 14l5 5 5-5"/></svg>
+                            {% endif %}
+                        </span>
+                    </a>
+                </th>
+            {%- endmacro %}
             <table class="data-table" style="min-width:600px;">
                 <thead>
                     <tr>
-                        <th>Patient ID</th>
-                        <th>Name</th>
-                        <th>Age</th>
-                        <th>Sex</th>
-                        <th>FBS (mg/dL)</th>
-                        <th>Risk Level</th>
-                        <th>Date</th>
+                        {{ sort_th('patient_code', 'Patient ID') }}
+                        {{ sort_th('name', 'Name') }}
+                        {{ sort_th('age', 'Age') }}
+                        {{ sort_th('sex', 'Sex') }}
+                        {{ sort_th('fbs', 'FBS (mg/dL)') }}
+                        {{ sort_th('risk', 'Risk Level') }}
+                        {{ sort_th('date', 'Date') }}
                         <th>Action</th>
                     </tr>
                 </thead>
@@ -248,7 +287,7 @@
                            <td>
                                 <a href="{{ url_for('nurse.nurse_patient_file_view', patient_id=p.patient_code, return_qs=qs) }}" class="btn btn-secondary" style="padding:0.35rem 0.75rem; font-size:0.75rem;">View</a>
                                 <a href="{{ url_for('nurse.nurse_new_record', patient_id=p.patient_code, return_qs=qs) }}" class="btn btn-secondary" style="padding:0.35rem 0.75rem; font-size:0.75rem;">+ Add Record</a>
-                                <form method="POST" action="{{ url_for('nurse.nurse_patient_delete', patient_id=p.patient_code) }}" style="display:inline;" onsubmit="return confirm('Move {{ p.first_name }} {{ p.last_name }} to Recycle Bin? This record will be permanently deleted after 15 days unless restored.');">
+                                <form method="POST" action="{{ url_for('nurse.nurse_patient_delete', patient_id=p.patient_code) }}" style="display:inline;" data-confirm="Move {{ p.first_name }} {{ p.last_name }} to Recycle Bin? This record will be permanently deleted after 15 days unless restored.">
                                     <input type="hidden" name="return_qs" value="{{ qs }}">
                                     <button type="submit" class="btn btn-secondary" style="padding:0.35rem 0.75rem; font-size:0.75rem; color:#b91c1c; border-color:#fca5a5;">Delete</button>
                                 </form>
@@ -299,6 +338,7 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="{{ url_for('static', filename='js/nurse_dialog.js') }}"></script>
 <script>
     window.__csvImportUrl = "{{ url_for('nurse.nurse_data_management_import') }}";
     window.__justSaved = {{ 'true' if request.args.get('just_saved') else 'false' }};

@@ -361,22 +361,193 @@ def get_actual_vs_predicted(months: int = 6) -> dict:
     }
 
 
-def get_screening_volume_timeline(days: int = 14) -> dict:
-    """Screenings per day, last N days -- feeds the line chart."""
+_VOLUME_LEVELS = ("year", "month", "week")
+TIMELINE_START_YEAR = 2018  # year axis always begins here, even if older years have no data
+
+
+def _parse_year(year) -> int:
+    try:
+        y = int(year)
+    except (TypeError, ValueError):
+        raise ValueError("year must be a 4-digit number")
+    if not 2000 <= y <= 2100:
+        raise ValueError("year out of range")
+    return y
+
+
+def _parse_month(month) -> int:
+    try:
+        m = int(month)
+    except (TypeError, ValueError):
+        raise ValueError("month must be 1-12")
+    if not 1 <= m <= 12:
+        raise ValueError("month must be 1-12")
+    return m
+
+
+# Screening date = the visit's assessment_date (what imported historical CSV
+# rows carry), falling back to lab_screenings.test_datetime. Accepts ISO
+# (2018-01-01) or dd/mm/yyyy (01/01/2018).
+_DAY_EXPR = """COALESCE(
+    CASE
+        WHEN v.assessment_date LIKE '____-__-__%'
+            THEN SUBSTR(v.assessment_date, 1, 10)
+        WHEN v.assessment_date LIKE '__/__/____'
+            THEN SUBSTR(v.assessment_date, 7, 4) || '-' ||
+                 SUBSTR(v.assessment_date, 4, 2) || '-' ||
+                 SUBSTR(v.assessment_date, 1, 2)
+    END,
+    DATE(ls.test_datetime)
+)"""
+
+
+def _screening_records() -> list[tuple[str, float | None]]:
+    """[(ISO day, fbs_mg_dl or None)] for every screening of a non-deleted patient."""
     conn = get_connection()
-    rows = conn.execute(f"""
-        SELECT DATE(ls.test_datetime) AS day, COUNT(*) AS n
-        FROM lab_screenings ls
-        JOIN visits v ON v.id = ls.visit_id
-        JOIN patients p ON p.id = v.patient_id
-        WHERE p.deleted_at IS NULL AND ls.test_datetime IS NOT NULL
-        GROUP BY day
-        ORDER BY day DESC
-        LIMIT ?
-    """, (days,)).fetchall()
-    conn.close()
-    data = {r["day"]: r["n"] for r in rows if r["day"] is not None}
-    return dict(sorted(data.items()))
+    try:
+        rows = conn.execute(f"""
+            SELECT {_DAY_EXPR} AS day, ls.fbs_mg_dl AS fbs
+            FROM lab_screenings ls
+            JOIN visits v ON v.id = ls.visit_id
+            JOIN patients p ON p.id = v.patient_id
+            WHERE p.deleted_at IS NULL
+        """).fetchall()
+    finally:
+        conn.close()
+    return [(r["day"], r["fbs"]) for r in rows if r["day"] and len(r["day"]) == 10]
+
+
+def _screening_days() -> list[str]:
+    return [day for day, _ in _screening_records()]
+
+
+FBS_CLASSES = ("Normal", "Prediabetic", "Diabetic")
+
+
+def _fbs_class(fbs) -> str | None:
+    """Same clinical cut-offs as the dashboard legend: <100, 100-125, >=126."""
+    if fbs is None:
+        return None
+    return "Normal" if fbs < 100 else ("Prediabetic" if fbs < 126 else "Diabetic")
+
+
+def get_screening_trend(level: str = "year", year=None, month=None,
+                        start_year: int = TIMELINE_START_YEAR) -> dict:
+    """
+    Screenings split into three lines (Normal / Prediabetic / Diabetic by FBS),
+    for the drill-down chart on the Health Results page:
+      level="year"  -> one point per year, start_year .. current year
+      level="month" -> Jan..Dec of `year`                      (labels YYYY-MM)
+      level="day"   -> every date of `year`/`month`            (labels YYYY-MM-DD)
+    Gaps are zero-filled so each line is continuous. Screenings with no FBS
+    value can't be classed, so they are left out (reported as `unclassified`).
+    Returns {"level", "labels": [...], "series": {"Normal": [...], ...},
+             "unclassified": n}. Raises ValueError on bad input.
+    """
+    import calendar
+    from collections import Counter
+    from datetime import date
+
+    if level not in ("year", "month", "day"):
+        raise ValueError("level must be year, month or day")
+
+    counts = {c: Counter() for c in FBS_CLASSES}
+    unclassified = 0
+
+    if level == "year":
+        key = lambda d: int(d[:4]) if d[:4].isdigit() else None
+        in_scope = lambda d: True
+    else:
+        y = _parse_year(year)
+        if level == "month":
+            key = lambda d: int(d[5:7]) if d[5:7].isdigit() else None
+            in_scope = lambda d: d[:4] == f"{y:04d}"
+        else:
+            m = _parse_month(month)
+            prefix = f"{y:04d}-{m:02d}-"
+            key = lambda d: int(d[8:10]) if d[8:10].isdigit() else None
+            in_scope = lambda d: d.startswith(prefix)
+
+    for day, fbs in _screening_records():
+        if not in_scope(day):
+            continue
+        k = key(day)
+        if k is None:
+            continue
+        cls = _fbs_class(fbs)
+        if cls is None:
+            unclassified += 1
+            continue
+        counts[cls][k] += 1
+
+    if level == "year":
+        seen = [k for c in counts.values() for k in c]
+        keys = list(range(min([start_year, *seen]), max([date.today().year, *seen]) + 1))
+        labels = [str(k) for k in keys]
+    elif level == "month":
+        keys = list(range(1, 13))
+        labels = [f"{y:04d}-{k:02d}" for k in keys]
+    else:
+        keys = list(range(1, calendar.monthrange(y, m)[1] + 1))
+        labels = [f"{y:04d}-{m:02d}-{k:02d}" for k in keys]
+
+    return {
+        "level": level,
+        "labels": labels,
+        "series": {c: [counts[c].get(k, 0) for k in keys] for c in FBS_CLASSES},
+        "unclassified": unclassified,
+    }
+
+
+def get_screening_volume_timeline(level: str = "year", year=None, month=None,
+                                  start_year: int = TIMELINE_START_YEAR) -> dict:
+    """
+    Screening counts for the drill-down line chart (insertion-ordered dict,
+    gaps zero-filled so the line is continuous):
+      level="year"  -> {"2018": n, ... "2026": n}           start_year .. current year
+                       (extends earlier/later if data falls outside that range)
+      level="month" -> {"2026-01": n, ... "2026-12": n}     needs year
+      level="week"  -> {"Wk 1 (Sep 1-7)": n, ...}           needs year + month
+    Weeks are fixed 7-day blocks (1-7, 8-14, 15-21, 22-28, 29-end) so they
+    always line up with the calendar month the nurse drilled into.
+    Raises ValueError on a bad level/year/month (route turns it into a 400).
+    """
+    import calendar
+    from collections import Counter
+    from datetime import date
+
+    if level not in _VOLUME_LEVELS:
+        raise ValueError("level must be year, month or week")
+
+    days = _screening_days()
+
+    if level == "year":
+        counts = Counter(int(d[:4]) for d in days if d[:4].isdigit())
+        first = min([start_year, *counts])
+        last = max([date.today().year, *counts])
+        return {str(y): counts.get(y, 0) for y in range(first, last + 1)}
+
+    y = _parse_year(year)
+
+    if level == "month":
+        counts = Counter(int(d[5:7]) for d in days if d[:4] == f"{y:04d}" and d[5:7].isdigit())
+        return {f"{y:04d}-{m:02d}": counts.get(m, 0) for m in range(1, 13)}
+
+    m = _parse_month(month)
+    prefix = f"{y:04d}-{m:02d}-"
+    days_in_month = calendar.monthrange(y, m)[1]
+    n_weeks = (days_in_month + 6) // 7
+    buckets = [0] * n_weeks
+    for d in days:
+        if d.startswith(prefix) and d[8:10].isdigit():
+            day = int(d[8:10])
+            if 1 <= day <= days_in_month:
+                buckets[(day - 1) // 7] += 1
+    out = {}
+    for i in range(n_weeks):
+        lo, hi = i * 7 + 1, min((i + 1) * 7, days_in_month)
+        out[f"Wk {i + 1} ({calendar.month_abbr[m]} {lo}-{hi})"] = buckets[i]
+    return out
 
 
 def get_top_barangays(limit: int = 8) -> dict:

@@ -33,7 +33,7 @@
                     <div class="field-group"><label class="field-label">Spouse's First Name</label><input type="text" id="spouseFirstName" class="field-input" value="{{ patient.spouse_first_name }}"></div>
                 </div>
                 <div class="grid-5">
-                    <div class="field-group"><label class="field-label">Date of Assessment</label><input type="date" id="dateAssessment" class="field-input"></div>
+                    <div class="field-group"><label class="field-label">Date of Assessment<span class="required-mark">*</span></label><input type="date" id="dateAssessment" class="field-input" required></div>
                     <div class="field-group"><label class="field-label">Date of Birth</label><input type="date" id="birthdate" class="field-input" value="{{ patient.birthdate }}" required></div>
                     <div class="field-group"><label class="field-label">Age</label><input type="text" id="age" class="field-input" placeholder="yrs" value="{{ patient.age }}" readonly></div>
                     <div class="field-group">
@@ -117,9 +117,10 @@
 
         <!-- med and surg histo -->
         <div class="form-card">
-            <div class="card-header">3. Past Medical History <span style="font-weight:400; text-transform:none; font-size:0.75rem; color:var(--text-muted);">(confirm still accurate)</span></div>
+            <div class="card-header"><span>3. Past Medical History<span class="required-mark">*</span></span> <span style="font-weight:400; text-transform:none; font-size:0.75rem; color:var(--text-muted);">(confirm still accurate)</span></div>
             <div class="card-body">
-                <div class="radio-card-wrapper">
+                <div class="radio-card-wrapper" id="pmhGroup">
+                    <div class="radio-card"><input type="checkbox" class="pmh pmh-none" id="pmh0" value="None"><label for="pmh0">None reported</label></div>
                     <div class="radio-card"><input type="checkbox" class="pmh" id="pmh1" value="Allergy"><label for="pmh1">Allergy</label></div>
                     <div class="radio-card"><input type="checkbox" class="pmh" id="pmh2" value="Asthma"><label for="pmh2">Asthma</label></div>
                     <div class="radio-card"><input type="checkbox" class="pmh" id="pmh3" value="Cancer"><label for="pmh3">Cancer</label></div>
@@ -143,9 +144,10 @@
 
         <!-- fam histo -->
         <div class="form-card">
-            <div class="card-header">4. Family History (1st Degree Relative)</div>
+            <div class="card-header"><span>4. Family History (1st Degree Relative)<span class="required-mark">*</span></span></div>
             <div class="card-body">
-                <div class="radio-card-wrapper">
+                <div class="radio-card-wrapper" id="fhGroup">
+                    <div class="radio-card"><input type="checkbox" class="fh fh-none" id="fh0" value="None"><label for="fh0">None reported</label></div>
                     <div class="radio-card"><input type="checkbox" class="fh" id="fh1" value="Hypertension"><label for="fh1">Hypertension</label></div>
                     <div class="radio-card"><input type="checkbox" class="fh" id="fh2" value="Stroke/Cerebrovascular Disease"><label for="fh2">Stroke</label></div>
                     <div class="radio-card"><input type="checkbox" class="fh" id="fh3" value="Coronary Artery Disease"><label for="fh3">Heart Attack / CAD</label></div>
@@ -179,9 +181,9 @@
 
         <!-- lifestyle -->
         <div class="form-card">
-            <div class="card-header">6. Personal / Social History &amp; Lifestyle Factors</div>
+            <div class="card-header"><span>6. Personal / Social History &amp; Lifestyle Factors<span class="required-mark">*</span></span></div>
             <div class="card-body">
-                <label class="field-label">Smoking (Tobacco/Cigarette)</label>
+                <label class="field-label">Smoking (Tobacco/Cigarette)<span class="required-mark">*</span></label>
                 <div class="radio-card-wrapper" style="margin-bottom: 1.5rem;">
                     <div class="radio-card"><input type="radio" name="smoke" id="sm1" value="Never smoked"><label for="sm1">Never smoked</label></div>
                     <div class="radio-card"><input type="radio" name="smoke" id="sm2" value="Stopped > 1 year"><label for="sm2">Stopped &gt; 1 year</label></div>
@@ -192,13 +194,13 @@
 
                 <div class="grid-3">
                     <div class="field-group">
-                        <label class="field-label">Alcohol Intake</label>
+                        <label class="field-label">Alcohol Intake<span class="required-mark">*</span></label>
                         <select id="alcohol" class="field-input">
                             <option>Never Consumed</option><option>Yes</option><option>Yes (Binge: 5+ drinks in one occasion past month)</option>
                         </select>
                     </div>
                     <div class="field-group">
-                        <label class="field-label">Illicit Drug Use</label>
+                        <label class="field-label">Illicit Drug Use<span class="required-mark">*</span></label>
                         <select id="illicitDrugs" class="field-input"><option>No</option><option>Yes</option></select>
                     </div>
                     <div class="field-group">
@@ -275,20 +277,20 @@
 
         <!-- vitals and physical exam -->
         <div class="form-card">
-            <div class="card-header">10. Anthropometric Measurements, Vitals &amp; Physical Exam <span style="font-weight:400; text-transform:none; font-size:0.75rem; color:var(--text-muted);">(new measurements for this visit)</span></div>
+            <div class="card-header"><span>10. Anthropometric Measurements, Vitals &amp; Physical Exam<span class="required-mark">*</span></span> <span style="font-weight:400; text-transform:none; font-size:0.75rem; color:var(--text-muted);">(new measurements for this visit)</span></div>
             <div class="card-body">
                 <div class="grid-3">
-                    <div class="field-group"><label class="field-label">Systolic BP</label><input type="number" id="bpSystolic" class="field-input" placeholder="e.g. 120 mmHg"></div>
-                    <div class="field-group"><label class="field-label">Diastolic BP</label><input type="number" id="bpDiastolic" class="field-input" placeholder="e.g. 80 mmHg"></div>
-                    <div class="field-group"><label class="field-label">Heart Rate</label><input type="text" id="hr" class="field-input" placeholder="bpm"></div>
+                    <div class="field-group"><label class="field-label">Systolic BP<span class="required-mark">*</span></label><input type="number" id="bpSystolic" class="field-input" placeholder="e.g. 120 mmHg"></div>
+                    <div class="field-group"><label class="field-label">Diastolic BP<span class="required-mark">*</span></label><input type="number" id="bpDiastolic" class="field-input" placeholder="e.g. 80 mmHg"></div>
+                    <div class="field-group"><label class="field-label">Heart Rate<span class="required-mark">*</span></label><input type="text" id="hr" class="field-input" placeholder="bpm"></div>
                 </div>
                 <div class="grid-3">
-                    <div class="field-group"><label class="field-label">Respiratory Rate</label><input type="text" id="rr" class="field-input" placeholder="cpm"></div>
-                    <div class="field-group"><label class="field-label">Height (cm)</label><input type="number" id="height" class="field-input"></div>
-                    <div class="field-group"><label class="field-label">Weight (kg)</label><input type="number" id="weight" class="field-input"></div>
+                    <div class="field-group"><label class="field-label">Respiratory Rate<span class="required-mark">*</span></label><input type="text" id="rr" class="field-input" placeholder="cpm"></div>
+                    <div class="field-group"><label class="field-label">Height (cm)<span class="required-mark">*</span></label><input type="number" id="height" class="field-input"></div>
+                    <div class="field-group"><label class="field-label">Weight (kg)<span class="required-mark">*</span></label><input type="number" id="weight" class="field-input"></div>
                 </div>
                 <div class="grid-3">
-                    <div class="field-group"><label class="field-label">Waist Circ. (cm)</label><input type="number" id="waist" class="field-input" placeholder="Central Adiposity"></div>
+                    <div class="field-group"><label class="field-label">Waist Circ. (cm)<span class="required-mark">*</span></label><input type="number" id="waist" class="field-input" placeholder="Central Adiposity"></div>
                     <div class="field-group"><label class="field-label">BMI (Auto-calculated)</label><input type="text" id="bmi" class="field-input" readonly placeholder="— kg/m²"></div>
                     <div class="field-group"><label class="field-label">Obesity Classification</label><input type="text" id="obesityClass" class="field-input" readonly></div>
                 </div>
@@ -314,5 +316,9 @@
 {% endblock %}
 
 {% block scripts %}
+    <script>
+        window.__dataManagementUrl = "{{ url_for('nurse.nurse_data_management') }}";
+    </script>
+    <script src="{{ url_for('static', filename='js/nurse_dialog.js') }}"></script>
     <script src="{{ url_for('static', filename='js/nurse_new_record.js') }}"></script>
 {% endblock %}

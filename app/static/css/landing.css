@@ -173,6 +173,29 @@ html, body.landing-stage {
     transition: filter 0.2s;
 }
 
+/* About Us button (upper right) */
+.top-nav .nav-about-btn {
+    grid-column: 3;
+    justify-self: end;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #86efac;
+    text-decoration: none;
+    font-size: 1rem;
+    font-weight: 600;
+    padding: 0.6rem 1.15rem;
+    border-radius: 8px;
+    border: 1px solid rgba(134, 239, 172, 0.35);
+    background: rgba(255, 255, 255, 0.06);
+    transition: background-color 0.2s, transform 0.2s, box-shadow 0.2s;
+}
+.top-nav .nav-about-btn:hover {
+    background: rgba(39, 174, 96, 0.25);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(39, 174, 96, 0.3);
+}
+
 .nav-btn-primary:hover {
     filter: brightness(1.15);
 }
@@ -619,6 +642,12 @@ html, body.landing-stage {
         grid-column: 1;
         justify-self: stretch;
         gap: 0.5rem;
+    }
+    .top-nav .nav-about-btn {
+        grid-column: 1;
+        justify-self: stretch;
+        justify-content: center;
+        margin-top: 0.5rem;
     }
     .top-nav .nav-actions a {
         flex: 1;

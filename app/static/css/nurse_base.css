@@ -159,8 +159,18 @@ textarea.field-input   { height: auto; padding: 0.625rem 0.875rem; resize: verti
 .data-hub-wrapper { overflow: hidden; transition: max-height 0.35s ease; max-height: 1000px; }
 .data-hub-wrapper.collapsed { max-height: 0; }
 .data-hub-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: var(--gap); padding-bottom: var(--gap); }
-.filter-row    { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: var(--gap); align-items: flex-end; margin-bottom: var(--gap); }
-.filter-row .field-group { margin-bottom: 0; }
+/* Filter bar: one row on normal screens (wraps only when it truly can't fit).
+   Search + Status get extra width so "Awaiting Lab Result" isn't cut off;
+   Apply / Clear are icon-only, sized to match the 40px inputs. */
+.filter-row    { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: flex-end; margin-bottom: var(--gap); }
+.filter-row .field-group { margin-bottom: 0; flex: 1 1 0; min-width: 7.25rem; }
+.filter-row .field-group.filter-wide   { flex-grow: 1.5; min-width: 7.5rem; }    /* Search */
+.filter-row .field-group.filter-mid    { min-width: 8rem; }                      /* Barangay */
+.filter-row .field-group.filter-status { flex-grow: 1.5; min-width: 12.5rem; }   /* fits "Awaiting Lab Result" */
+.filter-row .field-group.filter-date   { min-width: 9.5rem; }
+.filter-row .field-input { padding: 0 0.65rem; text-overflow: ellipsis; }
+.filter-actions { display: flex; gap: 0.5rem; flex: 0 0 auto; }
+.filter-icon-btn { width: 40px; height: 40px; padding: 0; flex: 0 0 auto; }
 .accordion-item   { border-top: 1px solid var(--border); margin-top: 0.875rem; padding-top: 0.875rem; }
 .accordion-toggle { display: flex; justify-content: space-between; align-items: center; width: 100%; background: none; border: none; cursor: pointer; font-size: 0.8rem; color: var(--t2); padding: 0; }
 .accordion-icon   { font-size: 0.7rem; transition: transform 0.2s; }
@@ -640,3 +650,87 @@ svg.nav-icon { height: 24px; padding: 2px; box-sizing: border-box; fill: none; s
 .dash-fit .dash-table td:nth-child(3) { white-space: nowrap; }
 .dash-fit .dash-scroll { overflow-x: hidden; }
 .dash-fit .table-wrap { overflow-x: hidden !important; }
+/* ==========================================================================
+   Group-level required errors (checkbox groups: PMH, Family History, etc.)
+   ========================================================================== */
+.radio-card-wrapper.group-error { outline: 2px solid var(--danger); outline-offset: 4px; border-radius: 6px; animation: field-shake 0.3s ease; }
+.group-error-text { display: block; color: var(--danger); font-size: 0.75rem; font-weight: 500; margin: 0.5rem 0 0; animation: field-error-in 0.15s ease-out; }
+.radio-card.is-none-option label { border-style: dashed; }
+.radio-card.is-none-option input:checked + label { border-style: solid; }
+
+/* ==========================================================================
+   Shared confirm dialog (draft save -> go to Data Management?)
+   ========================================================================== */
+.nurse-modal-overlay {
+    position: fixed; inset: 0; background: rgba(15, 23, 15, 0.45);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 1000; padding: 1rem; animation: nurse-modal-fade 0.15s ease-out;
+}
+@keyframes nurse-modal-fade { from { opacity: 0; } to { opacity: 1; } }
+.nurse-modal {
+    background: var(--white); border-radius: var(--radius); max-width: 26rem; width: 100%;
+    padding: 1.5rem; box-shadow: 0 12px 32px rgba(0,0,0,0.2);
+    animation: nurse-modal-in 0.18s ease-out;
+}
+@keyframes nurse-modal-in { from { opacity: 0; transform: translateY(8px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+.nurse-modal h3 { margin: 0 0 0.5rem; font-size: 1.05rem; color: var(--t1); }
+.nurse-modal p { margin: 0 0 1rem; font-size: 0.85rem; color: var(--t2); line-height: 1.5; }
+.nurse-modal-actions { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+.nurse-modal-actions .btn { flex: 1 1 auto; }
+.nurse-modal-remember { display: flex; align-items: center; gap: 0.5rem; margin: 0 0 1.1rem; font-size: 0.78rem; color: var(--t3); }
+.nurse-modal-remember input { margin: 0; }
+/* Required-field asterisk: red, sits right after the label / section title */
+.required-mark { color: var(--danger); margin-left: 0.2rem; font-weight: 700; }
+
+/* Shared popup (nurse_dialog.js): white card, X at top right, OK button */
+.nurse-modal.nurse-dialog { background: #fff; color: var(--t1); color-scheme: light; }
+.nurse-dialog-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 0.75rem; }
+.nurse-dialog-head h3 { margin: 0; }
+.nurse-dialog-x { background: none; border: none; font-size: 1.6rem; line-height: 1; color: var(--t3); cursor: pointer; padding: 0 0.35rem; margin: -0.3rem -0.4rem 0 0; border-radius: 4px; font-family: inherit; }
+.nurse-dialog-x:hover { background: var(--bg); color: var(--t1); }
+.nurse-dialog-msg { white-space: pre-line; overflow-wrap: anywhere; }
+.nurse-dialog .nurse-modal-actions { justify-content: flex-end; }
+.nurse-dialog .nurse-modal-actions .btn { flex: 0 0 auto; min-width: 5.5rem; }
+
+/* Hover/focus tooltip: any element with class "tip" and a data-tip="..." */
+.tip { position: relative; }
+.tip::after {
+    content: attr(data-tip); position: absolute; left: 0; bottom: calc(100% + 8px);
+    width: max-content; max-width: 17rem; padding: 0.55rem 0.75rem;
+    background: #1a2e1a; color: #fff; font-size: 0.75rem; font-weight: 400; line-height: 1.4;
+    text-align: left; text-transform: none; letter-spacing: normal; white-space: normal;
+    border-radius: 6px; box-shadow: 0 6px 16px rgba(0,0,0,0.2);
+    opacity: 0; visibility: hidden; transform: translateY(4px);
+    transition: opacity 0.15s, transform 0.15s; pointer-events: none; z-index: 20;
+}
+.tip:hover::after, .tip:focus-visible::after { opacity: 1; visibility: visible; transform: none; }
+
+/* Printing the screening page: dropdown sections must not hide content */
+@media print {
+    .screening-layout .card-body.collapsible.collapsed { display: block !important; }
+    .tip::after { display: none; }
+}
+
+.tip.tip-right::after { left: auto; right: 0; }
+/* ==========================================================================
+   Screening Volume Timeline drill-down breadcrumb
+   ========================================================================== */
+.dash-breadcrumb { display: flex; align-items: center; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.5rem; }
+.dash-breadcrumb .crumb {
+    background: none; border: 0; padding: 0.1rem 0.3rem; margin: 0;
+    font: inherit; font-size: 0.75rem; font-weight: 600; color: var(--g-accent);
+    cursor: pointer; border-radius: 4px;
+}
+.dash-breadcrumb .crumb:hover:not(.current) { background: var(--g-light); text-decoration: underline; }
+.dash-breadcrumb .crumb.current { color: var(--t3); cursor: default; font-weight: 700; }
+.dash-breadcrumb .crumb-sep { color: var(--t3); font-size: 0.75rem; }
+
+/* Sortable table headers (Data Management) */
+.data-table th .th-sort { color: inherit; text-decoration: none; display: inline-flex; align-items: center; gap: 0.35rem; cursor: pointer; white-space: nowrap; }
+.data-table th .th-sort:hover { color: var(--t1); }
+.data-table th .th-sort:focus-visible { outline: 2px solid var(--g-accent); outline-offset: 2px; border-radius: 3px; }
+.data-table th .sort-ind { display: inline-flex; opacity: 0.35; }
+.data-table th .sort-ind svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.data-table th .th-sort:hover .sort-ind { opacity: 0.7; }
+.data-table th .th-sort.active { color: var(--t1); }
+.data-table th .th-sort.active .sort-ind { opacity: 1; color: var(--g-accent); }

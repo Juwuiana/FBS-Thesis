@@ -132,24 +132,108 @@ document.addEventListener('DOMContentLoaded', async function () {
             });
         }
 
+        // ---------------------------------------------------------------
+        // Screening Volume Timeline: year -> month -> week drill-down.
+        // `timeline` (from the server) is the year-level data for the
+        // initial paint; drilling in fetches the next level from
+        // /nurse_dashboard/screening-volume instead of reloading the page.
+        // ---------------------------------------------------------------
         const ctxLine = document.getElementById('screeningsLineChart');
         if (ctxLine) {
-            new Chart(ctxLine, {
-                type: 'line',
-                data: {
-                    labels: Object.keys(timeline),
-                    datasets: [{
-                        label: 'Screenings', data: Object.values(timeline),
-                        borderColor: green, backgroundColor: 'rgba(39,174,96,0.05)',
-                        tension: 0.3, fill: true, borderWidth: 2
-                    }]
-                },
-                options: {
-                    responsive: true, maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: { y: { beginAtZero: true, grid: { color: '#e2e8f0' } }, x: { grid: { display: false } } }
+            const MONTH_ABBR = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const breadcrumbEl = document.getElementById('volumeBreadcrumb');
+            const hintEl = document.getElementById('volumeHint');
+            const chartBox = ctxLine.closest('.chart-container');
+            let volumeChart = null;
+            let path = []; // [] = year level; [{level:'year',...}] = viewing one year's months; + month step = viewing one month's weeks
+
+            function volumeUrl(level, year, month) {
+                const p = new URLSearchParams({ level });
+                if (year) p.set('year', year);
+                if (month) p.set('month', month);
+                return `/nurse_dashboard/screening-volume?${p.toString()}`;
+            }
+
+            function displayLabels(labels, level) {
+                if (level !== 'month') return labels;
+                return labels.map(l => MONTH_ABBR[Number(l.split('-')[1])] || l);
+            }
+
+            function renderBreadcrumb() {
+                const crumbs = [{ label: 'All Years' }, ...path.map(s => ({ label: s.label }))];
+                breadcrumbEl.innerHTML = crumbs.map((c, i) => {
+                    const isLast = i === crumbs.length - 1;
+                    const text = `<button type="button" class="crumb${isLast ? ' current' : ''}" data-i="${i}" ${isLast ? 'disabled' : ''}>${escapeHtml(c.label)}</button>`;
+                    return i === 0 ? text : `<span class="crumb-sep">›</span>${text}`;
+                }).join('');
+                breadcrumbEl.querySelectorAll('button.crumb:not(.current)').forEach(btn => {
+                    btn.addEventListener('click', () => goTo(path.slice(0, Number(btn.dataset.i))));
+                });
+                if (hintEl) hintEl.textContent = path.length < 2 ? 'Click a point to zoom in.' : 'Most zoomed in — click a crumb above to zoom back out.';
+            }
+
+            function drawChart(labels, values, level) {
+                if (volumeChart) volumeChart.destroy();
+                volumeChart = new Chart(ctxLine, {
+                    type: 'line',
+                    data: {
+                        labels: displayLabels(labels, level),
+                        datasets: [{
+                            label: 'Screenings', data: values,
+                            borderColor: green, backgroundColor: 'rgba(39,174,96,0.05)',
+                            tension: 0.3, fill: true, borderWidth: 2, pointRadius: 4, pointHoverRadius: 6,
+                        }]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#e2e8f0' } },
+                            x: { grid: { display: false } }
+                        },
+                        onHover: (evt, elements) => {
+                            ctxLine.style.cursor = (level !== 'week' && elements.length) ? 'pointer' : 'default';
+                        },
+                        onClick: (evt, elements) => {
+                            if (level === 'week' || !elements.length) return;
+                            const label = labels[elements[0].index];
+                            if (level === 'year') {
+                                goTo([{ level: 'year', value: label, label }]);
+                            } else {
+                                const [y, m] = label.split('-');
+                                goTo([...path, { level: 'month', value: m, year: y, label: `${MONTH_ABBR[Number(m)]} ${y}` }]);
+                            }
+                        },
+                    },
+                });
+            }
+
+            async function goTo(newPath) {
+                path = newPath;
+                renderBreadcrumb();
+                if (!path.length) {
+                    drawChart(Object.keys(timeline), Object.values(timeline), 'year');
+                    return;
                 }
-            });
+                const last = path[path.length - 1];
+                const level = last.level === 'year' ? 'month' : 'week';
+                const year = last.level === 'year' ? last.value : last.year;
+                const month = last.level === 'month' ? last.value : undefined;
+                if (chartBox) chartBox.style.opacity = '0.5';
+                try {
+                    const res = await fetch(volumeUrl(level, year, month));
+                    if (!res.ok) throw new Error('HTTP ' + res.status);
+                    const json = await res.json();
+                    drawChart(json.labels || [], json.values || [], json.level || level);
+                } catch (err) {
+                    console.error('Could not load screening volume breakdown', err);
+                } finally {
+                    if (chartBox) chartBox.style.opacity = '1';
+                }
+            }
+
+            renderBreadcrumb();
+            drawChart(Object.keys(timeline), Object.values(timeline), 'year');
         }
 
         // Actual (solid) vs model-predicted (dashed), per month

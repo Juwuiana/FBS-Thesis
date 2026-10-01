@@ -8,20 +8,25 @@
     const saveBtn = document.getElementById('saveRecordBtn');
     const cancelBtn = document.getElementById('cancelEditBtn');
     const subtitle = document.getElementById('pageSubtitle');
+
+    // Section dropdowns: each header toggles only itself. Bound before the
+    // early return below so Portal Access / Past Records still open and close
+    // for a patient who has no visit yet (and therefore no edit form).
+    document.querySelectorAll('.section-toggle').forEach(header => {
+        header.addEventListener('click', () => {
+            const body = header.nextElementSibling;
+            if (!body || !body.classList.contains('card-body')) return;
+            const nowCollapsed = header.classList.toggle('collapsed');
+            body.classList.toggle('collapsed', nowCollapsed);
+        });
+    });
+
     if (!editBtn) return; // no latest_visit -> nothing to edit
 
     const form = document.getElementById('recordForm');
     const isDraft = form.dataset.isDraft === 'true';
     const editUrl = form.dataset.editUrl;
     const editableFields = document.querySelectorAll('.editable-field');
-
-    // Section collapse/expand toggles, same pattern as nurse_intake.html.
-    document.querySelectorAll('.section-toggle').forEach(header => {
-        header.addEventListener('click', () => {
-            header.classList.toggle('collapsed');
-            header.nextElementSibling.classList.toggle('collapsed');
-        });
-    });
 
     function setEditing(on) {
         editingNow = on;

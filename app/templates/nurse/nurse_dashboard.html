@@ -117,12 +117,14 @@
 
     <div class="form-card span-4">
         <div class="card-header">Screening Volume Timeline
-            <span class="info-dot has-tip" tabindex="0" data-tip="Number of screenings done per day over the last 14 days.">i</span>
+            <span class="info-dot has-tip" tabindex="0" data-tip="Starts by year. Click a point to drill into its months, then into a month's weeks.">i</span>
         </div>
         <div class="card-body">
+            <div class="dash-breadcrumb" id="volumeBreadcrumb"></div>
             <div class="chart-container">
                 <canvas id="screeningsLineChart"></canvas>
             </div>
+            <p class="card-note" id="volumeHint">Click a point to zoom in.</p>
         </div>
     </div>
 

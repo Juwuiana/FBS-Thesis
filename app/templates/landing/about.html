@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>About Us — FBS-Based Diabetes Prediction System</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/about.css') }}">
+</head>
+<body>
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+
+    <header class="about-nav">
+        <a href="{{ url_for('auth.index') }}" class="back-btn"><i class="fas fa-arrow-left"></i> Back</a>
+    </header>
+
+    <main class="about-main">
+        <section class="about-hero">
+            <div class="badge-pill"><i class="fas fa-users"></i> The Team</div>
+            <h1>Meet the people behind <span class="hl">FBS-Thesis</span></h1>
+            <p>Computer Science students at Mapúa Malayan Colleges Laguna, building an edge-deployable, green machine learning tool for diabetes risk screening in Local Health Units.</p>
+            <svg class="ecg-mini" viewBox="0 0 600 40" preserveAspectRatio="none" aria-hidden="true">
+                <polyline points="0,20 90,20 100,8 110,32 120,3 130,24 140,20 260,20 270,8 280,32 290,3 300,24 310,20 430,20 440,8 450,32 460,3 470,24 480,20 600,20"/>
+            </svg>
+        </section>
+
+        <section class="team-grid">
+            <article class="member-card" style="--i:0">
+                <div class="avatar"><span>JE</span></div>
+                <h3>Julliana Clarise O. Espiritu</h3>
+                <p class="role">Researcher</p>
+                <p class="bio">Team Lead and Frontend Developer</p>
+                <div class="socials"><a href="#" aria-label="GitHub"><i class="fab fa-github"></i></a><a href="#" aria-label="Email"><i class="fas fa-envelope"></i></a></div>
+            </article>
+
+            <article class="member-card" style="--i:1">
+                <div class="avatar"><span>JE</span></div>
+                <h3>Jerome R. Elano</h3>
+                <p class="role">Researcher</p>
+                <p class="bio">Lead Backend Developer</p>
+                <div class="socials"><a href="#" aria-label="GitHub"><i class="fab fa-github"></i></a><a href="#" aria-label="Email"><i class="fas fa-envelope"></i></a></div>
+            </article>
+
+            <article class="member-card" style="--i:2">
+                <div class="avatar"><span>KP</span></div>
+                <h3>Kurt Gabriel C. Pernia</h3>
+                <p class="role">Researcher</p>
+                <p class="bio">UI/UX Designer and Backend Developer</p>
+                <div class="socials"><a href="#" aria-label="GitHub"><i class="fab fa-github"></i></a><a href="#" aria-label="Email"><i class="fas fa-envelope"></i></a></div>
+            </article>
+
+            <article class="member-card" style="--i:3">
+                <div class="avatar"><span>VV</span></div>
+                <h3>Venisse V. Velandres</h3>
+                <p class="role">Researcher</p>
+                <p class="bio">Frontend and Backend Developer</p>
+                <div class="socials"><a href="#" aria-label="GitHub"><i class="fab fa-github"></i></a><a href="#" aria-label="Email"><i class="fas fa-envelope"></i></a></div>
+            </article>
+
+            <article class="member-card adviser" style="--i:4">
+                <div class="avatar"><span>JE</span></div>
+                <h3>Jonalyn G. Ebron</h3>
+                <p class="role">Thesis Adviser</p>
+                <p class="bio">Guides the direction and methodology of the study.</p>
+                <div class="socials"><a href="#" aria-label="Email"><i class="fas fa-envelope"></i></a></div>
+            </article>
+        </section>
+    </main>
+
+    <footer class="about-footer">Mapúa Malayan Colleges Laguna · BS Computer Science · CS2001R Thesis</footer>
+
+    <script>
+        const cards = document.querySelectorAll('.member-card');
+
+        // Scroll / load reveal (staggered)
+        const io = new IntersectionObserver((entries) => {
+            entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+        }, { threshold: 0.15 });
+        cards.forEach(c => io.observe(c));
+
+        // 3D tilt + cursor spotlight
+        const canHover = window.matchMedia('(hover: hover)').matches;
+        const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (canHover && !reduce) {
+            cards.forEach(card => {
+                card.addEventListener('mousemove', (e) => {
+                    const r = card.getBoundingClientRect();
+                    const x = e.clientX - r.left, y = e.clientY - r.top;
+                    const rx = ((y / r.height) - 0.5) * -12;
+                    const ry = ((x / r.width) - 0.5) * 12;
+                    card.style.setProperty('--mx', x + 'px');
+                    card.style.setProperty('--my', y + 'px');
+                    card.style.transform = `perspective(700px) rotateX(${rx}deg) rotateY(${ry}deg) translateY(-6px)`;
+                });
+                card.addEventListener('mouseleave', () => { card.style.transform = ''; });
+            });
+        }
+    </script>
+</body>
+</html>
