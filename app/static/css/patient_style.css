@@ -1137,3 +1137,20 @@ svg.nav-icon { height: 24px; padding: 2px; box-sizing: border-box; fill: none; s
     .patient-bell-wrap { top: 7px; right: 12px; }
     .patient-bell-panel { position: fixed; top: 56px; right: 12px; left: 12px; width: auto; }
 }
+.req-star { color: #dc2626; font-weight: 700; }
+.hfbs-list { margin-top: 0.6rem; border: 1px solid var(--border, #e3e9e4); border-radius: 12px; overflow: hidden; background: #fff; }
+.hfbs-row { display: grid; grid-template-columns: 9rem 1fr auto; gap: 0.75rem; align-items: center; padding: 0.75rem 1rem; border-bottom: 1px solid var(--border, #e3e9e4); font-size: 0.85rem; }
+.hfbs-row:last-child { border-bottom: 0; }
+.hfbs-when { display: flex; flex-direction: column; line-height: 1.3; color: var(--t2, #475569); }
+.hfbs-when span { font-size: 0.72rem; color: var(--t3, #6b7c6b); }
+.hfbs-val strong { font-size: 1.05rem; }
+.hfbs-val .range-badge { margin-left: 0.35rem; }
+.hfbs-meta { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; justify-content: flex-end; }
+.hfbs-fasted { font-size: 0.7rem; color: var(--t3, #6b7c6b); border: 1px dashed var(--border, #cbd5e1); border-radius: 4px; padding: 0.05rem 0.4rem; }
+.hfbs-status { font-size: 0.7rem; font-weight: 600; padding: 0.2rem 0.6rem; border-radius: 999px; }
+.hfbs-status.wait { background: #fef3c7; color: #b45309; }
+.hfbs-status.done { background: #e8f5e9; color: #2e7d32; }
+@media (max-width: 600px) {
+    .hfbs-row { grid-template-columns: 1fr; gap: 0.35rem; }
+    .hfbs-meta { justify-content: flex-start; }
+}
