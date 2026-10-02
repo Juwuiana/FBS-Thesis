@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, jsonify, abort, redirect, url_for, Response, current_app, session, flash, send_from_directory
-from app.models import patient_model, visit_model, lab_model, lookup_model, health_analytics_model, audit_model
+from app.models import patient_fbs_model, patient_model, visit_model, lab_model, lookup_model, health_analytics_model, audit_model
 from app.db import get_db
 from app.controllers import auth_controller, metrics_controller
 from datetime import date as date_cls
@@ -391,6 +391,7 @@ def nurse_screening(patient_id, visit_id=None):
         existing_screening=existing_screening,
         is_latest=is_latest,
         active_page='intake',
+        patient_entries=patient_fbs_model.list_entries_for_screening(patient["id"], selected_visit_id),
     )
 
 @nurse_bp.route('/nurse/patient_file_view/<patient_id>')
@@ -1009,3 +1010,15 @@ def nurse_issue_portal_credentials(patient_id):
         'nurse/nurse_patient_credentials_slip.html',
         patient=patient, temp_password=temp_password,
     )
+
+@nurse_bp.route('/patient/<patient_id>/fbs_entry/<int:entry_id>/status', methods=['POST'])
+def patient_fbs_set_status(patient_id, entry_id):
+    patient = patient_model.get_patient_by_code(patient_id)
+    if not patient:
+        abort(404)
+    status = (request.get_json(silent=True) or {}).get("status")
+    try:
+        ok = patient_fbs_model.set_review_status(entry_id, patient["id"], status, session.get("user_id"))
+    except ValueError:
+        return jsonify({"error": "Invalid status"}), 400
+    return (jsonify({"status": status}), 200) if ok else (jsonify({"error": "Not found"}), 404)

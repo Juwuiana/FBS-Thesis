@@ -1,8 +1,9 @@
 from flask import Blueprint, abort, current_app, flash, jsonify, render_template, request, session, redirect, url_for
-from app.models import patient_portal_model, patient_model, visit_model, lookup_model, settings as settings_model
+from app.models import patient_portal_model, patient_model, visit_model, lookup_model, patient_fbs_model, settings as settings_model
 from app.controllers import patient_auth_controller
 from flask import Response
 from datetime import date as date_cls, datetime
+
 
 
 patient_bp = Blueprint('patient', __name__)
@@ -185,6 +186,7 @@ def patient_health_results():
         location_has_provinces=lookup_model.psgc_has_provinces(),
         record_options=PATIENT_RECORD_OPTIONS,
         today=date_cls.today().isoformat(),
+        self_fbs_entries=patient_portal_model.get_self_reported_fbs(patient_id),
     )
 
 
@@ -274,9 +276,10 @@ def patient_edit_visit(visit_id):
 def patient_add_record():
     """
     Patient adds a new (follow-up) record for themselves. Same sections as the
-    nurse's Add New Record, but anthropometrics / vitals are OPTIONAL and there
-    is no FBS here: FBS and the risk result are only ever recorded by a nurse at
-    screening. The visit is saved as a "draft" so it shows up for the nurse as a
+    nurse's Add New Record, but anthropometrics / vitals are OPTIONAL. A home FBS 
+    reading is optional and saved separately as self-reported. The screening FBS 
+    and risk result are only ever recorded by a nurse.
+    The visit is saved as a "draft" so it shows up for the nurse as a
     record still awaiting screening (the nurse screening step marks it submitted).
     """
     patient_id = patient_portal_model.get_current_patient_id()
@@ -357,6 +360,22 @@ def patient_add_record():
             return fail(err)
         visit[name] = val
 
+        # --- optional home FBS reading (self-reported, saved separately) ---------
+    self_fbs = None
+    raw_fbs = (request.form.get('self_fbs_value') or '').strip()
+    if raw_fbs:
+        unit = (request.form.get('self_fbs_unit') or 'mg_dl').strip()
+        fasted = (request.form.get('self_fbs_fasted') or '').strip()
+        if unit not in patient_fbs_model.VALID_UNITS or fasted not in patient_fbs_model.VALID_FASTED:
+            return fail("Please choose a unit and answer the fasting question for your FBS reading.")
+        try:
+            val = float(raw_fbs)
+        except ValueError:
+            return fail("FBS must be a number.")
+        if not (20 <= patient_fbs_model.to_mg_dl(val, unit) <= 600):
+            return fail("FBS looks out of range.")
+        self_fbs = {"entered_value": val, "entered_unit": unit, "fasted": fasted}
+
     # BMI + class only when both height and weight were given (same cut-offs as the nurse form)
     visit["bmi"], visit["obesity_class"] = None, None
     if visit.get("height_cm") and visit.get("weight_kg"):
@@ -391,7 +410,9 @@ def patient_add_record():
             visit_model.save_visit_conditions(visit_id, category, codes)
     visit_model.save_cvd_responses(visit_id, cvd)
     visit_model.flag_patient_submitted_record(visit_id)
-
+    if self_fbs:
+        patient_fbs_model.create_entry(patient_id, visit_id, self_fbs["entered_value"],
+                                       self_fbs["entered_unit"], self_fbs["fasted"])
     flash("Your new record was submitted. A health worker will complete your screening and FBS.", "success")
     return redirect(url_for('patient.patient_health_results', view='history'))
 

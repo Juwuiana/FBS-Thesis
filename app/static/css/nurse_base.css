@@ -813,3 +813,7 @@ select.field-input[disabled] {
 }
 
 .card-header .header-desc { margin-left: auto; text-align: right; }
+
+/* Tooltips in a table's last column open leftward so the card edge can't clip them */
+td:last-child .tip::after, th:last-child .tip::after { left: auto; right: 0; }
+.tip::after { max-width: min(17rem, 70vw); }
