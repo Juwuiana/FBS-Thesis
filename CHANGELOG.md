@@ -1,5 +1,6 @@
 # Staff password recovery
 
+- **Fixed:** Recycle Bin records now use a separate configurable 7-, 15-, or 30-day undo window (15 days by default), with hourly automatic purging, immediate purge on policy changes, and a system audit event for removals.
 - **Fixed:** removed decorative Data Privacy controls and duplicate content-use text from the admin Privacy &amp; Security page.
 - **Added:** replaced fictional municipality agreement rows with the two real LHU stations and a shared read-only Data Handling and Confidentiality Agreement modal.
 - **Removed:** retired the redundant global all-role sign-out control from Encryption &amp; Storage; per-role Force Sign-Out remains available under Access Roles &amp; Permissions.

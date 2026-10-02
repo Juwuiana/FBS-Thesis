@@ -303,7 +303,7 @@
                            <td>
                                 <a href="{{ url_for('nurse.nurse_patient_file_view', patient_id=p.patient_code, return_qs=qs) }}" class="btn btn-secondary" style="padding:0.35rem 0.75rem; font-size:0.75rem;">View</a>
                                 <a href="{{ url_for('nurse.nurse_new_record', patient_id=p.patient_code, return_qs=qs) }}" class="btn btn-secondary" style="padding:0.35rem 0.75rem; font-size:0.75rem;">+ Add Record</a>
-                                <form method="POST" action="{{ url_for('nurse.nurse_patient_delete', patient_id=p.patient_code) }}" style="display:inline;" data-confirm="Move {{ p.first_name }} {{ p.last_name }} to Recycle Bin? This record will be permanently deleted after 15 days unless restored.">
+                                <form method="POST" action="{{ url_for('nurse.nurse_patient_delete', patient_id=p.patient_code) }}" style="display:inline;" data-confirm="Move {{ p.first_name }} {{ p.last_name }} to the Recycle Bin? It will be permanently deleted after {{ recycle_bin_days }} days unless restored.">
                                     <input type="hidden" name="return_qs" value="{{ qs }}">
                                     <button type="submit" class="btn btn-secondary" style="padding:0.35rem 0.75rem; font-size:0.75rem; color:#b91c1c; border-color:#fca5a5;">Delete</button>
                                 </form>

@@ -203,14 +203,28 @@
                         <input type="text" class="ps-input" value="{{ password_hash_method }}" readonly />
                     </div>
                     <form id="dataRetentionForm" method="POST" action="{{ url_for('admin.update_data_retention') }}">
-                        <div class="form-group">
-                            <label class="form-label">Data Retention Threshold</label>
-                            <select class="ps-select" name="data_retention_days">
-                                <option value="365" {% if data_retention_days == 365 %}selected{% endif %}>Purge Local Staged Cache After 12 Months</option>
-                                <option value="180" {% if data_retention_days == 180 %}selected{% endif %}>Purge After 6 Months</option>
-                                <option value="730" {% if data_retention_days == 730 %}selected{% endif %}>Purge After 24 Months</option>
-                                <option value="" {% if data_retention_days is none %}selected{% endif %}>Never Purge (Manual Only)</option>
+                        <div class="form-group retention-setting-group">
+                            <label class="form-label" for="recycleBinDays">Recycle Bin Retention</label>
+                            <select class="ps-select" id="recycleBinDays" name="recycle_bin_days">
+                                <option value="7" {% if recycle_bin_days == 7 %}selected{% endif %}>7 days</option>
+                                <option value="15" {% if recycle_bin_days == 15 %}selected{% endif %}>15 days</option>
+                                <option value="30" {% if recycle_bin_days == 30 %}selected{% endif %}>30 days</option>
                             </select>
+                            <p class="ps-description retention-help">Applies only to patient records that a nurse has moved to the Recycle Bin. Active patient records are not deleted automatically.</p>
+                            <div class="retention-status" aria-label="Current Recycle Bin status">
+                                <div class="retention-status-item">
+                                    <span>Records in Recycle Bin</span>
+                                    <strong>{{ recycle_bin_status.total }}</strong>
+                                </div>
+                                <div class="retention-status-item">
+                                    <span>Due for purge</span>
+                                    <strong>{{ recycle_bin_status.due }}</strong>
+                                </div>
+                                <div class="retention-status-item">
+                                    <span>Oldest deleted record</span>
+                                    <strong>{{ recycle_bin_status.oldest_deleted_at or "None" }}</strong>
+                                </div>
+                            </div>
                         </div>
                     </form>
                 </div>

@@ -571,6 +571,9 @@ def _attach_pending_edits(patients):
 
 @nurse_bp.route('/nurse/data_management')
 def nurse_data_management():
+    patient_model.run_retention_purge()
+    from app.models import settings as settings_model
+
     barangay = request.args.get('barangay') or None
     risk = request.args.get('risk') or None
     date = request.args.get('date') or None
@@ -628,6 +631,7 @@ def nurse_data_management():
         entries=entries,
         sort=sort,
         direction=direction,
+        recycle_bin_days=settings_model.get_recycle_bin_days(),
     )
 
 @nurse_bp.route('/nurse/data_management/acknowledge_edits/<patient_id>', methods=['POST'])
@@ -742,9 +746,15 @@ def nurse_patient_delete(patient_id):
 
 @nurse_bp.route('/nurse/recycle_bin')
 def nurse_recycle_bin():
-    patient_model.purge_expired_deleted_patients()
+    patient_model.run_retention_purge()
     deleted_patients = patient_model.list_deleted_patients()
-    return render_template('nurse/nurse_recycle_bin.html', deleted_patients=deleted_patients, active_page='data_management')
+    from app.models import settings as settings_model
+    return render_template(
+        'nurse/nurse_recycle_bin.html',
+        deleted_patients=deleted_patients,
+        recycle_bin_days=settings_model.get_recycle_bin_days(),
+        active_page='data_management',
+    )
 
 
 @nurse_bp.route('/nurse/patient/<patient_id>/restore', methods=['POST'])

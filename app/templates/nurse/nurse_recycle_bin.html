@@ -4,7 +4,7 @@
 <header class="topbar">
     <div>
         <h1 class="page-title">Recycle Bin</h1>
-        <p class="page-subtitle">Deleted patient records — auto-purged 15 days after deletion</p>
+        <p class="page-subtitle">Deleted patient records are permanently removed {{ recycle_bin_days }} days after deletion</p>
     </div>
     <a href="{{ url_for('nurse.nurse_data_management') }}" class="btn btn-secondary">← Back to Data Management</a>
 </header>
@@ -31,9 +31,13 @@
                         <td>{{ p.barangay or "—" }}</td>
                         <td>{{ p.deleted_at }}</td>
                         <td>
+                            {% if p.days_remaining == 0 %}
+                            <span class="risk-badge badge-danger">Due for deletion</span>
+                            {% else %}
                             <span class="risk-badge {{ 'badge-danger' if p.days_remaining <= 3 else 'badge-warning' }}">
                                 {{ p.days_remaining }} day{{ 's' if p.days_remaining != 1 else '' }} left
                             </span>
+                            {% endif %}
                         </td>
                         <td>
                             <form method="POST" action="{{ url_for('nurse.nurse_patient_restore', patient_id=p.patient_code) }}" style="display:inline;">

@@ -7,11 +7,20 @@
 {% block content %}
 <main class="page-content">
   <div class="dm-card">
-    <div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="staff-page-header">
       <div class="dm-card-title mb-0">{{ employee.name }}</div>
-      <a href="{{ url_for('admin.data_management') }}" class="filter-btn" style="text-decoration:none;">
+      <a href="{{ url_for('admin.data_management') }}" class="filter-btn staff-back-link">
         <i class="bi bi-arrow-left me-1"></i> Back to Data Management
       </a>
+    </div>
+
+    <div class="staff-profile-avatar-wrap">
+      {% if employee.avatar_filename %}
+      <img class="staff-profile-avatar" src="{{ url_for('static', filename='uploads/avatars/' + employee.avatar_filename) }}" alt="{{ employee.name }} profile photo" onerror="this.classList.add('staff-profile-avatar-hidden'); this.nextElementSibling.classList.remove('staff-profile-avatar-fallback-hidden');">
+      <div class="staff-profile-avatar staff-profile-avatar-fallback staff-profile-avatar-fallback-hidden" role="img" aria-label="{{ employee.name }} initials">{{ (employee.first_name[:1] ~ employee.last_name[:1]) | upper }}</div>
+      {% else %}
+      <div class="staff-profile-avatar staff-profile-avatar-fallback" role="img" aria-label="{{ employee.name }} initials">{{ (employee.first_name[:1] ~ employee.last_name[:1]) | upper }}</div>
+      {% endif %}
     </div>
 
     <div class="row g-3 mb-4">
@@ -73,7 +82,7 @@
       </div>
     </div>
 
-    <a href="{{ url_for('admin.staff_detail', employee_id=employee.id) }}" class="filter-btn" style="text-decoration:none;padding:8px 20px;">
+    <a href="{{ url_for('admin.staff_detail', employee_id=employee.id) }}" class="filter-btn staff-edit-link">
       <i class="bi bi-pencil me-1"></i> Edit Employee
     </a>
   </div>

@@ -9,6 +9,9 @@ DEFAULT_SESSION_TIMEOUT_MINUTES = 30
 DATA_RETENTION_KEY = "data_retention_days"
 DEFAULT_DATA_RETENTION_DAYS = 365
 ALLOWED_DATA_RETENTION_DAYS = (180, 365, 730, None)
+RECYCLE_BIN_DAYS_KEY = "recycle_bin_days"
+DEFAULT_RECYCLE_BIN_DAYS = 15
+ALLOWED_RECYCLE_BIN_DAYS = (7, 15, 30)
 MAX_LOGIN_ATTEMPTS_KEY = "max_login_attempts"
 DEFAULT_MAX_LOGIN_ATTEMPTS = 5
 ALLOWED_MAX_LOGIN_ATTEMPTS = (3, 5, 10)
@@ -69,6 +72,21 @@ def set_data_retention_days(days):
     if days not in ALLOWED_DATA_RETENTION_DAYS:
         raise ValueError(f"{days} is not an allowed data retention value.")
     set_setting(DATA_RETENTION_KEY, days if days is not None else "")
+
+
+def get_recycle_bin_days():
+    raw = get_setting(RECYCLE_BIN_DAYS_KEY, DEFAULT_RECYCLE_BIN_DAYS)
+    try:
+        days = int(raw)
+    except (TypeError, ValueError):
+        return DEFAULT_RECYCLE_BIN_DAYS
+    return days if days in ALLOWED_RECYCLE_BIN_DAYS else DEFAULT_RECYCLE_BIN_DAYS
+
+
+def set_recycle_bin_days(days):
+    if days not in ALLOWED_RECYCLE_BIN_DAYS:
+        raise ValueError(f"{days} is not an allowed Recycle Bin retention value.")
+    set_setting(RECYCLE_BIN_DAYS_KEY, days)
 
 
 def _role_setting_key(prefix, role):

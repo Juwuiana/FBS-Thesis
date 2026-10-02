@@ -47,6 +47,55 @@ def _audit_event(action, severity="Info"):
         ip_address=request.remote_addr, severity=severity,
     )
 
+
+def _validate_staff_details(form):
+    from app.models import lookup_model
+
+    errors = []
+    role_label = (form.get("role") or "").strip()
+    station_label = (form.get("station") or "").strip()
+    phone = auth_controller.normalize_phone(form.get("contact"))
+    facility = STATION_MAP.get(station_label)
+
+    if role_label not in STAFF_ROLES:
+        errors.append("Please select a valid role.")
+    if not auth_controller.PH_MOBILE_RE.match(phone):
+        errors.append("Enter a valid 10-digit mobile number starting with 9.")
+    if station_label not in STATIONS or not facility:
+        errors.append("Please select a valid station.")
+
+    barangay_code = (form.get("barangay_code") or "").strip()
+    barangay_name = (form.get("barangay_name") or "").strip()
+    barangay_id = None
+    if not barangay_code and not barangay_name:
+        errors.append("Please select an assigned barangay.")
+    elif not errors:
+        if barangay_code:
+            barangay_id = lookup_model.get_or_create_barangay(
+                barangay_code,
+                barangay_name,
+                (form.get("city_code") or "").strip(),
+                (form.get("city_name") or "").strip(),
+                (form.get("region_code") or "").strip(),
+                (form.get("region_name") or "").strip(),
+            )
+        else:
+            barangay_id = lookup_model.get_or_create_barangay_by_name(barangay_name)
+        if barangay_id is None:
+            errors.append("Please select an assigned barangay.")
+
+    return errors, {
+        "role": role_label,
+        "facility": facility,
+        "phone": phone,
+        "barangay_id": barangay_id,
+    }
+
+
+def _mask_staff_phone(phone):
+    value = phone or ""
+    return f"{value[:3]}****{value[-3:]}" if len(value) == 10 else "****"
+
 @admin_bp.route("/dashboard")
 @login_required
 def dashboard():
@@ -594,8 +643,7 @@ def add_staff():
     )
 
 
-# Shows full staff info (read-only) with Role as the one editable field.
-# queries and delete this comment.
+# Shows full staff info (read-only) with selected editable fields.
 @admin_bp.route("/data-management/<employee_id>/view")
 @login_required
 def staff_view(employee_id):
@@ -631,30 +679,103 @@ def staff_view(employee_id):
 @admin_bp.route("/data-management/<employee_id>")
 @login_required
 def staff_detail(employee_id):
+    from app.db import get_db
     from app.models import user as user_model
 
     employee = user_model.get_employee_by_id(employee_id)
     if employee is None:
         abort(404)
-    return render_template("admin/staff_detail.html", employee=employee, roles=STAFF_ROLES)
+    barangay_preselect = {}
+    if employee.get("barangay_id"):
+        row = get_db().execute(
+            "SELECT barangay_code, city_code, region_code, name FROM barangays WHERE id = ?",
+            (employee["barangay_id"],),
+        ).fetchone()
+        if row:
+            barangay_preselect = {
+                "barangay_code": row["barangay_code"] or "",
+                "city_code": row["city_code"] or "",
+                "region_code": row["region_code"] or "",
+                "barangay_name": row["name"] or "",
+            }
+    return render_template(
+        "admin/staff_detail.html",
+        employee=employee,
+        roles=STAFF_ROLES,
+        stations=STATIONS,
+        barangay_preselect=barangay_preselect,
+    )
 
 
-@admin_bp.route("/data-management/<employee_id>/update-role", methods=["POST"])
+@admin_bp.route("/data-management/<employee_id>/update-details", methods=["POST"])
 @login_required
-def staff_update_role(employee_id):
-    from app.models import user as user_model
+def staff_update_details(employee_id):
+    from app.models import lookup_model, user as user_model
 
     employee = user_model.get_employee_by_id(employee_id)
     if employee is None:
         abort(404)
 
-    new_role = request.form.get("role", "").strip()
-    if user_model.update_user_role(employee_id, new_role):
-        _audit_event(f"Role changed: {employee['role']} -> {new_role} (user: {employee_id})", "Warning")
-        flash("Employee role updated successfully.", "success")
-    else:
-        flash("Please select a valid role.", "error")
+    errors, cleaned = _validate_staff_details(request.form)
+    if errors:
+        for message in errors:
+            flash(message, "error")
+        return redirect(url_for("admin.staff_detail", employee_id=employee_id))
 
+    role_changed = employee["role"] != cleaned["role"]
+    target_user = user_model.get_user_by_employee_id(employee_id)
+    if role_changed and target_user["id"] == session.get("user_id"):
+        flash("You cannot change your own role.", "error")
+        return redirect(url_for("admin.staff_detail", employee_id=employee_id))
+    if (
+        role_changed
+        and employee["role"] == "Health Officer"
+        and employee["status"] == "Approved"
+        and not employee["is_suspended"]
+    ):
+        active_admins = get_db().execute(
+            "SELECT COUNT(*) FROM users WHERE role = ? AND status = ? AND is_suspended = 0",
+            ("medical_officer", "approved"),
+        ).fetchone()[0]
+        if active_admins <= 1:
+            flash("The last active Health Officer cannot be demoted.", "error")
+            return redirect(url_for("admin.staff_detail", employee_id=employee_id))
+
+    if not user_model.update_staff_details(
+        employee_id,
+        cleaned["facility"],
+        cleaned["phone"],
+        cleaned["barangay_id"],
+        cleaned["role"],
+    ):
+        flash("Employee details could not be updated.", "error")
+        return redirect(url_for("admin.staff_detail", employee_id=employee_id))
+
+    new_barangay = lookup_model.get_barangay_name_by_id(cleaned["barangay_id"]) or "Unknown"
+    changes = []
+    if employee["facility"] != cleaned["facility"]:
+        new_station = next(label for label, value in STATION_MAP.items() if value == cleaned["facility"])
+        changes.append(f"Station / LHU: {employee['station']} -> {new_station}")
+    if employee["phone"] != cleaned["phone"]:
+        changes.append(
+            f"Contact Number: {_mask_staff_phone(employee['phone'])} -> "
+            f"{_mask_staff_phone(cleaned['phone'])}"
+        )
+    if employee["barangay_id"] != cleaned["barangay_id"]:
+        changes.append(f"Assigned Barangay: {employee['barangay']} -> {new_barangay}")
+    if role_changed:
+        changes.append(f"Role: {employee['role']} -> {cleaned['role']}")
+    if changes:
+        _audit_event(
+            f"Staff details changed (employee: {employee_id}): " + "; ".join(changes),
+            "Warning",
+        )
+    if role_changed:
+        _audit_event(
+            f"Role changed: {employee['role']} -> {cleaned['role']} (user: {employee_id})",
+            "Warning",
+        )
+    flash("Employee details updated successfully.", "success")
     return redirect(url_for("admin.staff_detail", employee_id=employee_id))
 
 
@@ -717,15 +838,16 @@ def reset_staff_password(employee_id):
     employee = user_model.get_user_by_employee_id(employee_id)
     if employee is None:
         abort(404)
-    if employee["status"] != "recovery":
+    if employee["status"] != "recovery" and not employee["is_suspended"]:
         return jsonify({"error": "This employee does not have a pending password recovery request."}), 400
 
+    reset_reason = "suspended account" if employee["is_suspended"] else "recovery request"
     temp_password = auth_controller.generate_temp_password()
     user_model.reset_password(
         employee["id"], generate_password_hash(temp_password), status="approved"
     )
     _audit_event(
-        f"Password reset for {employee['email']} (recovery request)", "Warning"
+        f"Password reset for {employee['email']} ({reset_reason})", "Warning"
     )
     return jsonify({
         "temp_password": temp_password,
@@ -734,15 +856,94 @@ def reset_staff_password(employee_id):
     })
 
 
+@admin_bp.route("/data-management/<employee_id>/unlock", methods=["POST"])
+@login_required
+def unlock_staff(employee_id):
+    from app.models import settings as settings_model, user as user_model
+
+    employee = user_model.get_user_by_employee_id(employee_id)
+    if employee is None:
+        abort(404)
+    is_legacy_lockout = (
+        employee["status"] == "recovery"
+        and employee["failed_login_attempts"] >= settings_model.get_max_login_attempts()
+    )
+    if not employee["is_suspended"] and not is_legacy_lockout:
+        flash("This account is not locked.", "error")
+        return redirect(url_for("admin.data_management"))
+
+    if employee["is_suspended"]:
+        user_model.set_suspended(employee["id"], False)
+    else:
+        user_model.unlock_user(employee["id"])
+    _audit_event(f"Account unlocked: {employee_id}", "Warning")
+    flash("Account unlocked successfully.", "success")
+    return redirect(url_for("admin.data_management"))
+
+
+@admin_bp.route("/data-management/<employee_id>/suspend", methods=["POST"])
+@login_required
+def suspend_staff(employee_id):
+    from app.models import user as user_model
+
+    employee = user_model.get_user_by_employee_id(employee_id)
+    if employee is None:
+        abort(404)
+    if employee["id"] == session.get("user_id"):
+        flash("You cannot suspend your own account.", "error")
+        return redirect(url_for("admin.staff_detail", employee_id=employee_id))
+    if employee["is_suspended"]:
+        flash("This account is already suspended.", "error")
+        return redirect(url_for("admin.staff_detail", employee_id=employee_id))
+    if employee["status"] != "approved":
+        flash("Only approved accounts can be suspended.", "error")
+        return redirect(url_for("admin.staff_detail", employee_id=employee_id))
+
+    if employee["role"] == "medical_officer":
+        active_admins = get_db().execute(
+            "SELECT COUNT(*) FROM users WHERE role = ? AND status = ? AND is_suspended = 0",
+            ("medical_officer", "approved"),
+        ).fetchone()[0]
+        if active_admins <= 1:
+            flash("The last active Health Officer account cannot be suspended.", "error")
+            return redirect(url_for("admin.staff_detail", employee_id=employee_id))
+
+    user_model.set_suspended(employee["id"], True)
+    _audit_event(f"Staff account suspended: {employee_id}", "Critical")
+    flash("Staff account suspended.", "success")
+    return redirect(url_for("admin.staff_detail", employee_id=employee_id))
+
+
+@admin_bp.route("/data-management/<employee_id>/reactivate", methods=["POST"])
+@login_required
+def reactivate_staff(employee_id):
+    from app.models import user as user_model
+
+    employee = user_model.get_user_by_employee_id(employee_id)
+    if employee is None:
+        abort(404)
+    if not employee["is_suspended"]:
+        flash("This account is not suspended.", "error")
+        return redirect(url_for("admin.staff_detail", employee_id=employee_id))
+
+    user_model.set_suspended(employee["id"], False)
+    _audit_event(f"Staff account reactivated: {employee_id}", "Warning")
+    flash("Staff account reactivated.", "success")
+    return redirect(url_for("admin.staff_detail", employee_id=employee_id))
+
+
 @admin_bp.route("/privacy-security")
 @login_required
 def privacy_security():
     from app.models import settings as settings_model
+    from app.models import patient_model
     from werkzeug.security import generate_password_hash
 
+    patient_model.run_retention_purge()
     session_timeout_minutes = settings_model.get_session_timeout_minutes()
     max_login_attempts = settings_model.get_max_login_attempts()
-    data_retention_days = settings_model.get_data_retention_days()
+    recycle_bin_days = settings_model.get_recycle_bin_days()
+    recycle_bin_status = patient_model.get_recycle_bin_status()
     password_hash_method = generate_password_hash("x").split(":", 1)[0]
     roles = [
         {
@@ -765,7 +966,8 @@ def privacy_security():
         lhu_agreements=lhu_agreements,
         session_timeout_minutes=session_timeout_minutes,
         max_login_attempts=max_login_attempts,
-        data_retention_days=data_retention_days,
+        recycle_bin_days=recycle_bin_days,
+        recycle_bin_status=recycle_bin_status,
         password_hash_method=password_hash_method,
     )
 
@@ -858,17 +1060,22 @@ def role_force_signout():
 @login_required
 def update_data_retention():
     from app.models import settings as settings_model
+    from app.models import patient_model
 
-    raw = request.form.get("data_retention_days")
+    raw = request.form.get("recycle_bin_days")
     try:
-        days = int(raw) if raw else None
-        settings_model.set_data_retention_days(days)
+        days = int(raw)
+        settings_model.set_recycle_bin_days(days)
     except (TypeError, ValueError):
         flash("Please choose a valid retention period.", "error")
         return redirect(url_for("admin.privacy_security"))
-    label = f"{days} day(s)" if days else "manual purge only"
+    label = f"{days} day(s)"
     _audit_event(f"Data retention threshold updated to {label}", "Info")
-    flash(f"Data retention threshold updated to {label}.", "success")
+    removed = patient_model.run_retention_purge(force=True)
+    message = f"Recycle Bin retention updated to {days} days."
+    if removed:
+        message += f" {removed} expired patient record(s) removed immediately."
+    flash(message, "success")
     return redirect(url_for("admin.privacy_security"))
 
 

@@ -5,11 +5,13 @@ all reads/writes to `patients`
 import csv
 import hashlib
 import io
+import logging
 import re
-from datetime import date
+import time
+from datetime import date, datetime, timezone
+from threading import Lock
 from app.db import get_db
 from app.models.db import get_connection
-from datetime import date, datetime  
 import sqlite3
 import openpyxl
 from io import BytesIO
@@ -17,6 +19,12 @@ from openpyxl.worksheet.datavalidation import DataValidation
 from openpyxl.comments import Comment
 from openpyxl.formatting.rule import FormulaRule
 from openpyxl.styles import PatternFill, Font
+
+
+_RETENTION_PURGE_INTERVAL_SECONDS = 60 * 60
+_last_retention_purge_at = None
+_retention_purge_lock = Lock()
+_logger = logging.getLogger(__name__)
 
 
 def _compute_age(birthdate_iso: str) -> int:
@@ -444,41 +452,118 @@ def purge_expired_deleted_patients() -> int:
     """
     from app.models import settings as settings_model
 
-    retention_days = settings_model.get_data_retention_days()
-    if retention_days is None:
+    retention_days = settings_model.get_recycle_bin_days()
+    conn = get_connection()
+    try:
+        cur = conn.execute(
+            "DELETE FROM patients WHERE deleted_at IS NOT NULL AND deleted_at <= datetime('now', ?)",
+            (f"-{retention_days} days",),
+        )
+        conn.commit()
+        return cur.rowcount
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def run_retention_purge(force: bool = False) -> int:
+    """Run the automatic purge at most hourly; force is for explicit admin/startup actions."""
+    global _last_retention_purge_at
+
+    now = time.monotonic()
+    with _retention_purge_lock:
+        if (
+            not force
+            and _last_retention_purge_at is not None
+            and now - _last_retention_purge_at < _RETENTION_PURGE_INTERVAL_SECONDS
+        ):
+            return 0
+        _last_retention_purge_at = now
+
+    try:
+        purged = purge_expired_deleted_patients()
+    except Exception:
+        _logger.exception("Automatic Recycle Bin purge failed.")
         return 0
 
-    conn = get_connection()
-    cur = conn.execute(
-        "DELETE FROM patients WHERE deleted_at IS NOT NULL AND deleted_at <= datetime('now', ?)",
-        (f"-{retention_days} days",),
-    )
-    conn.commit()
-    purged = cur.rowcount
-    conn.close()
+    if purged:
+        try:
+            from app.models import audit_model, settings as settings_model
+
+            audit_model.log_event(
+                get_db(),
+                user_id=None,
+                user_name="system",
+                role="system",
+                action=(
+                    f"Automatic Recycle Bin purge removed {purged} patient "
+                    f"record(s) older than {settings_model.get_recycle_bin_days()} days"
+                ),
+                ip_address="system",
+                severity="Warning",
+            )
+        except Exception:
+            _logger.exception("Could not write the automatic Recycle Bin purge audit event.")
     return purged
 
 
 def list_deleted_patients() -> list[dict]:
     """Backs nurse_recycle_bin.html. days_remaining is clamped at 0 in
     case this renders in the gap before a purge has run."""
+    from app.models import settings as settings_model
+
+    retention_days = settings_model.get_recycle_bin_days()
     conn = get_connection()
-    rows = conn.execute("""
+    try:
+        rows = conn.execute("""
         SELECT p.id, p.patient_code, p.last_name, p.first_name, p.deleted_at,
                b.name AS barangay
         FROM patients p
         LEFT JOIN barangays b ON b.id = p.barangay_id
         WHERE p.deleted_at IS NOT NULL
         ORDER BY p.deleted_at DESC
-    """).fetchall()
-    conn.close()
+        """).fetchall()
+    finally:
+        conn.close()
+    now = datetime.now(timezone.utc)
     result = []
     for r in rows:
         d = dict(r)
         deleted_dt = datetime.fromisoformat(d["deleted_at"])
-        d["days_remaining"] = max(15 - (datetime.utcnow() - deleted_dt).days, 0)
+        if deleted_dt.tzinfo is None:
+            deleted_dt = deleted_dt.replace(tzinfo=timezone.utc)
+        elapsed_days = max((now - deleted_dt.astimezone(timezone.utc)).days, 0)
+        d["days_remaining"] = max(retention_days - elapsed_days, 0)
         result.append(d)
     return result
+
+
+def get_recycle_bin_status() -> dict:
+    """Return the current soft-deleted count, overdue count, and oldest timestamp."""
+    from app.models import settings as settings_model
+
+    retention_days = settings_model.get_recycle_bin_days()
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            """
+            SELECT COUNT(*) AS total,
+                   COALESCE(SUM(CASE WHEN deleted_at <= datetime('now', ?) THEN 1 ELSE 0 END), 0) AS due,
+                   MIN(deleted_at) AS oldest_deleted_at
+            FROM patients
+            WHERE deleted_at IS NOT NULL
+            """,
+            (f"-{retention_days} days",),
+        ).fetchone()
+        return {
+            "total": row["total"],
+            "due": row["due"],
+            "oldest_deleted_at": row["oldest_deleted_at"],
+        }
+    finally:
+        conn.close()
 
 
 def list_screenings_missing_risk_prediction(barangay=None, date=None) -> list[dict]:

@@ -205,17 +205,20 @@ def authenticate(email, password):
         user = user_model.get_user_by_id(user["id"])
         max_attempts = settings_model.get_max_login_attempts()
         if user["failed_login_attempts"] >= max_attempts:
-            user_model.set_status(user["id"], "recovery")
+            user_model.set_suspended(user["id"], True)
             audit_model.log_event(
                 get_db(), user_id=user["id"], user_name=user["email"], role=user["role"],
-                action=f"Account locked after {max_attempts} failed login attempts: {email}",
+                action=f"Account suspended after {max_attempts} failed login attempts: {email}",
                 ip_address=None, severity="Critical",
             )
             return None, (
-                "Too many failed attempts. Your account has been locked - contact "
-                "your LHU administrator for a password reset."
+                "Too many failed attempts. Your account has been suspended - "
+                "contact your LHU administrator."
             )
         return None, "Invalid email or password."
+
+    if user["is_suspended"]:
+        return None, "Your account has been suspended. Contact your LHU administrator."
 
     user_status = user["status"]
     if current_app.config.get("REQUIRE_ADMIN_APPROVAL", True) and user_status != "approved":

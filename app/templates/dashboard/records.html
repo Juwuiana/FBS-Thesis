@@ -26,7 +26,8 @@
         <option value="approved">Approved</option>
         <option value="rejected">Rejected</option>
         <option value="pending">Pending</option>
-        <option value="recovery">Password Recovery</option>
+        <option value="password recovery">Password Recovery</option>
+        <option value="suspended">Suspended</option>
       </select>
       <button class="filter-btn" onclick="applyFilters()">Filter</button>
       <button class="export-btn" onclick="exportTable()">
@@ -49,7 +50,7 @@
             <th class="hide-mobile">Contact</th>
             <th>Status</th>
             <th class="hide-mobile">Date Added</th>
-            <th>Action</th>
+            <th class="dm-action-column">Action</th>
           </tr>
         </thead>
         <tbody id="dmTableBody">
@@ -61,16 +62,18 @@
           >
             <td><span class="patient-id">{{ e.id }}</span></td>
             <td>
-              <div style="font-weight:600;font-size:13px">{{ e.name }}</div>
-              <div style="font-size:11px;color:var(--text-muted)">{{ e.email }}</div>
+              <div class="dm-person-name">{{ e.name }}</div>
+              <div class="dm-person-email">{{ e.email }}</div>
             </td>
             <td class="hide-mobile">
               <span class="badge-category">{{ e.role }}</span>
             </td>
-            <td class="hide-mobile" style="font-size:13px">{{ e.station }}</td>
-            <td class="hide-mobile" style="font-size:12px;color:var(--text-muted)">{{ e.contact }}</td>
+            <td class="hide-mobile dm-station">{{ e.station }}</td>
+            <td class="hide-mobile dm-contact">{{ e.contact }}</td>
             <td>
-              {% if e.status == 'Approved' %}
+              {% if e.status == 'Suspended' %}
+                <span class="risk-pill risk-suspended">Suspended</span>
+              {% elif e.status == 'Approved' %}
                 <span class="risk-pill risk-low">Approved</span>
               {% elif e.status == 'Rejected' %}
                 <span class="risk-pill risk-high">Rejected</span>
@@ -80,14 +83,11 @@
                 <span class="risk-pill risk-moderate">Pending</span>
               {% endif %}
             </td>
-            <td class="hide-mobile" style="font-size:12px;color:var(--text-muted);white-space:nowrap">{{ e.date_added }}</td>
-            <td>
-              <div class="d-flex gap-1">
-                <a href="{{ url_for('admin.staff_view', employee_id=e.id) }}" class="view-btn" style="text-decoration:none;">View</a>
-                <a href="{{ url_for('admin.staff_detail', employee_id=e.id) }}" class="view-btn" style="text-decoration:none;background:transparent;color:var(--accent-green);border:1.5px solid var(--accent-green)">Edit</a>
-                {% if e.status == 'Password Recovery' %}
-                  <button type="button" class="view-btn reset-password-btn" data-reset-url="{{ url_for('admin.reset_staff_password', employee_id=e.id) }}">Reset Password</button>
-                {% endif %}
+            <td class="hide-mobile dm-date-added">{{ e.date_added }}</td>
+            <td class="dm-action-column">
+              <div class="dm-row-actions">
+                <a href="{{ url_for('admin.staff_view', employee_id=e.id) }}" class="view-btn">View</a>
+                <a href="{{ url_for('admin.staff_detail', employee_id=e.id) }}" class="view-btn view-btn-secondary">Edit</a>
               </div>
             </td>
           </tr>
@@ -98,10 +98,10 @@
 
     <!-- Footer -->
     <div class="d-flex justify-content-between align-items-center mt-3 flex-wrap gap-2">
-      <span id="recordCount" style="font-size:12px;color:var(--text-muted)">
+      <span id="recordCount" class="dm-record-count">
         Showing {{ employees | length }} employees
       </span>
-      <a href="{{ url_for('admin.add_staff') }}" class="filter-btn" style="padding:6px 16px;font-size:12px;text-decoration:none;">
+      <a href="{{ url_for('admin.add_staff') }}" class="filter-btn dm-add-employee">
         <i class="bi bi-person-plus me-1"></i> Add Employee
       </a>
     </div>
@@ -149,26 +149,6 @@
   </div>
 </div>
 
-<div class="modal fade" id="resetPasswordModal" tabindex="-1" aria-labelledby="resetPasswordModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header" style="background:var(--green-light); border-top:4px solid var(--green-light);">
-        <h5 class="modal-title" id="resetPasswordModalLabel">Temporary Password Issued</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <p id="resetPasswordRecipient" class="mb-3"></p>
-        <label class="field-label" for="resetPasswordValue">Temporary Password</label>
-        <input type="text" id="resetPasswordValue" class="form-control" readonly style="font-family:monospace;font-size:1.1rem;font-weight:700;">
-        <p class="small text-muted mt-3 mb-0">Write this down or print it now. It won't be retrievable after you leave this modal.</p>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-        <button type="button" class="filter-btn" id="printResetPassword"><i class="bi bi-printer me-1"></i> Print</button>
-      </div>
-    </div>
-  </div>
-</div>
 {% endblock %}
 
 {% block scripts %}
@@ -317,40 +297,5 @@
     });
   })();
 
-  (() => {
-    const modalElement = document.getElementById('resetPasswordModal');
-    const recipient = document.getElementById('resetPasswordRecipient');
-    const password = document.getElementById('resetPasswordValue');
-    const printButton = document.getElementById('printResetPassword');
-    let resetRow = null;
-
-    document.querySelectorAll('.reset-password-btn').forEach(button => {
-      button.addEventListener('click', async () => {
-        button.disabled = true;
-        resetRow = button.closest('tr');
-        try {
-          const response = await fetch(button.dataset.resetUrl, {
-            method: 'POST',
-            headers: { 'X-Requested-With': 'XMLHttpRequest' }
-          });
-          const payload = await response.json();
-          if (!response.ok) throw new Error(payload.error || 'The password reset could not be completed.');
-          recipient.textContent = `${payload.name} · ${payload.email}`;
-          password.value = payload.temp_password;
-          const statusPill = resetRow.querySelector('.risk-pill');
-          statusPill.className = 'risk-pill risk-low';
-          statusPill.textContent = 'Approved';
-          resetRow.dataset.status = 'approved';
-          bootstrap.Modal.getOrCreateInstance(modalElement).show();
-        } catch (error) {
-          window.alert(error.message);
-        } finally {
-          button.disabled = false;
-        }
-      });
-    });
-
-    printButton.addEventListener('click', () => window.print());
-  })();
 </script>
 {% endblock %}

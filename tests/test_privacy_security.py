@@ -1,10 +1,11 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+import time
 
 import pytest
 from werkzeug.security import generate_password_hash
 
 from app import create_app
-from app.db import get_connection
+from app.db import get_connection, get_db
 from app.controllers.auth_controller import authenticate
 from app.models import patient_model, settings as settings_model, user as user_model
 from config import Config
@@ -60,7 +61,7 @@ def active_patient_session(client, patient_id, version=1):
 
 
 def add_deleted_patient(app, code, age_days):
-    deleted_at = (datetime.utcnow() - timedelta(days=age_days)).strftime("%Y-%m-%d %H:%M:%S")
+    deleted_at = (datetime.now(timezone.utc) - timedelta(days=age_days)).strftime("%Y-%m-%d %H:%M:%S")
     with app.app_context():
         conn = get_connection()
         conn.execute(
@@ -70,34 +71,236 @@ def add_deleted_patient(app, code, age_days):
         )
         conn.commit()
         conn.close()
+    return deleted_at
 
 
-def test_retention_setting_changes_automatic_purge_and_persists(app):
-    add_deleted_patient(app, "OLD-180", 181)
-    add_deleted_patient(app, "NEW-180", 179)
+def test_recycle_bin_setting_falls_back_on_missing_or_invalid_values(app):
     with app.app_context():
-        settings_model.set_data_retention_days(180)
-        assert settings_model.get_data_retention_days() == 180
+        assert settings_model.get_recycle_bin_days() == 15
+        settings_model.set_setting(settings_model.RECYCLE_BIN_DAYS_KEY, "invalid")
+        assert settings_model.get_recycle_bin_days() == 15
+        settings_model.set_setting(settings_model.RECYCLE_BIN_DAYS_KEY, "365")
+        assert settings_model.get_recycle_bin_days() == 15
+
+
+@pytest.mark.parametrize("days", [7, 15, 30])
+def test_recycle_bin_setting_accepts_only_supported_days(app, days):
+    with app.app_context():
+        settings_model.set_recycle_bin_days(days)
+        assert settings_model.get_recycle_bin_days() == days
+
+
+@pytest.mark.parametrize("days", [None, 0, 8, 14, 31, "7"])
+def test_recycle_bin_setting_rejects_disallowed_days(app, days):
+    with app.app_context(), pytest.raises(ValueError):
+        settings_model.set_recycle_bin_days(days)
+
+
+@pytest.mark.parametrize("days", [7, 15, 30])
+def test_purge_uses_selected_recycle_bin_period(app, days):
+    add_deleted_patient(app, f"OLD-{days}", days + 2)
+    add_deleted_patient(app, f"NEW-{days}", days - 2)
+    with app.app_context():
+        settings_model.set_recycle_bin_days(days)
         assert patient_model.purge_expired_deleted_patients() == 1
         conn = get_connection()
         remaining = conn.execute(
             "SELECT patient_code FROM patients WHERE deleted_at IS NOT NULL"
         ).fetchall()
         conn.close()
-        assert [row["patient_code"] for row in remaining] == ["NEW-180"]
+        assert [row["patient_code"] for row in remaining] == [f"NEW-{days}"]
 
 
-def test_never_purge_leaves_soft_deleted_patients_untouched(app):
-    add_deleted_patient(app, "VERY-OLD", 5000)
+def test_legacy_data_retention_setting_does_not_control_recycle_bin(app):
+    add_deleted_patient(app, "LEGACY-SETTING", 20)
     with app.app_context():
         settings_model.set_data_retention_days(None)
-        assert patient_model.purge_expired_deleted_patients() == 0
-        conn = get_connection()
-        found = conn.execute(
-            "SELECT 1 FROM patients WHERE patient_code = 'VERY-OLD'"
-        ).fetchone()
-        conn.close()
-        assert found is not None
+        assert settings_model.get_data_retention_days() is None
+        assert settings_model.get_recycle_bin_days() == 15
+        assert patient_model.purge_expired_deleted_patients() == 1
+
+
+def test_deleted_patient_days_remaining_uses_configured_days_and_clamps_at_zero(app):
+    add_deleted_patient(app, "BIN-RECENT", 4)
+    add_deleted_patient(app, "BIN-EXPIRED", 40)
+    with app.app_context():
+        settings_model.set_recycle_bin_days(30)
+        patients = {row["patient_code"]: row for row in patient_model.list_deleted_patients()}
+        assert patients["BIN-RECENT"]["days_remaining"] == 26
+        assert patients["BIN-EXPIRED"]["days_remaining"] == 0
+
+
+def test_run_retention_purge_audits_once_only_when_records_are_removed(app):
+    add_deleted_patient(app, "AUDITED-OLD", 20)
+    admin_id = add_user(app, "purge-audit-admin@example.com")
+    with app.app_context():
+        settings_model.set_recycle_bin_days(7)
+        assert patient_model.run_retention_purge(force=True) == 1
+        rows = get_db().execute(
+            "SELECT user_id, user_name, action, severity FROM audit_log "
+            "WHERE action LIKE 'Automatic Recycle Bin purge%'"
+        ).fetchall()
+        assert len(rows) == 1
+        assert rows[0]["user_id"] is None
+        assert rows[0]["user_name"] == "system"
+        assert "1 patient record(s) older than 7 days" in rows[0]["action"]
+        assert rows[0]["severity"] == "Warning"
+        assert patient_model.run_retention_purge(force=True) == 0
+        assert get_db().execute(
+            "SELECT COUNT(*) FROM audit_log WHERE action LIKE 'Automatic Recycle Bin purge%'"
+        ).fetchone()[0] == 1
+
+    client = app.test_client()
+    active_session(client, admin_id)
+    audit_page = client.get("/admin/audit-trails")
+    assert audit_page.status_code == 200
+    assert b"system" in audit_page.data
+
+
+def test_retention_purge_throttles_repeated_calls(app, monkeypatch):
+    add_deleted_patient(app, "THROTTLE-FIRST", 20)
+    with app.app_context():
+        settings_model.set_recycle_bin_days(7)
+    monkeypatch.setattr(patient_model, "_last_retention_purge_at", None)
+
+    with app.app_context():
+        assert patient_model.run_retention_purge() == 1
+    add_deleted_patient(app, "THROTTLE-SECOND", 20)
+    with app.app_context():
+        assert patient_model.run_retention_purge() == 0
+        assert get_db().execute(
+            "SELECT 1 FROM patients WHERE patient_code = ?", ("THROTTLE-SECOND",)
+        ).fetchone() is not None
+
+
+def test_nurse_recycle_bin_page_survives_purge_failure(app, monkeypatch):
+    nurse_id = add_user(app, "purge-failure-nurse@example.com", role="health_worker")
+
+    def fail_purge():
+        raise RuntimeError("simulated purge failure")
+
+    monkeypatch.setattr(patient_model, "_last_retention_purge_at", None)
+    monkeypatch.setattr(patient_model, "purge_expired_deleted_patients", fail_purge)
+    client = app.test_client()
+    active_session(client, nurse_id, "health_worker")
+
+    response = client.get("/nurse/recycle_bin")
+
+    assert response.status_code == 200
+    assert b"Recycle Bin" in response.data
+
+
+def test_recycle_bin_pages_render_configured_period(app):
+    nurse_id = add_user(app, "retention-nurse@example.com", role="health_worker")
+    add_patient(app)
+    with app.app_context():
+        settings_model.set_recycle_bin_days(30)
+    client = app.test_client()
+    active_session(client, nurse_id, "health_worker")
+
+    management_page = client.get("/nurse/data_management")
+    recycle_page = client.get("/nurse/recycle_bin")
+
+    assert b"permanently deleted after 30 days" in management_page.data
+    assert b"permanently deleted after 15 days" not in management_page.data
+    assert b"permanently removed 30 days after deletion" in recycle_page.data
+    assert b"15 days" not in recycle_page.data
+
+
+def test_admin_can_shorten_retention_and_purge_immediately(app):
+    add_deleted_patient(app, "SHORTEN-POLICY", 8)
+    admin_id = add_user(app, "retention-admin@example.com")
+    with app.app_context():
+        settings_model.set_recycle_bin_days(30)
+    client = app.test_client()
+    active_session(client, admin_id)
+
+    response = client.post(
+        "/admin/privacy-security/data-retention",
+        data={"recycle_bin_days": "7"},
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"Recycle Bin retention updated to 7 days" in response.data
+    assert b"1 expired patient record(s) removed immediately" in response.data
+    with app.app_context():
+        assert settings_model.get_recycle_bin_days() == 7
+        assert get_db().execute(
+            "SELECT 1 FROM patients WHERE patient_code = ?", ("SHORTEN-POLICY",)
+        ).fetchone() is None
+
+
+def test_non_admin_cannot_change_recycle_bin_retention(app):
+    nurse_id = add_user(app, "retention-nonadmin@example.com", role="health_worker")
+    client = app.test_client()
+    active_session(client, nurse_id, "health_worker")
+
+    response = client.post(
+        "/admin/privacy-security/data-retention",
+        data={"recycle_bin_days": "7"},
+    )
+
+    assert response.status_code == 403
+
+
+def test_admin_page_shows_recycle_bin_and_due_counts(app, monkeypatch):
+    oldest = add_deleted_patient(app, "STATUS-OLD", 9)
+    add_deleted_patient(app, "STATUS-NEWER", 2)
+    admin_id = add_user(app, "retention-status-admin@example.com")
+    with app.app_context():
+        settings_model.set_recycle_bin_days(7)
+    monkeypatch.setattr(patient_model, "_last_retention_purge_at", time.monotonic())
+    client = app.test_client()
+    active_session(client, admin_id)
+
+    response = client.get("/admin/privacy-security")
+
+    assert response.status_code == 200
+    assert b"Records in Recycle Bin" in response.data
+    assert b"Due for purge" in response.data
+    assert b"Oldest deleted record" in response.data
+    assert b">2</strong>" in response.data
+    assert b">1</strong>" in response.data
+    assert oldest.encode() in response.data
+
+
+def test_purge_cascades_and_database_check_passes(app):
+    add_deleted_patient(app, "CASCADE-OLD", 10)
+    with app.app_context():
+        settings_model.set_recycle_bin_days(7)
+        patient_id = get_db().execute(
+            "SELECT id FROM patients WHERE patient_code = ?", ("CASCADE-OLD",)
+        ).fetchone()["id"]
+        visit_id = get_db().execute(
+            "INSERT INTO visits (patient_id, visit_type, assessment_date) VALUES (?, 'intake', '2026-09-01')",
+            (patient_id,),
+        ).lastrowid
+        get_db().execute(
+            "INSERT INTO lab_screenings (visit_id, fbs_mg_dl, test_datetime) VALUES (?, 100, '2026-09-01 08:00:00')",
+            (visit_id,),
+        )
+        get_db().execute("INSERT INTO cvd_responses (visit_id) VALUES (?)", (visit_id,))
+        get_db().commit()
+        assert patient_model.purge_expired_deleted_patients() == 1
+        assert get_db().execute("SELECT COUNT(*) FROM visits WHERE id = ?", (visit_id,)).fetchone()[0] == 0
+        assert get_db().execute("SELECT COUNT(*) FROM lab_screenings WHERE visit_id = ?", (visit_id,)).fetchone()[0] == 0
+        assert get_db().execute("SELECT COUNT(*) FROM cvd_responses WHERE visit_id = ?", (visit_id,)).fetchone()[0] == 0
+
+    result = app.test_cli_runner().invoke(args=["db-check"])
+    assert result.exit_code == 0
+    assert "No foreign key violations." in result.output
+
+
+def test_purge_expired_cli_forces_purge_and_reports_count(app):
+    add_deleted_patient(app, "CLI-OLD", 20)
+    with app.app_context():
+        settings_model.set_recycle_bin_days(7)
+
+    result = app.test_cli_runner().invoke(args=["purge-expired"])
+
+    assert result.exit_code == 0
+    assert "Purged 1 expired patient record(s)." in result.output
 
 
 def test_failed_login_attempts_increment_and_reset_on_success(app):

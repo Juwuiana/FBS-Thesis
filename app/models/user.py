@@ -9,7 +9,7 @@ never f-strings/.format()/% into the query text.
 import sqlite3
 
 from app.db import get_db
-from app.constants import BARANGAYS
+from app.constants import BARANGAYS, ROLE_MAP
 from app.models import lookup_model
 
 
@@ -217,11 +217,15 @@ def update_avatar(user_id, filename):
 
 def get_staff_records():
     """Return user records in the shape expected by the Data Management table."""
+    from app.models import settings as settings_model
+
     db = get_db()
+    max_login_attempts = settings_model.get_max_login_attempts()
     rows = db.execute(
         """
         SELECT id, first_name, middle_name, last_name, email, phone, role,
-               facility, barangay, status, created_at
+               facility, barangay, status, created_at, failed_login_attempts,
+               is_suspended
         FROM users
         ORDER BY created_at DESC, id DESC
         """
@@ -230,6 +234,11 @@ def get_staff_records():
     employees = []
     for row in rows:
         name = " ".join(part for part in [row["first_name"], row["middle_name"], row["last_name"]] if part)
+        is_suspended = bool(row["is_suspended"])
+        is_locked = (
+            row["status"] == "recovery"
+            and row["failed_login_attempts"] >= max_login_attempts
+        )
         employees.append(
             {
                 "id": f"EMP-{row['id']:05d}",
@@ -238,7 +247,10 @@ def get_staff_records():
                 "role": display_role_from_db(row["role"]),
                 "station": display_facility_from_db(row["facility"]),
                 "contact": row["phone"],
-                "status": display_status_from_db(row["status"]),
+                "status": "Suspended" if is_suspended else display_status_from_db(row["status"]),
+                "is_locked": is_locked,
+                "is_password_recovery": row["status"] == "recovery" and not is_suspended,
+                "is_suspended": is_suspended,
                 "date_added": row["created_at"],
             }
         )
@@ -246,6 +258,8 @@ def get_staff_records():
 
 
 def get_employee_by_id(employee_id):
+    from app.models import settings as settings_model
+
     if isinstance(employee_id, str):
         employee_id = employee_id.strip()
         if employee_id.upper().startswith("EMP-"):
@@ -257,6 +271,11 @@ def get_employee_by_id(employee_id):
     user = get_user_by_id(user_id)
     if not user:
         return None
+    is_suspended = bool(user["is_suspended"])
+    is_locked = (
+        user["status"] == "recovery"
+        and user["failed_login_attempts"] >= settings_model.get_max_login_attempts()
+    )
     return {
         "id": f"EMP-{user['id']:05d}",
         "name": " ".join(part for part in [user["first_name"], user["middle_name"], user["last_name"]] if part),
@@ -268,25 +287,29 @@ def get_employee_by_id(employee_id):
         "email": user["email"],
         "role": display_role_from_db(user["role"]),
         "station": display_facility_from_db(user["facility"]),
+        "facility": user["facility"],
         "barangay": display_staff_barangay(user),
+        "barangay_id": user["barangay_id"],
         "contact": user["phone"],
-        "status": display_status_from_db(user["status"]),
+        "phone": user["phone"],
+        "avatar_filename": user["avatar_filename"],
+        "status": "Suspended" if is_suspended else display_status_from_db(user["status"]),
+        "is_locked": is_locked,
+        "is_suspended": is_suspended,
         "date_added": user["created_at"],
         "last_login_at": user["last_login_at"],
     }
 
 
-def update_user_role(employee_id, role_name):
+def update_staff_details(employee_id, facility, phone, barangay_id, role):
     user = get_user_by_employee_id(employee_id)
-    if user is None:
-        return False
-    db_role = db_role_from_display(role_name)
-    if not db_role:
+    db_role = ROLE_MAP.get(role)
+    if user is None or not db_role:
         return False
     db = get_db()
     db.execute(
-        "UPDATE users SET role = ? WHERE id = ?",
-        (db_role, user["id"]),
+        "UPDATE users SET role = ?, facility = ?, phone = ?, barangay_id = ? WHERE id = ?",
+        (db_role, facility, phone, barangay_id, user["id"]),
     )
     db.commit()
     return True
@@ -389,10 +412,32 @@ def set_status(user_id, status):
 def reset_password(user_id, password_hash, status="approved"):
     db = get_db()
     db.execute(
-        "UPDATE users SET password_hash = ?, status = ? WHERE id = ?",
+        "UPDATE users SET password_hash = ?, status = ?, failed_login_attempts = 0, is_suspended = 0 WHERE id = ?",
         (password_hash, status, user_id),
     )
     db.commit()
+
+
+def unlock_user(user_id):
+    db = get_db()
+    cursor = db.execute(
+        "UPDATE users SET status = ?, failed_login_attempts = 0, is_suspended = 0 WHERE id = ?",
+        ("approved", user_id),
+    )
+    db.commit()
+    return cursor.rowcount > 0
+
+
+def set_suspended(user_id, suspended: bool):
+    db = get_db()
+    cursor = db.execute(
+        "UPDATE users SET is_suspended = ?, "
+        "failed_login_attempts = CASE WHEN ? = 0 THEN 0 ELSE failed_login_attempts END "
+        "WHERE id = ?",
+        (1 if suspended else 0, 1 if suspended else 0, user_id),
+    )
+    db.commit()
+    return cursor.rowcount > 0
 
 
 def delete_user_by_employee_id(employee_id):

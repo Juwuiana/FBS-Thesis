@@ -113,6 +113,17 @@ def create_app(config_class=Config):
             )
             return redirect(url_for("auth.login"))
 
+        from app.models import user as user_model
+
+        signed_in_user = user_model.get_user_by_id(session["user_id"])
+        if signed_in_user is None or signed_in_user["is_suspended"]:
+            session.clear()
+            flash(
+                "Your account has been suspended. Contact your LHU administrator.",
+                "error",
+            )
+            return redirect(url_for("auth.login"))
+
         timeout_minutes = settings_model.get_session_timeout_minutes()
         now = datetime.now(timezone.utc)
         last_active_raw = session.get("last_active")
@@ -145,6 +156,8 @@ def create_app(config_class=Config):
             # the schema is known to be current.
             from app.models import user as user_model
             user_model.seed_demo_users()
+            from app.models import patient_model
+            patient_model.run_retention_purge(force=True)
 
     return app
 
@@ -204,6 +217,14 @@ def _register_cli(app):
                 f"  {v['table']} rowid={v['rowid']} -> {v['references']} (fk #{v['fk_index']})"
             )
         raise SystemExit(1)
+
+    @app.cli.command("purge-expired")
+    def purge_expired_command():
+        """flask purge-expired -- immediately purge expired Recycle Bin records."""
+        from app.models import patient_model
+
+        purged = patient_model.run_retention_purge(force=True)
+        click.echo(f"Purged {purged} expired patient record(s).")
 
     @app.cli.command("db-baseline")
     @click.argument("filenames", nargs=-1)
