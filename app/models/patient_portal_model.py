@@ -38,6 +38,10 @@ def _screened_visits(patient_id: int) -> list[dict]:
     Sorted by assessment date, not visit id -- CSV imports create visits in
     file order, so id order can differ from date order.
     """
+    from app.models import patient_model
+
+    if patient_model.get_patient_by_id(patient_id) is None:
+        return []
     visits = [v for v in visit_model.list_visits_for_patient(patient_id) if v["fbs"] is not None]
     visits.sort(key=lambda v: (_parse_date(v["date"]) or date.min, v["visit_id"]), reverse=True)
     return visits

@@ -134,7 +134,7 @@ def pending_sync(db, limit, offset):
                   q.sync_status, q.offline_created_at, q.gap_identifier
            FROM sync_queue_log q
            JOIN visits v ON v.id = q.visit_id
-           JOIN patients p ON p.id = v.patient_id AND p.deleted_at IS NULL
+           JOIN patients p ON p.id = v.patient_id AND p.deleted_at IS NULL AND p.anonymized_at IS NULL
            LEFT JOIN lab_screenings ls ON ls.visit_id = v.id
            WHERE q.sync_status IN ('QUEUED','FAILED')
            ORDER BY q.offline_created_at DESC LIMIT ? OFFSET ?""",
@@ -150,7 +150,7 @@ def recent_sync_rows(db, limit):
                   q.sync_status, q.offline_created_at
            FROM sync_queue_log q
            JOIN visits v ON v.id = q.visit_id
-           JOIN patients p ON p.id = v.patient_id AND p.deleted_at IS NULL
+           JOIN patients p ON p.id = v.patient_id AND p.deleted_at IS NULL AND p.anonymized_at IS NULL
            LEFT JOIN lab_screenings ls ON ls.visit_id = v.id
            ORDER BY q.offline_created_at DESC LIMIT ?""", (limit,)
     ).fetchall()
@@ -163,7 +163,7 @@ def pending_counts(db):
                   COUNT(ls.id) AS assessments
            FROM sync_queue_log q
            JOIN visits v ON v.id = q.visit_id
-           JOIN patients p ON p.id = v.patient_id AND p.deleted_at IS NULL
+           JOIN patients p ON p.id = v.patient_id AND p.deleted_at IS NULL AND p.anonymized_at IS NULL
            LEFT JOIN lab_screenings ls ON ls.visit_id = v.id
            WHERE q.sync_status IN ('QUEUED','FAILED')"""
     ).fetchone()
@@ -257,7 +257,7 @@ def sync_rows_page(db, status, limit, offset):
     cond = SYNC_FILTERS[status]
     base = f"""FROM sync_queue_log q
                JOIN visits v ON v.id = q.visit_id
-               JOIN patients p ON p.id = v.patient_id AND p.deleted_at IS NULL
+               JOIN patients p ON p.id = v.patient_id AND p.deleted_at IS NULL AND p.anonymized_at IS NULL
                LEFT JOIN lab_screenings ls ON ls.visit_id = v.id
                WHERE {cond}"""
     total = db.execute(f"SELECT COUNT(*) {base}").fetchone()[0]

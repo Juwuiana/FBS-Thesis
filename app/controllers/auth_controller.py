@@ -217,15 +217,16 @@ def authenticate(email, password):
             )
         return None, "Invalid email or password."
 
+    user_status = user["status"]
+    if user_status == "recovery":
+        return None, "Your account is awaiting a password reset from an administrator."
+
     if user["is_suspended"]:
         return None, "Your account has been suspended. Contact your LHU administrator."
 
-    user_status = user["status"]
     if current_app.config.get("REQUIRE_ADMIN_APPROVAL", True) and user_status != "approved":
         if user_status == "pending":
             return None, "Your account is still awaiting admin approval."
-        if user_status == "recovery":
-            return None, "Your account is awaiting a password reset from an administrator."
         return None, "Your account access has been denied. Contact your LHU administrator."
 
     if not settings_model.is_role_login_enabled(user["role"]):

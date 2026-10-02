@@ -81,7 +81,7 @@ def find_existing_patient_id(last_name: str, first_name: str, middle_name: str |
             """
             SELECT id, last_name, first_name, middle_name
             FROM patients
-            WHERE birthdate = ? AND deleted_at IS NULL
+            WHERE birthdate = ? AND deleted_at IS NULL AND anonymized_at IS NULL
             """,
             (birthdate,)
         ).fetchall()
@@ -148,7 +148,7 @@ def create_patient(data: dict, staff_id: int | None = None) -> int:
 def get_patient_code_by_id(patient_id: int) -> str | None:
     conn = get_connection()
     row = conn.execute(
-        "SELECT patient_code FROM patients WHERE id = ?",
+        "SELECT patient_code FROM patients WHERE id = ? AND anonymized_at IS NULL",
         (patient_id,)
     ).fetchone()
     conn.close()
@@ -172,7 +172,7 @@ def get_patient_by_code(patient_code: str) -> dict | None:
                b.region_code, b.region_name
         FROM patients p
         LEFT JOIN barangays b ON b.id = p.barangay_id
-        WHERE p.patient_code = ?
+        WHERE p.patient_code = ? AND p.anonymized_at IS NULL
     """, (patient_code,)).fetchone()
     conn.close()
     if row is None:
@@ -190,7 +190,7 @@ def get_patient_by_id(patient_id: int) -> dict | None:
                b.region_code, b.region_name
         FROM patients p
         LEFT JOIN barangays b ON b.id = p.barangay_id
-        WHERE p.id = ?
+        WHERE p.id = ? AND p.anonymized_at IS NULL
     """, (patient_id,)).fetchone()
     conn.close()
     if row is None:
@@ -209,7 +209,7 @@ def set_patient_credentials(patient_id: int, password_hash: str, staff_id: int |
             portal_activated_at = NULL,
             credentials_issued_by_staff_id = ?,
             credentials_issued_at = datetime('now')
-        WHERE id = ?
+        WHERE id = ? AND anonymized_at IS NULL
         """,
         (password_hash, staff_id, patient_id),
     )
@@ -224,24 +224,25 @@ def update_patient_password(patient_id: int, password_hash: str) -> None:
         UPDATE patients
         SET password_hash = ?, must_change_password = 0,
             portal_activated_at = COALESCE(portal_activated_at, datetime('now'))
-        WHERE id = ?
+        WHERE id = ? AND anonymized_at IS NULL
         """,
         (password_hash, patient_id),
     )
     conn.commit()
     conn.close()
 
-def list_patients(barangay: str = None, entries_limit: int = None) -> list[dict]:
+def list_patients(barangay: str = None, entries_limit: int = None, sort="name", direction="asc") -> list[dict]:
     conn = get_connection()
     sql = """
         SELECT p.id, p.patient_code, p.last_name, p.first_name, p.sex,
                p.birthdate, b.name AS barangay
         FROM patients p
         LEFT JOIN barangays b ON b.id = p.barangay_id
+         WHERE p.deleted_at IS NULL AND p.anonymized_at IS NULL
     """
     params = []
     if barangay:
-        sql += " WHERE b.name = ?"
+        sql += " AND b.name = ?"
         params.append(barangay)
     sql += _patient_order_by(sort, direction)
     if entries_limit:
@@ -284,7 +285,7 @@ def update_patient(patient_id: int, data: dict, allow_name_edit: bool = False, a
     conn = get_connection()
     try:
         conn.execute(
-            f"UPDATE patients SET {columns}, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            f"UPDATE patients SET {columns}, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND anonymized_at IS NULL",
             values
         )
         conn.commit()
@@ -300,7 +301,7 @@ def _patient_listing_filters(barangay=None, risk=None, date=None, q=None, status
     count_patients_with_latest_screening, so pagination's count and its
     page of rows can never drift out of sync with each other's filters.
     """
-    conditions, params = ["p.deleted_at IS NULL"], []
+    conditions, params = ["p.deleted_at IS NULL", "p.anonymized_at IS NULL"], []
 
     if barangay:
         conditions.append("b.name = ?")
@@ -426,14 +427,14 @@ def soft_delete_patient(patient_id: int) -> None:
 
     """
     conn = get_connection()
-    conn.execute("UPDATE patients SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?", (patient_id,))
+    conn.execute("UPDATE patients SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND anonymized_at IS NULL", (patient_id,))
     conn.commit()
     conn.close()
 
 
 def restore_patient(patient_id: int) -> None:
     conn = get_connection()
-    conn.execute("UPDATE patients SET deleted_at = NULL WHERE id = ?", (patient_id,))
+    conn.execute("UPDATE patients SET deleted_at = NULL WHERE id = ? AND anonymized_at IS NULL", (patient_id,))
     conn.commit()
     conn.close()
 
@@ -522,7 +523,7 @@ def list_deleted_patients() -> list[dict]:
                b.name AS barangay
         FROM patients p
         LEFT JOIN barangays b ON b.id = p.barangay_id
-        WHERE p.deleted_at IS NOT NULL
+        WHERE p.deleted_at IS NOT NULL AND p.anonymized_at IS NULL
         ORDER BY p.deleted_at DESC
         """).fetchall()
     finally:
@@ -566,6 +567,371 @@ def get_recycle_bin_status() -> dict:
         conn.close()
 
 
+def _patient_retention_due_sql(days):
+    if days is None:
+        return "0 = 1"
+    cutoff = "date('now', '-' || ? || ' days')"
+    return f"""
+        p.deleted_at IS NULL
+        AND p.anonymized_at IS NULL
+        AND (
+            COALESCE(v.max_assessment_date, date(p.created_at)) <= {cutoff}
+        )
+    """
+
+
+def count_patients_due_for_retention() -> int:
+    from app.models import settings as settings_model
+
+    days = settings_model.get_patient_retention_days()
+    if days is None:
+        return 0
+    conn = get_connection()
+    try:
+        sql = f"""
+            SELECT COUNT(*) AS n
+            FROM patients p
+            LEFT JOIN (
+                SELECT patient_id, MAX(assessment_date) AS max_assessment_date, COUNT(*) AS visit_count
+                FROM visits
+                GROUP BY patient_id
+            ) v ON v.patient_id = p.id
+            LEFT JOIN barangays b ON b.id = p.barangay_id
+            WHERE {_patient_retention_due_sql(days)}
+        """
+        row = conn.execute(sql, (str(days),)).fetchone()
+        return row["n"] if row else 0
+    finally:
+        conn.close()
+
+
+def list_patients_due_for_retention(limit=None, offset=0) -> list[dict]:
+    from app.models import settings as settings_model
+
+    days = settings_model.get_patient_retention_days()
+    if days is None:
+        return []
+    conn = get_connection()
+    try:
+        sql = f"""
+            SELECT p.id, p.patient_code,
+                     p.first_name, p.last_name, p.consent_research,
+                   SUBSTR(p.first_name, 1, 1) || SUBSTR(p.last_name, 1, 1) AS initials,
+                   p.sex, p.birthdate,
+                   b.name AS barangay,
+                   COALESCE(v.max_assessment_date, date(p.created_at)) AS last_screening_date,
+                   COALESCE(v.visit_count, 0) AS visit_count,
+                   CAST(julianday(date('now')) - julianday(COALESCE(v.max_assessment_date, date(p.created_at))) AS INTEGER) AS days_overdue
+            FROM patients p
+            LEFT JOIN barangays b ON b.id = p.barangay_id
+            LEFT JOIN (
+                SELECT patient_id, MAX(assessment_date) AS max_assessment_date, COUNT(*) AS visit_count
+                FROM visits
+                GROUP BY patient_id
+            ) v ON v.patient_id = p.id
+            WHERE {_patient_retention_due_sql(days)}
+            ORDER BY COALESCE(v.max_assessment_date, date(p.created_at)) ASC, p.id ASC
+        """
+        params = [str(days)]
+        if limit is not None:
+            sql += " LIMIT ?"
+            params.append(int(limit))
+            if offset:
+                sql += " OFFSET ?"
+                params.append(int(offset))
+        elif offset:
+            sql += " LIMIT -1 OFFSET ?"
+            params.append(int(offset))
+
+        rows = conn.execute(sql, params).fetchall()
+    finally:
+        conn.close()
+
+    result = []
+    for row in rows:
+        item = dict(row)
+        item["age"] = _compute_age(item["birthdate"]) if item.get("birthdate") else None
+        item["days_overdue"] = max(int(item.get("days_overdue", 0) or 0), 0)
+        result.append(item)
+    return result
+
+
+def get_patients_for_retention_ids(ids) -> list[dict]:
+    if not ids:
+        return []
+    ids = list(dict.fromkeys(int(i) for i in ids if i is not None and str(i).strip() not in ("", "None")))
+    if not ids:
+        return []
+    from app.models import settings as settings_model
+
+    days = settings_model.get_patient_retention_days()
+    if days is None:
+        return []
+    conn = get_connection()
+    try:
+        rows = _retention_due_rows(conn, ids, days)
+    finally:
+        conn.close()
+    result = []
+    for row in rows:
+        item = dict(row)
+        item["age"] = _compute_age(item["birthdate"]) if item.get("birthdate") else None
+        item["days_overdue"] = max(int(item.get("days_overdue", 0) or 0), 0)
+        result.append(item)
+    return result
+
+
+def _retention_due_rows(conn, ids, days):
+    placeholders = ",".join("?" for _ in ids)
+    return conn.execute(
+        f"""
+        SELECT p.id, p.patient_code, p.consent_research,
+               SUBSTR(p.first_name, 1, 1) || SUBSTR(p.last_name, 1, 1) AS initials,
+               p.sex, p.birthdate,
+               b.name AS barangay,
+               COALESCE(v.max_assessment_date, date(p.created_at)) AS last_screening_date,
+               COALESCE(v.visit_count, 0) AS visit_count,
+               CAST(julianday(date('now')) - julianday(COALESCE(v.max_assessment_date, date(p.created_at))) AS INTEGER) AS days_overdue
+        FROM patients p
+        LEFT JOIN barangays b ON b.id = p.barangay_id
+        LEFT JOIN (
+            SELECT patient_id, MAX(assessment_date) AS max_assessment_date, COUNT(*) AS visit_count
+            FROM visits
+            GROUP BY patient_id
+        ) v ON v.patient_id = p.id
+        WHERE p.id IN ({placeholders})
+          AND {_patient_retention_due_sql(days)}
+        ORDER BY p.id ASC
+        """,
+        [*ids, str(days)],
+    ).fetchall()
+
+
+def apply_patient_retention_action(ids, action: str) -> dict:
+    """Apply a due-record retention batch atomically and return audit details."""
+    if not ids:
+        raise ValueError("Select at least one patient record.")
+    ids = list(dict.fromkeys(int(i) for i in ids if i is not None and str(i).strip() not in ("", "None")))
+    if not ids:
+        raise ValueError("Select at least one valid patient record.")
+    if action not in ("anonymize", "delete"):
+        raise ValueError("Unsupported patient retention action.")
+
+    from app.models import settings as settings_model
+
+    retention_days = settings_model.get_patient_retention_days()
+    if retention_days is None:
+        raise ValueError("Patient record retention is turned off.")
+
+    conn = get_connection()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        cutoff_date = conn.execute(
+            "SELECT date('now', ?) AS cutoff_date", (f"-{retention_days} days",)
+        ).fetchone()["cutoff_date"]
+        rows = _retention_due_rows(conn, ids, retention_days)
+        if len(rows) != len(ids):
+            raise ValueError("Every selected patient must still be due for review.")
+
+        patient_codes = [row["patient_code"] for row in rows]
+        consent_delete_ids = [row["id"] for row in rows if not row["consent_research"]]
+        delete_ids = set(ids) if action == "delete" else set(consent_delete_ids)
+        anonymize_ids = [patient_id for patient_id in ids if patient_id not in delete_ids]
+        existing_codes = {
+            row["patient_code"]: row["id"]
+            for row in conn.execute("SELECT id, patient_code FROM patients").fetchall()
+        }
+
+        for patient_id in ids:
+            if patient_id in delete_ids:
+                conn.execute("DELETE FROM patients WHERE id = ?", (patient_id,))
+                continue
+
+            conn.execute("DELETE FROM patient_login_events WHERE patient_id = ?", (patient_id,))
+            conn.execute(
+                """
+                UPDATE visits
+                SET clinical_notes = NULL,
+                    past_surgical_history = NULL,
+                    pe_skin = NULL,
+                    pe_heent = NULL,
+                    pe_chest = NULL,
+                    pe_heart = NULL,
+                    pe_abdomen = NULL,
+                    pe_extremities = NULL,
+                    edited_fields = NULL,
+                    patient_edit_previous_values = NULL
+                WHERE patient_id = ?
+                """,
+                (patient_id,),
+            )
+            conn.execute(
+                """
+                UPDATE lab_screenings
+                SET glucometer_id = NULL, referral_action = NULL, referred_to = NULL
+                WHERE visit_id IN (SELECT id FROM visits WHERE patient_id = ?)
+                """,
+                (patient_id,),
+            )
+            conn.execute(
+                """
+                UPDATE sync_queue_log
+                SET last_error = NULL
+                WHERE visit_id IN (SELECT id FROM visits WHERE patient_id = ?)
+                """,
+                (patient_id,),
+            )
+
+            patient_code = f"ANON-{patient_id:010d}"
+            existing_owner = existing_codes.get(patient_code)
+            if existing_owner is not None and existing_owner != patient_id:
+                raise ValueError("An anonymized patient code already exists; no records were changed.")
+            existing_codes[patient_code] = patient_id
+            conn.execute(
+                """
+                UPDATE patients
+                SET patient_code = ?,
+                    last_name = 'ANONYMIZED', first_name = 'ANONYMIZED',
+                    middle_name = NULL,
+                    father_last_name = NULL, father_first_name = NULL,
+                    mother_last_name = NULL, mother_first_name = NULL,
+                    spouse_last_name = NULL, spouse_first_name = NULL,
+                    maiden_name = NULL, married_name = NULL,
+                    contact_number = NULL, address = NULL, religion = NULL, occupation = NULL,
+                    birthdate = SUBSTR(birthdate, 1, 4) || '-01-01',
+                    password_hash = NULL, portal_activated_at = NULL,
+                    credentials_issued_by_staff_id = NULL, credentials_issued_at = NULL,
+                    anonymized_at = CURRENT_TIMESTAMP,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                (patient_code, patient_id),
+            )
+
+        conn.commit()
+        return {
+            "action": action,
+            "retention_days": retention_days,
+            "cutoff_date": cutoff_date,
+            "patient_codes": patient_codes,
+            "processed_count": len(rows),
+            "anonymized_count": len(anonymize_ids),
+            "deleted_count": len(delete_ids),
+            "consent_deleted_count": len(consent_delete_ids) if action == "anonymize" else 0,
+        }
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def anonymize_patients_for_retention(ids) -> int:
+    """Compatibility wrapper for the established anonymize retention action."""
+    result = apply_patient_retention_action(ids, "anonymize")
+    return result["anonymized_count"]
+
+
+def export_patients_csv_for_ids(ids) -> str:
+    if not ids:
+        return "patient_code,age,sex,civil_status,education,occupation,region,city,barangay,assessment_date,smoking_status,alcohol_intake,illicit_drug_use,physical_activity,diabetes_diagnosis,bp_systolic,bp_diastolic,heart_rate,respiratory_rate,height_cm,weight_kg,waist_cm,bmi,obesity_class,fbs_mg_dl,risk_level,risk_source,pmh,family_history,diet,immunization,dm_symptom,q1_chest_discomfort,q2_pain_center_left_arm,q3_occurs_uphill_hurrying,q4_slows_down_if_occurs,q5_relieved_by_rest_tablet,q6_relieved_under_10min,q7_severe_pain_30min_plus,q8_tia_stroke_symptoms\n"
+    ids = list(dict.fromkeys(int(i) for i in ids if i is not None and str(i).strip() not in ("", "None")))
+    if not ids:
+        return "patient_code,age,sex,civil_status,education,occupation,region,city,barangay,assessment_date,smoking_status,alcohol_intake,illicit_drug_use,physical_activity,diabetes_diagnosis,bp_systolic,bp_diastolic,heart_rate,respiratory_rate,height_cm,weight_kg,waist_cm,bmi,obesity_class,fbs_mg_dl,risk_level,risk_source,pmh,family_history,diet,immunization,dm_symptom,q1_chest_discomfort,q2_pain_center_left_arm,q3_occurs_uphill_hurrying,q4_slows_down_if_occurs,q5_relieved_by_rest_tablet,q6_relieved_under_10min,q7_severe_pain_30min_plus,q8_tia_stroke_symptoms\n"
+    conn = get_connection()
+    placeholders = ",".join("?" for _ in ids)
+    rows = conn.execute(
+        f"""
+        SELECT p.patient_code, p.birthdate, p.sex, p.civil_status, p.education, p.occupation,
+               b.region_name AS region, b.city_name AS city, b.name AS barangay,
+               v.id AS visit_id, v.assessment_date,
+               v.smoking_status, v.alcohol_intake, v.illicit_drug_use, v.physical_activity,
+               v.diabetes_diagnosis, v.bp_systolic, v.bp_diastolic, v.heart_rate,
+               v.respiratory_rate, v.height_cm, v.weight_kg, v.waist_cm, v.bmi, v.obesity_class,
+               ls.fbs_mg_dl,
+               COALESCE(ls.final_risk_level, ls.preliminary_risk_level, ls.model_predicted_risk_level) AS risk,
+               CASE
+                   WHEN ls.final_risk_level IS NOT NULL THEN 'Confirmed'
+                   WHEN ls.preliminary_risk_level IS NOT NULL THEN 'Preliminary'
+                   WHEN ls.model_predicted_risk_level IS NOT NULL THEN 'Model-predicted'
+                   ELSE 'Pending'
+               END AS risk_source
+        FROM patients p
+        LEFT JOIN barangays b ON b.id = p.barangay_id
+        LEFT JOIN visits v ON v.patient_id = p.id
+        LEFT JOIN lab_screenings ls ON ls.visit_id = v.id
+        WHERE p.id IN ({placeholders})
+          AND p.deleted_at IS NULL
+          AND p.anonymized_at IS NULL
+        ORDER BY p.patient_code, v.id
+        """,
+        ids,
+    ).fetchall()
+    visit_ids = [dict(r)["visit_id"] for r in rows if dict(r)["visit_id"] is not None]
+    conditions_by_visit = {}
+    cvd_by_visit = {}
+    if visit_ids:
+        placeholders2 = ",".join("?" * len(visit_ids))
+        cond_rows = conn.execute(f"""
+            SELECT vc.visit_id, cc.category, cc.code
+            FROM visit_conditions vc
+            JOIN condition_catalog cc ON cc.id = vc.condition_id
+            WHERE vc.visit_id IN ({placeholders2})
+        """, visit_ids).fetchall()
+        for cr in cond_rows:
+            conditions_by_visit.setdefault(cr["visit_id"], {"pmh": [], "family_history": [], "diet": [], "immunization": [], "dm_symptom": []})
+            conditions_by_visit[cr["visit_id"]][cr["category"]].append(cr["code"])
+        cvd_rows = conn.execute(f"SELECT * FROM cvd_responses WHERE visit_id IN ({placeholders2})", visit_ids).fetchall()
+        for cvr in cvd_rows:
+            cvd_by_visit[cvr["visit_id"]] = dict(cvr)
+    conn.close()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "patient_code", "age", "sex", "civil_status", "education", "occupation", "region", "city", "barangay",
+        "assessment_date", "smoking_status", "alcohol_intake", "illicit_drug_use", "physical_activity",
+        "diabetes_diagnosis", "bp_systolic", "bp_diastolic", "heart_rate", "respiratory_rate",
+        "height_cm", "weight_kg", "waist_cm", "bmi", "obesity_class",
+        "fbs_mg_dl", "risk_level", "risk_source",
+        "pmh", "family_history", "diet", "immunization", "dm_symptom",
+        "q1_chest_discomfort", "q2_pain_center_left_arm", "q3_occurs_uphill_hurrying",
+        "q4_slows_down_if_occurs", "q5_relieved_by_rest_tablet", "q6_relieved_under_10min",
+        "q7_severe_pain_30min_plus", "q8_tia_stroke_symptoms",
+    ])
+    for r in rows:
+        d = dict(r)
+        age = _compute_age(d["birthdate"]) if d["birthdate"] else ""
+        vid = d["visit_id"]
+        cond = conditions_by_visit.get(vid, {"pmh": [], "family_history": [], "diet": [], "immunization": [], "dm_symptom": []})
+        cvd = cvd_by_visit.get(vid, {})
+        writer.writerow([
+            d["patient_code"], age, d["sex"] or "", d["civil_status"] or "", d["education"] or "", d["occupation"] or "",
+            d["region"] or "", d["city"] or "", d["barangay"] or "",
+            d["assessment_date"] or "",
+            d["smoking_status"] or "", d["alcohol_intake"] or "", d["illicit_drug_use"] or "", d["physical_activity"] or "",
+            d["diabetes_diagnosis"] or "",
+            d["bp_systolic"] if d["bp_systolic"] is not None else "",
+            d["bp_diastolic"] if d["bp_diastolic"] is not None else "",
+            d["heart_rate"] if d["heart_rate"] is not None else "",
+            d["respiratory_rate"] if d["respiratory_rate"] is not None else "",
+            d["height_cm"] if d["height_cm"] is not None else "",
+            d["weight_kg"] if d["weight_kg"] is not None else "",
+            d["waist_cm"] if d["waist_cm"] is not None else "",
+            d["bmi"] if d["bmi"] is not None else "",
+            d["obesity_class"] or "",
+            d["fbs_mg_dl"] if d["fbs_mg_dl"] is not None else "",
+            d["risk"] or "", d["risk_source"],
+            ";".join(cond["pmh"]), ";".join(cond["family_history"]), ";".join(cond["diet"]),
+            ";".join(cond["immunization"]), ";".join(cond["dm_symptom"]),
+            int(bool(cvd.get("q1_chest_discomfort"))), int(bool(cvd.get("q2_pain_center_left_arm"))),
+            int(bool(cvd.get("q3_occurs_uphill_hurrying"))), int(bool(cvd.get("q4_slows_down_if_occurs"))),
+            int(bool(cvd.get("q5_relieved_by_rest_tablet"))), int(bool(cvd.get("q6_relieved_under_10min"))),
+            int(bool(cvd.get("q7_severe_pain_30min_plus"))), int(bool(cvd.get("q8_tia_stroke_symptoms"))),
+        ])
+    return output.getvalue()
+
+
 def list_screenings_missing_risk_prediction(barangay=None, date=None) -> list[dict]:
     """
     Visits that have an FBS reading but no risk classification at all yet
@@ -576,6 +942,7 @@ def list_screenings_missing_risk_prediction(barangay=None, date=None) -> list[di
     conn = get_connection()
     conditions, params = [
         "p.deleted_at IS NULL",
+        "p.anonymized_at IS NULL",
         "ls.fbs_mg_dl IS NOT NULL",
         "ls.final_risk_level IS NULL",
         "ls.preliminary_risk_level IS NULL",
@@ -610,7 +977,7 @@ def export_patients_csv(barangay=None, risk=None, date=None, all_visits=False) -
     """
     conn = get_connection()
 
-    conditions, params = ["p.deleted_at IS NULL"], []
+    conditions, params = ["p.deleted_at IS NULL", "p.anonymized_at IS NULL"], []
     if barangay:
         conditions.append("b.name = ?")
         params.append(barangay)
@@ -740,7 +1107,10 @@ def export_single_patient_csv(patient_code: str, all_visits: bool = True) -> str
     """
     conn = get_connection()
 
-    patient_row = conn.execute("SELECT id FROM patients WHERE patient_code = ?", (patient_code,)).fetchone()
+    patient_row = conn.execute(
+        "SELECT id FROM patients WHERE patient_code = ? AND deleted_at IS NULL AND anonymized_at IS NULL",
+        (patient_code,),
+    ).fetchone()
     if patient_row is None:
         conn.close()
         return ""
@@ -777,7 +1147,7 @@ def export_single_patient_csv(patient_code: str, all_visits: bool = True) -> str
         LEFT JOIN barangays b ON b.id = p.barangay_id
         {visit_join}
         LEFT JOIN lab_screenings ls ON ls.visit_id = v.id
-        WHERE p.id = ?
+        WHERE p.id = ? AND p.deleted_at IS NULL AND p.anonymized_at IS NULL
         ORDER BY v.id
     """
 
@@ -1371,7 +1741,7 @@ def get_recent_login_events(patient_id: int, limit: int = 5) -> list[dict]:
 def update_patient_consent(patient_id: int, consent: bool) -> None:
     conn = get_connection()
     conn.execute(
-        "UPDATE patients SET consent_research = ? WHERE id = ?",
+        "UPDATE patients SET consent_research = ? WHERE id = ? AND anonymized_at IS NULL",
         (1 if consent else 0, patient_id),
     )
     conn.commit()

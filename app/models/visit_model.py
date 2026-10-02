@@ -537,7 +537,8 @@ def list_pending_patient_edits(limit: int = 20) -> list[dict]:
                p.patient_code, p.first_name, p.last_name
         FROM visits v
         JOIN patients p ON p.id = v.patient_id
-        WHERE v.edited_by_patient_at IS NOT NULL AND v.edit_acknowledged_at IS NULL
+                WHERE v.edited_by_patient_at IS NOT NULL AND v.edit_acknowledged_at IS NULL
+                    AND p.deleted_at IS NULL AND p.anonymized_at IS NULL
         ORDER BY v.edited_by_patient_at DESC
         LIMIT ?
     """, (limit,)).fetchall()

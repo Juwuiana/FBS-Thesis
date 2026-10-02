@@ -339,6 +339,35 @@ a.demo-btn { display: inline-flex; align-items: center; }
 .retention-status { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 8px; }
 .retention-status-item { display: flex; flex-direction: column; gap: 4px; padding: 9px 11px; border: 1px solid var(--border-color); border-radius: 6px; background: #f8fbf8; font-size: 11px; color: var(--text-muted); }
 .retention-status-item strong { color: var(--text-primary); font-size: 13px; overflow-wrap: anywhere; }
+.privacy-settings-body { min-width: 0; padding: 1.25rem 24px 24px; }
+.retention-section { min-width: 0; }
+.retention-card-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.retention-card { min-width: 0; padding: 16px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--card-bg); }
+.retention-card-title { margin-bottom: 14px; }
+.retention-card-form { display: flex; min-width: 0; flex-direction: column; gap: 12px; }
+.retention-card-setting { min-width: 0; width: 100%; }
+.retention-card-select { width: 100%; min-width: 0; }
+.retention-card .retention-help { min-height: 42px; margin: 0; }
+.retention-card .retention-status { grid-template-columns: repeat(auto-fit, minmax(105px, 1fr)); }
+.retention-card .retention-status-item { min-width: 0; overflow-wrap: anywhere; }
+.retention-card-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; }
+.retention-card-actions > * { display: inline-flex; flex: 1 1 138px; min-width: 0; min-height: 40px; align-items: center; justify-content: center; padding: 8px 10px; text-align: center; white-space: normal; }
+.retention-review { min-width: 0; margin-top: 20px; scroll-margin-top: 16px; }
+.retention-review-form { min-width: 0; }
+.retention-empty { margin-top: 16px; }
+.retention-consent-note { margin-top: 12px; }
+.retention-confirmation { display: grid; gap: 12px; max-width: 620px; margin-top: 18px; }
+.retention-warning { margin: 0; padding: 10px 12px; border-left: 3px solid var(--accent-green); background: #f3f8f3; color: var(--text-primary); font-size: 13px; }
+.retention-warning.is-destructive { border-left-color: var(--danger); background: var(--danger-bg); }
+.retention-irreversible-check { display: inline-flex; align-items: center; gap: 9px; color: var(--text-primary); font-size: 13px; }
+.retention-irreversible-check input { width: 16px; height: 16px; accent-color: var(--accent-green); }
+.retention-actions { margin-top: 14px; }
+.retention-confirm-button:disabled { cursor: not-allowed; opacity: .65; }
+.retention-confirm-button.is-destructive:not(:disabled) { background: var(--danger); color: #fff; border-color: var(--danger); }
+.retention-confirm-button.is-destructive:not(:disabled):hover { background: #dc2626; border-color: #dc2626; }
+@media (min-width: 768px) {
+  .retention-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 .ps-field-label { display: block; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .4px; margin-bottom: 6px; }
 .irb-badge { display: inline-flex; align-items: center; background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; border-radius: 8px; padding: 7px 14px; font-size: 12px; font-weight: 600; }
 .perm-yes     { color: #2e7d32; font-weight: 700; }

@@ -1,8 +1,10 @@
 from flask import Blueprint, jsonify, make_response, render_template, request, redirect, url_for, abort, flash, session
+import hashlib
+import hmac
 import sqlite3
 import csv
 import io
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from app.models.patient_model import _compute_age
 from werkzeug.security import generate_password_hash
 
@@ -95,6 +97,79 @@ def _validate_staff_details(form):
 def _mask_staff_phone(phone):
     value = phone or ""
     return f"{value[:3]}****{value[-3:]}" if len(value) == 10 else "****"
+
+
+def _coerce_retention_ids(raw_ids):
+    if raw_ids is None:
+        return []
+    if isinstance(raw_ids, str):
+        raw_ids = [raw_ids]
+    cleaned = []
+    for value in raw_ids:
+        text = str(value or "").strip()
+        try:
+            patient_id = int(text)
+        except ValueError as exc:
+            raise ValueError("Select valid patient records.") from exc
+        if patient_id <= 0 or patient_id in cleaned:
+            raise ValueError("Select valid patient records.")
+        cleaned.append(patient_id)
+    if len(cleaned) > 500:
+        raise ValueError("You can process up to 500 patient records at a time.")
+    return cleaned
+
+
+def _retention_session_hash():
+    user_id = session.get("user_id") or "guest"
+    security_version = session.get("security_version") or 0
+    payload = f"patient-retention:{user_id}:{security_version}:{datetime.utcnow().isoformat()}"
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _retention_ids_hash(patient_ids):
+    payload = ",".join(str(patient_id) for patient_id in sorted(patient_ids))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _retention_selection(patient_model):
+    raw_ids = request.form.getlist("patient_ids")
+    if len(raw_ids) > 500:
+        raise ValueError("You can process up to 500 patient records at a time.")
+    patient_ids = _coerce_retention_ids(raw_ids)
+    if not patient_ids:
+        raise ValueError("Select at least one patient record.")
+
+    submitted_hash = request.form.get("selection_hash")
+    expected_hash = session.get("patient_retention_selection_hash")
+    if not expected_hash or not submitted_hash or not hmac.compare_digest(expected_hash, submitted_hash):
+        raise ValueError("This retention review selection is no longer valid. Please refresh the page and try again.")
+
+    from app.models import settings as settings_model
+
+    retention_days = settings_model.get_patient_retention_days()
+    if retention_days is None:
+        raise ValueError("Patient record retention is turned off.")
+    due_rows = patient_model.get_patients_for_retention_ids(patient_ids)
+    if len(due_rows) != len(patient_ids):
+        raise ValueError("Every selected patient must still be due for review.")
+    return patient_ids, retention_days
+
+
+def _download_retention_archive(patient_model):
+    try:
+        patient_ids, _ = _retention_selection(patient_model)
+    except ValueError as exc:
+        flash(str(exc), "error")
+        return redirect(url_for("admin.privacy_security"))
+
+    csv_data = patient_model.export_patients_csv_for_ids(patient_ids)
+    session["patient_retention_archive_hash"] = _retention_ids_hash(patient_ids)
+    _audit_event(f"Exported {len(patient_ids)} patient record(s) for retention review", "Info")
+    response = make_response(csv_data)
+    response.headers["Content-Type"] = "text/csv; charset=utf-8"
+    response.headers["Content-Disposition"] = 'attachment; filename="patient_retention_archive.csv"'
+    return response
+
 
 @admin_bp.route("/dashboard")
 @login_required
@@ -937,14 +1012,23 @@ def reactivate_staff(employee_id):
 def privacy_security():
     from app.models import settings as settings_model
     from app.models import patient_model
-    from werkzeug.security import generate_password_hash
 
     patient_model.run_retention_purge()
     session_timeout_minutes = settings_model.get_session_timeout_minutes()
     max_login_attempts = settings_model.get_max_login_attempts()
     recycle_bin_days = settings_model.get_recycle_bin_days()
     recycle_bin_status = patient_model.get_recycle_bin_status()
-    password_hash_method = generate_password_hash("x").split(":", 1)[0]
+    patient_retention_days = settings_model.get_patient_retention_days()
+    patient_retention_due = patient_model.list_patients_due_for_retention(limit=10)
+    patient_retention_due_count = patient_model.count_patients_due_for_retention()
+    patient_retention_oldest_screening = (
+        patient_retention_due[0]["last_screening_date"] if patient_retention_due else None
+    )
+    patient_retention_cutoff_date = (
+        (datetime.now(timezone.utc).date() - timedelta(days=patient_retention_days)).isoformat()
+        if patient_retention_days is not None else None
+    )
+    session["patient_retention_selection_hash"] = _retention_session_hash()
     roles = [
         {
             "key": "patient",
@@ -968,8 +1052,104 @@ def privacy_security():
         max_login_attempts=max_login_attempts,
         recycle_bin_days=recycle_bin_days,
         recycle_bin_status=recycle_bin_status,
-        password_hash_method=password_hash_method,
+        patient_retention_days=patient_retention_days,
+        patient_retention_due=patient_retention_due,
+        patient_retention_due_count=patient_retention_due_count,
+        patient_retention_oldest_screening=patient_retention_oldest_screening,
+        patient_retention_cutoff_date=patient_retention_cutoff_date,
+        patient_retention_selection_hash=session.get("patient_retention_selection_hash"),
     )
+
+
+@admin_bp.route("/privacy-security/patient-retention/policy", methods=["POST"])
+@login_required
+def update_patient_retention_policy():
+    from app.models import settings as settings_model
+
+    raw = request.form.get("patient_retention_days")
+    try:
+        if raw in (None, "", "None"):
+            days = None
+        else:
+            days = int(raw)
+    except (TypeError, ValueError):
+        flash("Please choose a valid patient retention period.", "error")
+        return redirect(url_for("admin.privacy_security") + "#data")
+
+    if days not in settings_model.ALLOWED_PATIENT_RETENTION_DAYS:
+        flash("Please choose a valid patient retention period.", "error")
+        return redirect(url_for("admin.privacy_security") + "#data")
+
+    previous = settings_model.get_patient_retention_days()
+    settings_model.set_patient_retention_days(days)
+    label = "disabled" if days is None else f"{days} days"
+    previous_label = "disabled" if previous is None else f"{previous} days"
+    _audit_event(f"Patient record retention updated from {previous_label} to {label}", "Info")
+    flash(f"Patient record retention updated to {label}.", "success")
+    return redirect(url_for("admin.privacy_security") + "#data")
+
+
+@admin_bp.route("/privacy-security/patient-retention/action", methods=["POST"])
+@login_required
+def patient_retention_action():
+    from app.models import patient_model
+
+    action = (request.form.get("action") or "").strip().lower()
+    if request.form.get("download_archive") == "1" or action == "export":
+        return _download_retention_archive(patient_model)
+
+    try:
+        patient_ids, retention_days = _retention_selection(patient_model)
+        if action not in ("anonymize", "delete"):
+            raise ValueError("Choose anonymize or delete permanently.")
+
+        try:
+            confirmed_count = int(request.form.get("confirmation_count", ""))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Type the exact number of selected records to confirm.") from exc
+        if confirmed_count != len(patient_ids):
+            raise ValueError("The typed number must match the number of selected records.")
+        if request.form.get("confirm_irreversible") not in ("1", "on", "true"):
+            raise ValueError("Confirm that you understand this action cannot be undone.")
+
+        archive_hash = session.get("patient_retention_archive_hash")
+        if not archive_hash or not hmac.compare_digest(archive_hash, _retention_ids_hash(patient_ids)):
+            raise ValueError("Download the archive copy for this exact selection first.")
+
+        result = patient_model.apply_patient_retention_action(patient_ids, action)
+    except ValueError as exc:
+        flash(str(exc), "error")
+        return redirect(url_for("admin.privacy_security"))
+    except Exception:
+        flash("The retention batch failed. No records were changed.", "error")
+        return redirect(url_for("admin.privacy_security"))
+
+    patient_codes = result["patient_codes"]
+    code_summary = ", ".join(patient_codes[:20])
+    if len(patient_codes) > 20:
+        code_summary += f" +{len(patient_codes) - 20} more"
+    audit_action = (
+        f"Patient retention {action}: records={result['processed_count']}; "
+        f"anonymized={result['anonymized_count']}; deleted={result['deleted_count']}; "
+        f"consent_forced_deletes={result['consent_deleted_count']}; "
+        f"retention_days={retention_days}; cutoff_date={result['cutoff_date']}; "
+        f"patient_codes={code_summary}"
+    )
+    session.pop("patient_retention_archive_hash", None)
+    session.pop("patient_retention_selection_hash", None)
+    _audit_event(audit_action, "Critical")
+
+    if result["consent_deleted_count"]:
+        flash(
+            f"{result['anonymized_count']} patient record(s) anonymized and "
+            f"{result['consent_deleted_count']} record(s) deleted because research consent was not granted.",
+            "success",
+        )
+    elif action == "delete":
+        flash(f"{result['deleted_count']} patient record(s) deleted permanently.", "success")
+    else:
+        flash(f"{result['anonymized_count']} patient record(s) anonymized.", "success")
+    return redirect(url_for("admin.privacy_security"))
 
 
 @admin_bp.route("/privacy-security/session-timeout", methods=["POST"])
@@ -1068,7 +1248,7 @@ def update_data_retention():
         settings_model.set_recycle_bin_days(days)
     except (TypeError, ValueError):
         flash("Please choose a valid retention period.", "error")
-        return redirect(url_for("admin.privacy_security"))
+        return redirect(url_for("admin.privacy_security") + "#data")
     label = f"{days} day(s)"
     _audit_event(f"Data retention threshold updated to {label}", "Info")
     removed = patient_model.run_retention_purge(force=True)
@@ -1076,7 +1256,7 @@ def update_data_retention():
     if removed:
         message += f" {removed} expired patient record(s) removed immediately."
     flash(message, "success")
-    return redirect(url_for("admin.privacy_security"))
+    return redirect(url_for("admin.privacy_security") + "#data")
 
 
 @admin_bp.route("/privacy-security/change-password", methods=["POST"])

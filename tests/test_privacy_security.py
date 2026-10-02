@@ -265,6 +265,55 @@ def test_admin_page_shows_recycle_bin_and_due_counts(app, monkeypatch):
     assert oldest.encode() in response.data
 
 
+def test_privacy_page_has_retention_cards_and_only_three_tabs(app):
+    admin_id = add_user(app, "retention-cards-admin@example.com")
+    client = app.test_client()
+    active_session(client, admin_id)
+
+    response = client.get("/admin/privacy-security")
+
+    assert response.status_code == 200
+    assert response.data.count(b'class="retention-card"') == 2
+    assert response.data.count(b'class="retention-status-item"') == 6
+    assert b"Data Retention &amp; Anonymization" in response.data
+    assert b"Save Recycle Bin Retention" in response.data
+    assert b"Save Record Retention" in response.data
+    assert b"Encryption &amp; Storage" not in response.data
+    assert b'Save Key Policies' not in response.data
+    assert b"Retention, anonymization, roles, agreements" in response.data
+    assert b"Timeout, failed login attempts" in response.data
+    assert b"Review records" not in response.data
+    tab_names = [
+        response.data.index(b'data-tab="password"'),
+        response.data.index(b'data-tab="data"'),
+        response.data.index(b'data-tab="session"'),
+    ]
+    assert tab_names == sorted(tab_names)
+
+
+def test_retention_saves_redirect_to_data_privacy_tab(app):
+    admin_id = add_user(app, "retention-redirect-admin@example.com")
+    client = app.test_client()
+    active_session(client, admin_id)
+
+    recycle_response = client.post(
+        "/admin/privacy-security/data-retention",
+        data={"recycle_bin_days": "30"},
+    )
+    record_response = client.post(
+        "/admin/privacy-security/patient-retention/policy",
+        data={"patient_retention_days": "730"},
+    )
+
+    assert recycle_response.status_code == 302
+    assert recycle_response.headers["Location"].endswith("/admin/privacy-security#data")
+    assert record_response.status_code == 302
+    assert record_response.headers["Location"].endswith("/admin/privacy-security#data")
+    with app.app_context():
+        assert settings_model.get_recycle_bin_days() == 30
+        assert settings_model.get_patient_retention_days() == 730
+
+
 def test_purge_cascades_and_database_check_passes(app):
     add_deleted_patient(app, "CASCADE-OLD", 10)
     with app.app_context():
@@ -319,9 +368,9 @@ def test_configured_max_login_attempts_locks_account(app):
         for _ in range(2):
             assert authenticate("locked@example.com", "wrong")[1] == "Invalid email or password."
         error = authenticate("locked@example.com", "wrong")[1]
-        assert "account has been locked" in error
-        assert user_model.get_user_by_id(user_id)["status"] == "recovery"
-        assert "awaiting a password reset" in authenticate("locked@example.com", "Password123!")[1]
+        assert "account has been suspended" in error
+        assert user_model.get_user_by_id(user_id)["status"] == "approved"
+        assert "account has been suspended" in authenticate("locked@example.com", "Password123!")[1]
 
 
 def test_admin_security_settings_change_lockout_threshold_and_page_markup(app):

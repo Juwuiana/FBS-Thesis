@@ -1,16 +1,27 @@
+# Admin privacy retention layout
+
+- **Updated:** consolidated the Recycle Bin and active-patient retention controls into matching responsive cards in Data Privacy. Saving either policy now returns to that tab.
+
+# Patient record retention
+
+- **Added:** admin review confirmation with exact record-count and irreversible-action checks, archive-first selection binding, permanent deletion, consent-driven deletion, atomic batch processing, and one Critical audit event per successful batch.
+- **Fixed:** patient anonymization now clears direct identifiers, portal credentials, login events, free-text identifying details, and assigns a collision-safe `ANON-<id>` code while retaining de-identified screening results for analytics.
+- **Fixed:** anonymized patients are excluded from active patient, nurse workflow, export, sync, and portal-history lookups while remaining in aggregate health analytics.
+- **Verified:** retention tests cover rollback in both modes, cascade deletion, confirmation failures, portal login rejection, audit details, and visibility behavior.
+
 # Staff password recovery
 
 - **Fixed:** Recycle Bin records now use a separate configurable 7-, 15-, or 30-day undo window (15 days by default), with hourly automatic purging, immediate purge on policy changes, and a system audit event for removals.
 - **Fixed:** removed decorative Data Privacy controls and duplicate content-use text from the admin Privacy &amp; Security page.
 - **Added:** replaced fictional municipality agreement rows with the two real LHU stations and a shared read-only Data Handling and Confidentiality Agreement modal.
-- **Removed:** retired the redundant global all-role sign-out control from Encryption &amp; Storage; per-role Force Sign-Out remains available under Access Roles &amp; Permissions.
+- **Removed:** retired the redundant global all-role sign-out control from the privacy settings area; per-role Force Sign-Out remains available under Access Roles &amp; Permissions.
 - **Fixed:** simplified the admin Access Roles &amp; Permissions table to the real Patient and LHU Nurse roles, and renamed the first Privacy &amp; Security tab from “Password &amp; Login” to “Password.”
 - **Added:** wired the real patient portal login and personal-data export into the same role-control system as staff, including patient login/export toggles and patient-only force sign-out with role-scoped security versions.
 - **Added:** rebuilt admin Data Privacy access controls around the two real staff roles, with role-scoped login enablement, nurse-only export permission, and isolated force-signout actions.
 - **Fixed:** removed the fictional four-tier permissions table and duplicate decorative Data Retention Policy section from the admin Privacy & Security page.
 - **Added:** a self-contained nurse dashboard "Patients by Barangay" widget with a capped AJAX patient list, barangay filter, compact risk table, and direct links to patient files; it reuses the existing latest-screening patient query.
 
-- **Fixed:** made the admin Encryption &amp; Storage data-retention threshold control the existing automatic recycle-bin purge, with 6-, 12-, 24-month, and manual-only policies persisted in `app_settings`.
+- **Fixed:** made the admin recycle-bin retention control trigger the existing automatic purge, with 6-, 12-, 24-month, and manual-only policies persisted in `app_settings`.
 - **Added:** replaced the decorative salt-cipher text with the actual Werkzeug password-hashing method (`scrypt`) and repurposed salt rotation as a real global session-invalidation action using a security-version counter; the UI is explicitly no longer presented as field-level AES-256-GCM encryption.
 - **Added:** focused coverage for retention persistence and purge behavior, Never Purge, and invalidating other active sessions without signing out the initiating administrator.
 - **Added:** real configurable failed-login tracking with 3-, 5-, and 10-attempt thresholds; accounts reaching the threshold enter the existing administrator password-recovery flow.

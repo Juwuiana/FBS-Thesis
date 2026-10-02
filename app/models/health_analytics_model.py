@@ -571,7 +571,7 @@ def get_recent_registries(limit: int = 5) -> list[dict]:
         SELECT p.patient_code, p.first_name, p.last_name, p.birthdate, p.sex,
                ls.fbs_mg_dl, COALESCE(ls.final_risk_level, ls.preliminary_risk_level, ls.model_predicted_risk_level) AS risk,
                v.assessment_date
-        {_base_query()}
+        {_base_query()} AND p.anonymized_at IS NULL
         ORDER BY v.id DESC
         LIMIT ?
     """, (limit,)).fetchall()
@@ -620,7 +620,7 @@ def get_followup_summary() -> dict:
                       AND ls.follow_up_date IS NOT NULL
                       AND ls.follow_up_date < DATE('now') THEN 1 ELSE 0 END) AS overdue,
             SUM(CASE WHEN v.id IS NOT NULL AND ls.fbs_mg_dl IS NULL THEN 1 ELSE 0 END) AS awaiting_lab
-        {_base_query()}
+        {_base_query()} AND p.anonymized_at IS NULL
     """).fetchone()
     conn.close()
     return {k: row[k] or 0 for k in ("no_action", "overdue", "awaiting_lab")}
@@ -635,7 +635,7 @@ def get_followup_worklist(limit: int = 100) -> list[dict]:
         SELECT p.patient_code, p.first_name, p.last_name, p.birthdate, p.sex,
                b.name AS barangay, v.assessment_date, ls.fbs_mg_dl,
                {_RISK} AS risk, ls.referral_action, ls.referred_to, ls.follow_up_date
-        {_base_query()} AND {_RISK} IN ('Moderate','High')
+        {_base_query()} AND p.anonymized_at IS NULL AND {_RISK} IN ('Moderate','High')
     """).fetchall()
     conn.close()
 
@@ -851,6 +851,7 @@ def get_red_flags(limit: int = 20) -> list[dict]:
         JOIN cvd_responses cr ON cr.visit_id = v.id
         LEFT JOIN lab_screenings ls ON ls.visit_id = v.id
         WHERE p.deleted_at IS NULL
+                    AND p.anonymized_at IS NULL
           AND (cr.q7_severe_pain_30min_plus = 1 OR cr.q8_tia_stroke_symptoms = 1)
         ORDER BY (COALESCE({_RISK}, '') = 'High') DESC, v.assessment_date DESC
         LIMIT ?

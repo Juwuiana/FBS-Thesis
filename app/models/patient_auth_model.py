@@ -49,7 +49,7 @@ def authenticate_patient(patient_code: str, password: str):
     conn = get_connection()
     try:
         row = conn.execute(
-            "SELECT * FROM patients WHERE patient_code = ? AND deleted_at IS NULL",
+            "SELECT * FROM patients WHERE patient_code = ? AND deleted_at IS NULL AND anonymized_at IS NULL",
             (patient_code,),
         ).fetchone()
     finally:

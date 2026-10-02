@@ -9,6 +9,9 @@ DEFAULT_SESSION_TIMEOUT_MINUTES = 30
 DATA_RETENTION_KEY = "data_retention_days"
 DEFAULT_DATA_RETENTION_DAYS = 365
 ALLOWED_DATA_RETENTION_DAYS = (180, 365, 730, None)
+PATIENT_RETENTION_DAYS_KEY = "patient_record_retention_days"
+ALLOWED_PATIENT_RETENTION_DAYS = (365, 730, 1095, 1825, None)
+DEFAULT_PATIENT_RETENTION_DAYS = None
 RECYCLE_BIN_DAYS_KEY = "recycle_bin_days"
 DEFAULT_RECYCLE_BIN_DAYS = 15
 ALLOWED_RECYCLE_BIN_DAYS = (7, 15, 30)
@@ -57,6 +60,8 @@ def set_session_timeout_minutes(minutes):
     set_setting(SESSION_TIMEOUT_KEY, minutes)
 
 
+# Legacy/unreferenced: retained for compatibility with older retired settings,
+# but patient record review now uses PATIENT_RETENTION_DAYS_KEY.
 def get_data_retention_days():
     raw = get_setting(DATA_RETENTION_KEY, DEFAULT_DATA_RETENTION_DAYS)
     if raw in (None, "", "None"):
@@ -72,6 +77,23 @@ def set_data_retention_days(days):
     if days not in ALLOWED_DATA_RETENTION_DAYS:
         raise ValueError(f"{days} is not an allowed data retention value.")
     set_setting(DATA_RETENTION_KEY, days if days is not None else "")
+
+
+def get_patient_retention_days():
+    raw = get_setting(PATIENT_RETENTION_DAYS_KEY, DEFAULT_PATIENT_RETENTION_DAYS)
+    if raw in (None, "", "None"):
+        return None
+    try:
+        days = int(raw)
+    except (TypeError, ValueError):
+        return DEFAULT_PATIENT_RETENTION_DAYS
+    return days if days in ALLOWED_PATIENT_RETENTION_DAYS else DEFAULT_PATIENT_RETENTION_DAYS
+
+
+def set_patient_retention_days(days):
+    if days not in ALLOWED_PATIENT_RETENTION_DAYS:
+        raise ValueError(f"{days} is not an allowed patient retention value.")
+    set_setting(PATIENT_RETENTION_DAYS_KEY, "" if days is None else days)
 
 
 def get_recycle_bin_days():

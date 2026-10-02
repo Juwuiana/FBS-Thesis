@@ -7,8 +7,40 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/settings_shared.css') }}">
 {% endblock %}
 
+{% macro retention_card(title, form_id, form_action, label, select_id, select_name, options, selected, help_text, status_items, save_label, extra_button_url=None, extra_button_label=None) %}
+<article class="retention-card">
+    <h3 class="section-label retention-card-title">{{ title }}</h3>
+    <form id="{{ form_id }}" method="POST" action="{{ form_action }}" class="retention-card-form">
+        <div class="form-group retention-card-setting">
+            <label class="form-label" for="{{ select_id }}">{{ label }}</label>
+            <select class="ps-select retention-card-select" id="{{ select_id }}" name="{{ select_name }}">
+                {% for option in options %}
+                {% set is_selected = (selected is none and option.value == '') or (selected is not none and selected|string == option.value|string) %}
+                <option value="{{ option.value }}" {% if is_selected %}selected{% endif %}>{{ option.label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <p class="ps-description retention-help">{{ help_text }}</p>
+        <div class="retention-status" aria-label="{{ title }} status">
+            {% for item in status_items %}
+            <div class="retention-status-item">
+                <span>{{ item.label }}</span>
+                <strong>{{ item.value }}</strong>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="retention-card-actions">
+            <button type="submit" class="btn-save">{{ save_label }}</button>
+            {% if extra_button_url and extra_button_label %}
+            <a href="{{ extra_button_url }}" class="ps-secondary-btn">{{ extra_button_label }}</a>
+            {% endif %}
+        </div>
+    </form>
+</article>
+{% endmacro %}
+
 {% block content %}
-<div class="settings-body" style="padding: 1.25rem 24px 24px;">
+<div class="settings-body privacy-settings-body">
 
     <div class="settings-nav-panel">
         <button class="settings-tab active" data-tab="password">
@@ -20,19 +52,13 @@
         <button class="settings-tab" data-tab="data">
             <span class="stab-text">
                 <span class="stab-title">Data Privacy</span>
-                <span class="stab-sub">Anonymization, roles, agreements</span>
-            </span>
-        </button>
-        <button class="settings-tab" data-tab="encryption">
-            <span class="stab-text">
-                <span class="stab-title">Encryption &amp; Storage</span>
-                <span class="stab-sub">Local database configuration</span>
+                <span class="stab-sub">Retention, anonymization, roles, agreements</span>
             </span>
         </button>
         <button class="settings-tab" data-tab="session">
             <span class="stab-text">
                 <span class="stab-title">Session &amp; Login</span>
-                <span class="stab-sub">Timeout, 2FA, failed attempts</span>
+                <span class="stab-sub">Timeout, failed login attempts</span>
             </span>
         </button>
     </div>
@@ -74,6 +100,109 @@
         </div>
 
         <div class="settings-pane" id="pane-data">
+
+            <div class="settings-section retention-section">
+                <div class="section-label">Data Retention &amp; Anonymization</div>
+                <div class="retention-card-grid">
+                    {{ retention_card(
+                        'Recycle Bin', 'recycleBinRetentionForm', url_for('admin.update_data_retention'),
+                        'Retention period', 'recycleBinDays', 'recycle_bin_days',
+                        [
+                            {'value': 7, 'label': '7 days'},
+                            {'value': 15, 'label': '15 days'},
+                            {'value': 30, 'label': '30 days'}
+                        ],
+                        recycle_bin_days,
+                        'Applies only to records a nurse has moved to the Recycle Bin.',
+                        [
+                            {'label': 'Records in Recycle Bin', 'value': recycle_bin_status.total},
+                            {'label': 'Due for purge', 'value': recycle_bin_status.due},
+                            {'label': 'Oldest deleted record', 'value': recycle_bin_status.oldest_deleted_at or 'None'}
+                        ],
+                        'Save Recycle Bin Retention'
+                    ) }}
+                    {{ retention_card(
+                        'Active Patient Records', 'patientRetentionPolicyForm', url_for('admin.update_patient_retention_policy'),
+                        'Review threshold', 'patientRetentionDays', 'patient_retention_days',
+                        [
+                            {'value': '', 'label': 'Off (never review)'},
+                            {'value': 365, 'label': '1 year'},
+                            {'value': 730, 'label': '2 years'},
+                            {'value': 1095, 'label': '3 years'},
+                            {'value': 1825, 'label': '5 years'}
+                        ],
+                        patient_retention_days,
+                        "Counted from each patient's last screening. Nothing is changed automatically; you review and confirm every action.",
+                        [
+                            {'label': 'Records due for review', 'value': patient_retention_due_count},
+                            {'label': 'Oldest last screening among due', 'value': patient_retention_oldest_screening or 'None'},
+                            {'label': 'Cutoff date', 'value': patient_retention_cutoff_date or 'Off'}
+                        ],
+                        'Save Record Retention',
+                        '#patient-retention-review' if patient_retention_due_count else none,
+                        'Review records' if patient_retention_due_count else none
+                    ) }}
+                </div>
+                <p class="ps-description retention-consent-note">Patients who did not consent to research are permanently deleted even when anonymization is selected.</p>
+
+                {% if patient_retention_due %}
+                <div class="retention-review" id="patient-retention-review">
+                    <div class="section-label">Records due for review</div>
+                    <form id="patientRetentionActionForm" method="POST" action="{{ url_for('admin.patient_retention_action') }}" class="retention-review-form">
+                        <input type="hidden" name="selection_hash" value="{{ patient_retention_selection_hash }}">
+                        <input type="hidden" name="action" id="patientRetentionActionValue" value="anonymize">
+                        <div class="table-responsive">
+                            <table class="table table-borderless ps-roles-table mb-0">
+                                <thead>
+                                    <tr>
+                                        <th><input type="checkbox" id="select-all-patient-retention" aria-label="Select all due records"></th>
+                                        <th>Patient</th>
+                                        <th>Last screening</th>
+                                        <th>Days overdue</th>
+                                        <th>Barangay</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for row in patient_retention_due %}
+                                    <tr>
+                                        <td><input type="checkbox" name="patient_ids" value="{{ row.id }}"></td>
+                                        <td>{{ row.patient_code }}<br><small>{{ row.first_name if row.first_name else '' }} {{ row.last_name if row.last_name else '' }}</small></td>
+                                        <td>{{ row.last_screening_date or '—' }}</td>
+                                        <td>{{ row.days_overdue }}</td>
+                                        <td>{{ row.barangay or 'Unknown' }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="retention-confirmation">
+                            <div class="form-group retention-setting-group">
+                                <label class="form-label" for="patientRetentionAction">Action</label>
+                                <select class="ps-select" id="patientRetentionAction">
+                                    <option value="anonymize" selected>Anonymize (recommended)</option>
+                                    <option value="delete">Delete permanently</option>
+                                </select>
+                            </div>
+                            <p class="retention-warning" id="patientRetentionWarning" role="status">Anonymization removes direct identifiers and keeps the de-identified screening history.</p>
+                            <div class="form-group retention-confirm-count">
+                                <label class="form-label" for="patientRetentionConfirmCount">Type the exact number of selected records</label>
+                                <input class="form-input" id="patientRetentionConfirmCount" name="confirmation_count" type="number" min="1" step="1" inputmode="numeric" required>
+                            </div>
+                            <label class="retention-irreversible-check" for="patientRetentionIrreversible">
+                                <input id="patientRetentionIrreversible" name="confirm_irreversible" type="checkbox" value="1">
+                                <span>I understand this cannot be undone</span>
+                            </label>
+                        </div>
+                        <div class="form-actions d-flex gap-2 flex-wrap retention-actions">
+                            <button type="submit" name="download_archive" value="1" class="export-btn retention-download-button" disabled>Download archive copy</button>
+                            <button type="submit" class="btn-save retention-confirm-button" id="patientRetentionConfirm" disabled>Confirm anonymization</button>
+                        </div>
+                    </form>
+                </div>
+                {% else %}
+                <p class="ps-description retention-empty">No active patient records are currently due for a retention review.</p>
+                {% endif %}
+            </div>
 
             <div class="settings-section">
                 <div class="section-label">Access Roles &amp; Permissions</div>
@@ -190,52 +319,6 @@
 
         </div>
 
-        <div class="settings-pane" id="pane-encryption">
-            <div class="settings-section">
-                <div class="section-label">Local Encryption &amp; Storage Configuration</div>
-                <p class="ps-description" style="margin-bottom: 1rem;">
-                    Review the password-hashing method protecting local accounts
-                    and configure terminal storage constraints.
-                </p>
-                <div class="settings-form-grid" style="margin-bottom: 1rem;">
-                    <div class="form-group">
-                        <label class="form-label">Password Hashing Method</label>
-                        <input type="text" class="ps-input" value="{{ password_hash_method }}" readonly />
-                    </div>
-                    <form id="dataRetentionForm" method="POST" action="{{ url_for('admin.update_data_retention') }}">
-                        <div class="form-group retention-setting-group">
-                            <label class="form-label" for="recycleBinDays">Recycle Bin Retention</label>
-                            <select class="ps-select" id="recycleBinDays" name="recycle_bin_days">
-                                <option value="7" {% if recycle_bin_days == 7 %}selected{% endif %}>7 days</option>
-                                <option value="15" {% if recycle_bin_days == 15 %}selected{% endif %}>15 days</option>
-                                <option value="30" {% if recycle_bin_days == 30 %}selected{% endif %}>30 days</option>
-                            </select>
-                            <p class="ps-description retention-help">Applies only to patient records that a nurse has moved to the Recycle Bin. Active patient records are not deleted automatically.</p>
-                            <div class="retention-status" aria-label="Current Recycle Bin status">
-                                <div class="retention-status-item">
-                                    <span>Records in Recycle Bin</span>
-                                    <strong>{{ recycle_bin_status.total }}</strong>
-                                </div>
-                                <div class="retention-status-item">
-                                    <span>Due for purge</span>
-                                    <strong>{{ recycle_bin_status.due }}</strong>
-                                </div>
-                                <div class="retention-status-item">
-                                    <span>Oldest deleted record</span>
-                                    <strong>{{ recycle_bin_status.oldest_deleted_at or "None" }}</strong>
-                                </div>
-                            </div>
-                        </div>
-                    </form>
-                </div>
-                <div class="form-actions d-flex gap-2 flex-wrap">
-                    <button type="submit" form="dataRetentionForm" class="btn-save">
-                        Save Key Policies
-                    </button>
-                </div>
-            </div>
-        </div>
-
         <!-- ══ TAB: SESSION & LOGIN ══ -->
         <div class="settings-pane" id="pane-session">
             <div class="settings-section">
@@ -285,14 +368,63 @@
 document.addEventListener('DOMContentLoaded', () => {
     const tabs  = document.querySelectorAll('.settings-tab');
     const panes = document.querySelectorAll('.settings-pane');
+    const activateTab = (name) => {
+        tabs.forEach(tab => tab.classList.toggle('active', tab.dataset.tab === name));
+        panes.forEach(pane => pane.classList.toggle('active', pane.id === 'pane-' + name));
+    };
     tabs.forEach(tab => {
         tab.addEventListener('click', () => {
-            tabs.forEach(t => t.classList.remove('active'));
-            panes.forEach(p => p.classList.remove('active'));
-            tab.classList.add('active');
-            document.getElementById('pane-' + tab.dataset.tab).classList.add('active');
+            activateTab(tab.dataset.tab);
+            history.replaceState(null, '', '#' + tab.dataset.tab);
         });
     });
+    const initialTab = ['#data', '#patient-retention-review'].includes(window.location.hash) ? 'data' : 'password';
+    activateTab(initialTab);
+    if (window.location.hash === '#patient-retention-review') {
+        document.getElementById('patient-retention-review')?.scrollIntoView();
+    }
+
+    const retentionForm = document.getElementById('patientRetentionActionForm');
+    if (retentionForm) {
+        const patientChecks = [...retentionForm.querySelectorAll('input[name="patient_ids"]')];
+        const actionChoice = document.getElementById('patientRetentionAction');
+        const actionValue = document.getElementById('patientRetentionActionValue');
+        const countInput = document.getElementById('patientRetentionConfirmCount');
+        const irreversible = document.getElementById('patientRetentionIrreversible');
+        const confirmButton = document.getElementById('patientRetentionConfirm');
+        const downloadButton = retentionForm.querySelector('[name="download_archive"]');
+        const warning = document.getElementById('patientRetentionWarning');
+
+        const updateRetentionControls = () => {
+            const selectedCount = patientChecks.filter(check => check.checked).length;
+            const mode = actionChoice.value;
+            actionValue.value = mode;
+            confirmButton.disabled = selectedCount === 0
+                || countInput.value !== String(selectedCount)
+                || !irreversible.checked;
+            downloadButton.disabled = selectedCount === 0;
+            const deleting = mode === 'delete';
+            warning.classList.toggle('is-destructive', deleting);
+            confirmButton.classList.toggle('is-destructive', deleting);
+            confirmButton.textContent = deleting ? 'Delete permanently' : 'Confirm anonymization';
+            warning.textContent = deleting
+                ? 'This permanently deletes the selected patient records and their linked screening data.'
+                : 'Anonymization removes direct identifiers and keeps the de-identified screening history.';
+        };
+
+        patientChecks.forEach(check => check.addEventListener('change', updateRetentionControls));
+        actionChoice.addEventListener('change', updateRetentionControls);
+        countInput.addEventListener('input', updateRetentionControls);
+        irreversible.addEventListener('change', updateRetentionControls);
+        const selectAll = document.getElementById('select-all-patient-retention');
+        if (selectAll) {
+            selectAll.addEventListener('change', () => {
+                patientChecks.forEach(check => { check.checked = selectAll.checked; });
+                updateRetentionControls();
+            });
+        }
+        updateRetentionControls();
+    }
 });
 </script>
 {% endblock %}
