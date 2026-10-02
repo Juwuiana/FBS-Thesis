@@ -5,7 +5,7 @@
 <div class="settings-header">
     <div>
         <h1 class="settings-title">Privacy &amp; Security</h1>
-        <p class="settings-subtitle">Manage your password, session, and activity log</p>
+        <p class="settings-subtitle">Manage your password and activity log</p>
     </div>
 </div>
 
@@ -23,12 +23,6 @@
             <span class="stab-text">
                 <span class="stab-title">Audit Trail</span>
                 <span class="stab-sub">Your recorded actions</span>
-            </span>
-        </button>
-        <button class="settings-tab" data-tab="session">
-            <span class="stab-text">
-                <span class="stab-title">Session</span>
-                <span class="stab-sub">Auto-lock timing</span>
             </span>
         </button>
     </div>
@@ -126,29 +120,6 @@
                         </div>
                     </div>
                     {% endfor %}
-                </div>
-            </div>
-        </div>
-
-        <!-- ══ TAB: SESSION ══ -->
-        <div class="settings-pane" id="pane-session">
-            <div class="settings-section">
-                <div class="section-label">Session Settings</div>
-                <div class="readonly-note" style="margin-bottom: 1.1rem;">
-                    Your account session is verified and active.
-                </div>
-                <div class="settings-form-grid" style="max-width: 480px;">
-                    <div class="form-group" style="grid-column: 1 / -1;">
-                        <label class="form-label">Auto-lock screen after</label>
-                        <select class="form-input" name="session_timeout">
-                            <option value="15">15 minutes of inactivity</option>
-                            <option value="30" selected>30 minutes of inactivity</option>
-                            <option value="60">1 hour of inactivity</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="form-actions">
-                    <button type="button" class="btn-save">Save Session Rules</button>
                 </div>
             </div>
         </div>

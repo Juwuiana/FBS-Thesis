@@ -6,6 +6,82 @@
 
 {% block content %}
 <main class="page-content">
+  <button type="button" id="dmHubToggle" class="dm-hub-toggle" aria-expanded="false" aria-controls="dmHubWrapper">
+    <span id="dmHubToggleLabel">Show Import / Export Tools</span>
+    <span class="dm-hub-toggle-icon" id="dmHubToggleIcon" aria-hidden="true">&#9660;</span>
+  </button>
+
+  <div id="dmHubWrapper" class="dm-hub-wrapper collapsed">
+    <div class="dm-hub-grid">
+      <section class="dm-tool-card" aria-labelledby="dmImportTitle">
+        <div class="dm-tool-header" id="dmImportTitle">Import Employee Records</div>
+        <div class="dm-tool-body">
+          <p class="dm-tool-desc">Upload a CSV file to create approved employee accounts in one operation.</p>
+          <a href="{{ url_for('admin.staff_import_template') }}" class="export-btn dm-tool-btn">
+            <i class="bi bi-download me-1"></i> Download Blank Template
+          </a>
+          <div class="dm-field">
+            <label class="dm-field-label" for="dmImportFile">Select Source File (.csv)</label>
+            <input type="file" id="dmImportFile" class="dm-field-input" accept=".csv,text/csv">
+          </div>
+          <div id="dmImportFileError" class="dm-field-error" role="alert" hidden></div>
+          <p class="dm-warning-note">The file contains temporary passwords. Delete it after importing.</p>
+          <button type="button" id="dmImportBtn" class="filter-btn dm-tool-btn" disabled>
+            <i class="bi bi-upload me-1"></i> Import Employees
+          </button>
+          <div id="dmProgress" class="dm-progress" hidden>
+            <div class="dm-progress-label"><span id="dmProgressText">Uploading...</span><span id="dmProgressPct">0%</span></div>
+            <div class="dm-progress-track" id="dmProgressTrack" role="progressbar" aria-label="Import progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+              <div class="dm-progress-bar" id="dmProgressBar"></div>
+            </div>
+          </div>
+          <div id="dmImportResult" class="dm-result" aria-live="polite"></div>
+
+          <div class="dm-accordion">
+            <button type="button" id="dmSchemaToggle" class="dm-accordion-toggle" aria-expanded="false" aria-controls="dmSchemaContent">
+              <span>View Required Schema Instructions</span>
+              <span class="dm-accordion-icon" aria-hidden="true">&#9660;</span>
+            </button>
+            <div id="dmSchemaContent" class="dm-accordion-content">
+              <div class="dm-schema-box">
+                <div class="dm-schema-title">Required Column Headers:</div>
+                <ul class="dm-schema-list">
+                  <li class="dm-schema-item">first_name <span>(required)</span></li>
+                  <li class="dm-schema-item">middle_name</li>
+                  <li class="dm-schema-item">last_name <span>(required)</span></li>
+                  <li class="dm-schema-item">birthday <span>(required)</span></li>
+                  <li class="dm-schema-item">sex <span>(required)</span></li>
+                  <li class="dm-schema-item">email <span>(required)</span></li>
+                  <li class="dm-schema-item">phone <span>(required)</span></li>
+                  <li class="dm-schema-item">role <span>(required)</span></li>
+                  <li class="dm-schema-item">station <span>(required)</span></li>
+                  <li class="dm-schema-item">barangay <span>(required)</span></li>
+                  <li class="dm-schema-item">temporary_password <span>(required)</span></li>
+                </ul>
+                <p class="dm-schema-note">All headers must be present; middle_name may be left blank. birthday = YYYY-MM-DD; sex = male/female; phone = 10 digits starting with 9 (leading 0 or +63 accepted); role = Health Officer / LHU Nurse; station = LHU I / LHU II; barangay = name from the signup list.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="dm-tool-card" aria-labelledby="dmExportTitle">
+        <div class="dm-tool-header" id="dmExportTitle">Export Data Archives</div>
+        <div class="dm-tool-body">
+          <p class="dm-tool-desc">Download the staff records currently shown in the table as a CSV file. Only rows visible under the current filters are exported.</p>
+          <div class="dm-field">
+            <label class="dm-field-label" for="dmExportFormat">Export Format</label>
+            <select id="dmExportFormat" class="dm-field-input">
+              <option value="csv" selected>Comma-Separated Values (.csv)</option>
+            </select>
+          </div>
+          <button type="button" id="dmExportBtn" class="filter-btn dm-tool-btn" onclick="exportTable()">
+            <i class="bi bi-download me-1"></i> Export Staff Records
+          </button>
+        </div>
+      </section>
+    </div>
+  </div>
   <div class="dm-card">
     <div class="dm-card-title">Staff &amp; Employee Records – filter &amp; manage</div>
 
@@ -30,12 +106,6 @@
         <option value="suspended">Suspended</option>
       </select>
       <button class="filter-btn" onclick="applyFilters()">Filter</button>
-      <button class="export-btn" onclick="exportTable()">
-        <i class="bi bi-download me-1"></i> Export
-      </button>
-      <button class="export-btn" data-bs-toggle="modal" data-bs-target="#importEmployeesModal">
-        <i class="bi bi-upload me-1"></i> Import
-      </button>
     </div>
 
     <!-- Table -->
@@ -108,47 +178,6 @@
   </div>
 </main>
 
-<div class="modal fade" id="importEmployeesModal" tabindex="-1" aria-labelledby="importEmployeesModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="importEmployeesModalLabel">Import Employees</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <p class="small text-muted">Upload a CSV file to add approved employee accounts in one operation.</p>
-        <a href="{{ url_for('admin.staff_import_template') }}" class="export-btn d-inline-block text-decoration-none mb-3">
-          <i class="bi bi-download me-1"></i> Download CSV Template
-        </a>
-        <div id="importFileError" class="alert alert-danger d-none py-2" role="alert"></div>
-        <div id="csvDropZone" class="csv-drop-zone" tabindex="0">
-          <i class="bi bi-cloud-arrow-up fs-3 d-block mb-2"></i>
-          <span>Drag &amp; drop your CSV here, or click to browse</span>
-          <input type="file" id="csvFileInput" accept=".csv,text/csv" hidden>
-        </div>
-        <div id="selectedCsvFile" class="csv-selected-file d-none mt-2">
-          <span id="selectedCsvFileName"></span>
-          <span id="selectedCsvFileSize" class="text-muted"></span>
-          <button type="button" id="removeCsvFile" class="btn btn-sm btn-link text-danger p-0" aria-label="Remove selected file">
-            <i class="bi bi-x-lg"></i>
-          </button>
-        </div>
-        <div class="small text-muted mt-3">
-          Accepted values: sex = male/female; role = Health Officer / LHU Nurse; station = LHU I / LHU II; birthday = YYYY-MM-DD; phone = 10 digits starting with 9 (leading 0 or +63 accepted); barangay = name from the signup list.
-        </div>
-        <div class="small text-warning mt-2">The file contains temporary passwords. Delete it after importing.</div>
-        <div id="importResult" class="mt-3"></div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" id="startCsvImport" class="filter-btn" disabled>
-          <i class="bi bi-upload me-1"></i> Import
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-
 {% endblock %}
 
 {% block scripts %}
@@ -211,91 +240,110 @@
   }
 
   (() => {
-    const dropZone = document.getElementById('csvDropZone');
-    const fileInput = document.getElementById('csvFileInput');
-    const selectedFile = document.getElementById('selectedCsvFile');
-    const fileName = document.getElementById('selectedCsvFileName');
-    const fileSize = document.getElementById('selectedCsvFileSize');
-    const fileError = document.getElementById('importFileError');
-    const result = document.getElementById('importResult');
-    const importButton = document.getElementById('startCsvImport');
-    let chosenFile = null;
+    const $ = id => document.getElementById(id);
+    const toggle = $('dmHubToggle'), wrapper = $('dmHubWrapper');
+    toggle.addEventListener('click', () => {
+      const collapsed = wrapper.classList.toggle('collapsed');
+      toggle.setAttribute('aria-expanded', String(!collapsed));
+      $('dmHubToggleLabel').textContent = collapsed ? 'Show Import / Export Tools' : 'Hide Import / Export Tools';
+      $('dmHubToggleIcon').innerHTML = collapsed ? '&#9660;' : '&#9650;';
+    });
 
-    function formatSize(bytes) {
-      if (bytes < 1024) return `${bytes} B`;
-      return `${(bytes / 1024).toFixed(1)} KB`;
+    const schemaToggle = $('dmSchemaToggle'), schemaContent = $('dmSchemaContent');
+    schemaToggle.addEventListener('click', () => {
+      const open = schemaContent.classList.toggle('open');
+      schemaToggle.setAttribute('aria-expanded', String(open));
+    });
+
+    const fileInput = $('dmImportFile'), fileError = $('dmImportFileError');
+    const importButton = $('dmImportBtn'), result = $('dmImportResult');
+    const progress = $('dmProgress'), bar = $('dmProgressBar'), track = $('dmProgressTrack');
+    const progressText = $('dmProgressText'), progressPct = $('dmProgressPct');
+
+    function setProgress(percent) {
+      bar.classList.remove('indeterminate');
+      bar.style.width = percent + '%';
+      track.setAttribute('aria-valuenow', String(percent));
+      progressPct.textContent = percent + '%';
     }
 
-    function showError(message) {
-      fileError.textContent = message;
-      fileError.classList.remove('d-none');
+    function showResultError(message) {
+      result.textContent = '';
+      const box = document.createElement('div');
+      box.className = 'dm-field-error';
+      box.textContent = message;
+      result.appendChild(box);
     }
 
-    function clearFile() {
-      chosenFile = null;
-      fileInput.value = '';
-      selectedFile.classList.add('d-none');
-      importButton.disabled = true;
-    }
-
-    function selectFile(file) {
-      fileError.classList.add('d-none');
-      if (!file || !file.name.toLowerCase().endsWith('.csv')) {
-        clearFile();
-        showError('Only .csv files are accepted.');
+    fileInput.addEventListener('change', () => {
+      const file = fileInput.files[0];
+      fileError.hidden = true;
+      result.textContent = '';
+      progress.hidden = true;
+      if (!file) { importButton.disabled = true; return; }
+      if (!file.name.toLowerCase().endsWith('.csv')) {
+        fileInput.value = '';
+        importButton.disabled = true;
+        fileError.textContent = 'Only .csv files are accepted.';
+        fileError.hidden = false;
         return;
       }
-      chosenFile = file;
-      fileName.textContent = file.name;
-      fileSize.textContent = ` (${formatSize(file.size)})`;
-      selectedFile.classList.remove('d-none');
       importButton.disabled = false;
-    }
-
-    function escapeHtml(value) {
-      return String(value).replace(/[&<>'"]/g, character => ({
-        '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
-      }[character]));
-    }
-
-    dropZone.addEventListener('click', () => fileInput.click());
-    dropZone.addEventListener('keydown', event => {
-      if (event.key === 'Enter' || event.key === ' ') fileInput.click();
     });
-    fileInput.addEventListener('change', () => selectFile(fileInput.files[0]));
-    document.getElementById('removeCsvFile').addEventListener('click', clearFile);
-    ['dragenter', 'dragover'].forEach(eventName => dropZone.addEventListener(eventName, event => {
-      event.preventDefault();
-      dropZone.classList.add('dragover');
-    }));
-    ['dragleave', 'drop'].forEach(eventName => dropZone.addEventListener(eventName, event => {
-      event.preventDefault();
-      dropZone.classList.remove('dragover');
-    }));
-    dropZone.addEventListener('drop', event => selectFile(event.dataTransfer.files[0]));
 
-    importButton.addEventListener('click', async () => {
-      if (!chosenFile) return;
+    importButton.addEventListener('click', () => {
+      const file = fileInput.files[0];
+      if (!file) return;
       importButton.disabled = true;
-      result.innerHTML = '<div class="small text-muted">Importing...</div>';
+      result.textContent = '';
+      progress.hidden = false;
+      progressText.textContent = 'Uploading...';
+      setProgress(0);
+
       const formData = new FormData();
-      formData.append('file', chosenFile);
-      try {
-        const response = await fetch('{{ url_for("admin.staff_import") }}', { method: 'POST', body: formData });
-        const payload = await response.json();
+      formData.append('file', file);
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '{{ url_for("admin.staff_import") }}');
+      xhr.responseType = 'json';
+      xhr.upload.addEventListener('progress', event => {
+        if (event.lengthComputable) setProgress(Math.round((event.loaded / event.total) * 100));
+      });
+      xhr.upload.addEventListener('load', () => {
+        progressText.textContent = 'Processing...';
+        bar.classList.add('indeterminate');
+        progressPct.textContent = '';
+      });
+      const fail = message => {
+        progress.hidden = true;
+        showResultError(message);
+        importButton.disabled = false;
+      };
+      xhr.addEventListener('error', () => fail('The import could not be completed.'));
+      xhr.addEventListener('load', () => {
+        const payload = xhr.response;
+        if (!payload) { fail('The import could not be completed.'); return; }
+        progress.hidden = true;
+        result.textContent = '';
         if (payload.ok) {
-          result.innerHTML = `<div class="alert alert-success py-2">Imported ${payload.imported} employee${payload.imported === 1 ? '' : 's'}.</div>`;
+          const ok = document.createElement('div');
+          ok.className = 'dm-result-ok';
+          ok.textContent = `Imported ${payload.imported} employee${payload.imported === 1 ? '' : 's'}.`;
+          result.appendChild(ok);
           setTimeout(() => window.location.reload(), 700);
           return;
         }
-        result.innerHTML = `<div class="alert alert-danger py-2"><ul class="mb-0">${payload.errors.map(error => `<li>Row ${escapeHtml(error.row)}: ${escapeHtml(error.message)}</li>`).join('')}</ul></div>`;
+        const list = document.createElement('ul');
+        list.className = 'dm-result-errors';
+        (payload.errors || []).forEach(error => {
+          const item = document.createElement('li');
+          item.textContent = `Row ${error.row}: ${error.message}`;
+          list.appendChild(item);
+        });
+        result.appendChild(list);
         importButton.disabled = false;
-      } catch (error) {
-        result.innerHTML = '<div class="alert alert-danger py-2">The import could not be completed.</div>';
-        importButton.disabled = false;
-      }
+      });
+      xhr.send(formData);
     });
   })();
-
 </script>
 {% endblock %}
