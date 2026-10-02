@@ -19,19 +19,9 @@
     {% set dm_sym_options = [('Polyphagia','Polyphagia (Excessive eating)'),('Polydipsia','Polydipsia (Excessive thirst)'),('Polyuria','Polyuria (Excessive urination)')] %}
 
     <style>
-        /* Line-drawn chevron used for both the section-collapse toggle and the
-           FBS trend indicators, replacing the old solid ▲▼ glyphs. */
+        /* Section toggle arrow (.section-toggle-icon) now comes from nurse_base.css,
+           same as the New Record page. .trend-arrow below is still page-specific. */
         .section-toggle { cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
-        .section-toggle-icon {
-            width: 8px; height: 8px;
-            border-right: 2px solid currentColor;
-            border-bottom: 2px solid currentColor;
-            transform: rotate(45deg);
-            transition: transform .15s ease;
-            display: inline-block;
-            margin-left: 0.5rem;
-        }
-        .section-toggle.collapsed .section-toggle-icon { transform: rotate(-45deg); }
         .collapsible {
             overflow: hidden;
             max-height: 10000px;
@@ -39,16 +29,25 @@
         }
         .collapsible.collapsed { max-height: 0; padding-top: 0; padding-bottom: 0; }
 
+        /* Stemmed arrows (line body + head), same look as the patient portal's
+           trend arrows. Drawn as a mask so they take the text colour. */
         .trend-arrow {
             display: inline-block;
-            width: 7px; height: 7px;
-            border-right: 2px solid currentColor;
-            border-top: 2px solid currentColor;
+            width: 13px; height: 13px;
             margin-left: 0.35rem;
-            vertical-align: middle;
+            vertical-align: -2px;
+            background-color: currentColor;
+            -webkit-mask: var(--arrow-svg) no-repeat center / contain;
+            mask: var(--arrow-svg) no-repeat center / contain;
         }
-        .trend-arrow.up { transform: rotate(-45deg); color: var(--danger); }
-        .trend-arrow.down { transform: rotate(135deg); color: var(--green-accent); }
+        .trend-arrow.up {
+            color: var(--danger);
+            --arrow-svg: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cline x1='12' y1='20' x2='12' y2='4'/%3E%3Cpolyline points='5 11 12 4 19 11'/%3E%3C/svg%3E");
+        }
+        .trend-arrow.down {
+            color: #16a34a;
+            --arrow-svg: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cline x1='12' y1='4' x2='12' y2='20'/%3E%3Cpolyline points='5 13 12 20 19 13'/%3E%3C/svg%3E");
+        }
     </style>
 
     <header class="topbar">
@@ -98,7 +97,7 @@
     </p>
 
     <div class="form-card">
-        <div class="card-header section-toggle collapsed" style="background:var(--green-light); border-top-color:var(--green-light);">Patient Portal Access<span class="section-toggle-icon"></span></div>
+        <div class="card-header section-toggle collapsed" style="background:var(--green-light); border-top-color:var(--green-light);">Patient Portal Access<span class="section-toggle-icon">&#9660;</span></div>
         <div class="card-body collapsible collapsed">
             <div class="grid-3">
                 <div class="field-group">
@@ -129,7 +128,7 @@
 
     <!-- para kita agad past visits -->
     <div class="form-card">
-        <div class="card-header section-toggle collapsed" style="background:var(--green-light); border-top-color:var(--green-light);">Past Records — Screening History<span class="section-toggle-icon"></span></div>
+        <div class="card-header section-toggle collapsed" style="background:var(--green-light); border-top-color:var(--green-light);">Past Records — Screening History<span class="section-toggle-icon">&#9660;</span></div>
         <div class="card-body collapsible collapsed" style="padding: 0;">
             <table style="width: 100%; border-collapse: collapse; font-size: 0.8rem;">
                 <tr style="border-bottom: 1px solid var(--border); color: var(--text-muted);">
@@ -143,7 +142,7 @@
                     <td style="padding: 1rem;">
                         {{ r.date }}
                         {% if latest_visit and r.visit_id == latest_visit.visit_id %}
-                            <span style="font-size:0.7rem; color:var(--green-accent); font-weight:600; margin-left:0.4rem;">● Viewing</span>
+                            <span style="font-size:0.7rem; color:var(--g-accent); font-weight:600; margin-left:0.4rem;">● Viewing</span>
                         {% endif %}
                     </td>
                     <td style="padding: 1rem;">
@@ -207,7 +206,7 @@
           data-return-qs="{{ return_qs or '' }}">
     <!-- patient demo -->
     <div class="form-card">
-        <div class="card-header section-toggle" data-section="1">1. Patient Demographics<span class="section-toggle-icon"></span></div>
+        <div class="card-header section-toggle" data-section="1">1. Patient Demographics<span class="section-toggle-icon">&#9660;</span></div>
         <div class="card-body collapsible">
             <div class="grid-5">
                 <div class="field-group"><label class="field-label">Patient ID No.</label><input type="text" class="field-input" value="{{ patient.patient_code }}" disabled title="The patient code is generated and never editable."></div>
@@ -306,7 +305,7 @@
 
     <!-- membership -->
     <div class="form-card">
-        <div class="card-header section-toggle collapsed" data-section="2">2. PHIC Membership<span class="section-toggle-icon"></span></div>
+        <div class="card-header section-toggle collapsed" data-section="2">2. PHIC Membership<span class="section-toggle-icon">&#9660;</span></div>
         <div class="card-body collapsible collapsed">
             <div class="grid-2">
                 <div class="field-group">
@@ -333,7 +332,7 @@
 
     <!-- past med histo -->
     <div class="form-card">
-        <div class="card-header section-toggle collapsed" data-section="3">3. Past Medical History<span class="section-toggle-icon"></span></div>
+        <div class="card-header section-toggle collapsed" data-section="3">3. Past Medical History<span class="section-toggle-icon">&#9660;</span></div>
         <div class="card-body collapsible collapsed">
             <div class="radio-card-wrapper">
                 {% for code in pmh_options %}
@@ -346,7 +345,7 @@
 
     <!-- fam histo -->
     <div class="form-card">
-        <div class="card-header section-toggle collapsed" data-section="4">4. Family History (1st Degree Relative)<span class="section-toggle-icon"></span></div>
+        <div class="card-header section-toggle collapsed" data-section="4">4. Family History (1st Degree Relative)<span class="section-toggle-icon">&#9660;</span></div>
         <div class="card-body collapsible collapsed">
             <div class="radio-card-wrapper">
                 {% for code, label in fh_options %}
@@ -358,7 +357,7 @@
 
     <!-- cvd -->
     <div class="form-card">
-        <div class="card-header section-toggle collapsed" data-section="5">5. CVD Questionnaire<span class="section-toggle-icon"></span></div>
+        <div class="card-header section-toggle collapsed" data-section="5">5. CVD Questionnaire<span class="section-toggle-icon">&#9660;</span></div>
         <div class="card-body collapsible collapsed">
             <div class="grid-2">
                 {% for key, label, no_label, yes_label in cvd_questions %}
@@ -376,7 +375,7 @@
 
     <!-- lifestyle -->
     <div class="form-card">
-        <div class="card-header section-toggle collapsed" data-section="6">6. Personal / Social History &amp; Lifestyle Factors<span class="section-toggle-icon"></span></div>
+        <div class="card-header section-toggle collapsed" data-section="6">6. Personal / Social History &amp; Lifestyle Factors<span class="section-toggle-icon">&#9660;</span></div>
         <div class="card-body collapsible collapsed">
             <div class="grid-3">
                 <div class="field-group">
@@ -429,7 +428,7 @@
 
     <!-- dia histo -->
     <div class="form-card">
-        <div class="card-header section-toggle collapsed" data-section="7">7. Diabetes History<span class="section-toggle-icon"></span></div>
+        <div class="card-header section-toggle collapsed" data-section="7">7. Diabetes History<span class="section-toggle-icon">&#9660;</span></div>
         <div class="card-body collapsible collapsed">
             <div class="field-group">
                 <label class="field-label">Was patient diagnosed as having diabetes?</label>
@@ -451,7 +450,7 @@
 
     <!-- immuno -->
     <div class="form-card">
-        <div class="card-header section-toggle collapsed" data-section="8">8. Immunizations<span class="section-toggle-icon"></span></div>
+        <div class="card-header section-toggle collapsed" data-section="8">8. Immunizations<span class="section-toggle-icon">&#9660;</span></div>
         <div class="card-body collapsible collapsed">
             <div class="radio-card-wrapper">
                 {% for code in immu_options %}
@@ -464,7 +463,7 @@
     <!-- mens and preg histo -->
     {% if patient.sex == 'Female' %}
     <div class="form-card">
-        <div class="card-header section-toggle collapsed" data-section="9">9. Menstrual &amp; Pregnancy History<span class="section-toggle-icon"></span></div>
+        <div class="card-header section-toggle collapsed" data-section="9">9. Menstrual &amp; Pregnancy History<span class="section-toggle-icon">&#9660;</span></div>
         <div class="card-body collapsible collapsed">
             <div class="grid-4">
                 <div class="field-group"><label class="field-label">Age at Menarche</label><input type="number" class="field-input editable-field" data-field="visit.menarche_age" value="{{ latest_visit.menarche_age if latest_visit.menarche_age is not none else '' }}" disabled></div>
@@ -478,7 +477,7 @@
 
     <!-- vitals and physical exam -->
     <div class="form-card">
-        <div class="card-header section-toggle collapsed" data-section="10">10. Anthropometric Measurements, Vitals &amp; Physical Exam<span class="section-toggle-icon"></span></div>
+        <div class="card-header section-toggle collapsed" data-section="10">10. Anthropometric Measurements, Vitals &amp; Physical Exam<span class="section-toggle-icon">&#9660;</span></div>
         <div class="card-body collapsible collapsed">
             <div class="grid-3">
                 <div class="field-group"><label class="field-label">Systolic BP (mmHg)</label><input type="number" class="field-input editable-field" data-field="visit.bp_systolic" value="{{ latest_visit.bp_systolic if latest_visit.bp_systolic is not none else '' }}" disabled></div>
@@ -529,10 +528,6 @@
 
 {% block scripts %}
     <script>
-        // Tiny server-rendered config -- everything else lives in the
-        // external file below so it can be cached/minified like the rest
-        // of static/js/. Jinja can't run inside a static .js file, so the
-        // handful of URLs it needs to build are handed over here instead.
         window.__psgcUrl = "{{ url_for('nurse.nurse_static_data', filename='psgc_data.json') }}";
     </script>
     <script src="{{ url_for('static', filename='js/nurse_dialog.js') }}"></script>

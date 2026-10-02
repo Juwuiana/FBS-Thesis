@@ -1069,3 +1069,71 @@ svg.nav-icon { height: 24px; padding: 2px; box-sizing: border-box; fill: none; s
     from { opacity: 0; transform: scale(0.94); }
     to { opacity: 1; transform: scale(1); }
 }
+
+/* --- ADD NEW RECORD (patient self-entry form) --- */
+.ve-field select {
+    padding: 0.55rem 0.7rem; border: 1px solid var(--border, #e0e8e0); border-radius: 6px;
+    font-family: inherit; font-size: 0.85rem; color: var(--t1, #1a2e1a); background: #fff;
+}
+.ve-field select:focus { outline: none; border-color: var(--g-accent, #27ae60); box-shadow: 0 0 0 3px rgba(39,174,96,0.1); }
+.ve-field input[readonly] { background: var(--bg, #f3f6f4); color: var(--t3, #6b7c6b); }
+.rec-req  { color: var(--danger, #ef4444); font-weight: 700; }
+.rec-hint { font-weight: 400; text-transform: none; letter-spacing: normal; color: var(--t3, #6b7c6b); }
+.rec-group { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.rec-group > .rec-chips { display: contents; }
+.rec-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.rec-chip { cursor: pointer; }
+.rec-chip input { position: absolute; opacity: 0; pointer-events: none; }
+.rec-chip span {
+    display: inline-block; padding: 0.4rem 0.8rem; font-size: 0.8rem; color: var(--t2, #475569);
+    background: #fff; border: 1px solid var(--border, #e0e8e0); border-radius: 999px;
+    transition: background .12s, border-color .12s, color .12s;
+}
+.rec-chip:hover span { border-color: var(--g-accent, #27ae60); }
+.rec-chip input:checked + span { background: var(--g-light, #e8f5e9); border-color: var(--g-accent, #27ae60); color: var(--g-dark, #1a2e1a); font-weight: 600; }
+.rec-chip input:focus-visible + span { box-shadow: 0 0 0 3px rgba(39,174,96,0.25); }
+.rec-error {
+    margin-top: 1rem; padding: 0.7rem 0.9rem; font-size: 0.82rem; border-radius: 8px;
+    background: var(--danger-bg, #fee2e2); color: var(--danger, #ef4444);
+}
+#addView { padding-bottom: 1rem; }
+
+/* --- NOTIFICATION BELL (follow-up reminders) --- */
+.patient-bell-wrap { position: fixed; top: 14px; right: 18px; z-index: 95; }
+.patient-bell-btn {
+    position: relative; width: 38px; height: 38px; border-radius: 50%;
+    background: var(--white); border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; color: var(--t2); box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+.patient-bell-btn:hover, .patient-bell-btn[aria-expanded="true"] { color: var(--g-accent); border-color: var(--g-accent); }
+.patient-bell-btn svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.patient-bell-badge {
+    position: absolute; top: -4px; right: -4px; min-width: 17px; height: 17px; padding: 0 4px;
+    border-radius: 999px; background: var(--danger); color: #fff; border: 2px solid var(--white);
+    font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center;
+}
+.patient-bell-badge[hidden], .patient-bell-panel[hidden] { display: none; }
+.patient-bell-panel {
+    position: absolute; top: 46px; right: 0; width: 330px; max-height: 420px; overflow-y: auto;
+    background: var(--white); border: 1px solid var(--border); border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+}
+.patient-bell-header { font-size: 0.78rem; font-weight: 700; color: var(--t2); padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); }
+.patient-bell-empty { font-size: 0.8rem; color: var(--t3); padding: 1rem; margin: 0; }
+.patient-bell-item { display: flex; gap: 0.7rem; padding: 0.8rem 1rem; border-bottom: 1px solid var(--border); text-decoration: none; color: inherit; }
+.patient-bell-item:last-child { border-bottom: none; }
+.patient-bell-item:hover { background: var(--bg); }
+.patient-bell-dot { flex: none; width: 9px; height: 9px; border-radius: 50%; margin-top: 0.3rem; background: var(--warn); }
+.patient-bell-item.level-overdue .patient-bell-dot { background: var(--danger); }
+.patient-bell-item.level-today   .patient-bell-dot { background: var(--g-accent); }
+.patient-bell-text { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+.patient-bell-title { font-size: 0.82rem; font-weight: 600; color: var(--t1); }
+.patient-bell-item.level-overdue .patient-bell-title { color: var(--danger); }
+.patient-bell-msg { font-size: 0.75rem; color: var(--t2); line-height: 1.45; }
+
+@media (max-width: 768px) {
+    /* sits inside the 52px dark mobile header, left of the screen edge */
+    .patient-bell-wrap { top: 7px; right: 12px; }
+    .patient-bell-panel { position: fixed; top: 56px; right: 12px; left: 12px; width: auto; }
+}
