@@ -452,11 +452,29 @@ def record_patient_profile_edit(patient_id: int, key: str, previous_value) -> bo
 
 _LABEL_ACRONYMS = {"bp": "BP", "lmp": "LMP", "bmi": "BMI"}
 
+def flag_patient_submitted_record(visit_id: int) -> None:
+    """A patient submitted a brand-new record from the portal. Flags that exact
+    visit so it shows in the nurse bell and on the Data Management name flag
+    until a nurse reviews it. Nothing to compare, so no previous values."""
+    conn = get_connection()
+    try:
+        row = conn.execute("SELECT * FROM visits WHERE id = ?", (visit_id,)).fetchone()
+        if row is None:
+            return
+        _merge_edit_flag(conn, dict(row), ["new_record"], {})
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 def _field_label(key: str) -> str:
     """Human label for an edited-field key, e.g. bp_systolic -> 'BP systolic'."""
     if key == "location":
         return "Address / location"
+    if key == "new_record":
+        return "New record submitted"
     words = key.split("_")
     words = [_LABEL_ACRONYMS.get(w, w) for w in words]
     if words[0] not in _LABEL_ACRONYMS.values():

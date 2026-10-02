@@ -524,11 +524,35 @@ def nurse_new_record(patient_id):
     if patient is None:
         abort(404)
 
+    # Carry-over from the patient's most recent visit (all fields stay editable
+    # on the page). Vitals, physical exam, CVD answers, LMP and the assessment
+    # date are deliberately NOT carried over -- they are re-taken each visit.
+    prefill = None
+    visits = visit_model.list_visits_for_patient(patient["id"])  # newest first
+    if visits:
+        last_id = visits[0]["visit_id"]
+        last_visit = visit_model.get_visit_by_id(last_id)
+        if last_visit:
+            conds = visit_model.get_conditions_for_visit(last_id) or {}
+            carry = [
+                "status", "past_surgical_history", "smoking_status",
+                "alcohol_intake", "illicit_drug_use", "physical_activity",
+                "diabetes_diagnosis", "menarche_age", "gravida", "para",
+            ]
+            prefill = {
+                "visit": {k: last_visit.get(k) for k in carry},
+                "conditions": {
+                    k: list(conds.get(k) or [])
+                    for k in ("pmh", "family_history", "diet", "immunization", "dm_symptom")
+                },
+            }
+
     return render_template(
         'nurse/nurse_new_record.html',
         patient_id=patient_id,
         patient=patient,
         barangays=lookup_model.list_barangays(),
+        prefill=prefill,
         active_page='data_management',
     )
 
