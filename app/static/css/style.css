@@ -334,7 +334,6 @@ a.demo-btn { display: inline-flex; align-items: center; }
 .ps-section-header { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .8px; color: var(--accent-green); border-bottom: 2px solid var(--accent-green-light); padding-bottom: 8px; }
 .ps-description { font-size: 13px; color: var(--text-muted); line-height: 1.6; margin-bottom: 0; }
 .protocol-banner { background: #e8f5e9; border: 1px solid #a5d6a7; border-radius: 8px; padding: 10px 14px; font-size: 12px; font-weight: 600; color: #2e7d32; display: flex; align-items: center; }
-.retention-setting-group { min-width: 260px; }
 .retention-help { margin: 8px 0 12px; max-width: 620px; }
 .retention-status { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 8px; }
 .retention-status-item { display: flex; flex-direction: column; gap: 4px; padding: 9px 11px; border: 1px solid var(--border-color); border-radius: 6px; background: #f8fbf8; font-size: 11px; color: var(--text-muted); }
@@ -352,20 +351,57 @@ a.demo-btn { display: inline-flex; align-items: center; }
 .retention-card .retention-status-item { min-width: 0; overflow-wrap: anywhere; }
 .retention-card-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; }
 .retention-card-actions > * { display: inline-flex; flex: 1 1 138px; min-width: 0; min-height: 40px; align-items: center; justify-content: center; padding: 8px 10px; text-align: center; white-space: normal; }
-.retention-review { min-width: 0; margin-top: 20px; scroll-margin-top: 16px; }
-.retention-review-form { min-width: 0; }
 .retention-empty { margin-top: 16px; }
 .retention-consent-note { margin-top: 12px; }
-.retention-confirmation { display: grid; gap: 12px; max-width: 620px; margin-top: 18px; }
-.retention-warning { margin: 0; padding: 10px 12px; border-left: 3px solid var(--accent-green); background: #f3f8f3; color: var(--text-primary); font-size: 13px; }
+.retention-modal-form { display: flex; flex-direction: column; min-height: 0; max-height: 100%; }
+.retention-modal-subtitle { margin: 2px 0 0; font-size: 12px; color: var(--text-muted); }
+.retention-summary { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px; margin-bottom: 10px; font-size: 13px; color: var(--text-primary); }
+.retention-summary-note { font-size: 12px; color: var(--text-muted); }
+.retention-table-wrap { overflow-x: auto; border: 1px solid var(--border-color); border-radius: 6px; }
+.retention-table { min-width: 560px; font-size: 13px; }
+.retention-table thead th { position: sticky; top: 0; z-index: 1; background: #f3f8f3; color: var(--text-muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; white-space: nowrap; }
+.retention-table td, .retention-table th { padding: 9px 12px; vertical-align: middle; }
+.retention-col-check { width: 40px; text-align: center; }
+.retention-table input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent-green); }
+.retention-row { cursor: pointer; }
+.retention-row:hover { background: #f8fbf8; }
+.retention-row.is-selected { background: #eef6ee; }
+.retention-code { display: block; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-weight: 600; color: var(--text-primary); }
+.retention-name { display: block; font-size: 12px; color: var(--text-muted); }
+.retention-badge { display: inline-block; min-width: 40px; padding: 2px 9px; border-radius: 10px; background: #eef1ee; color: var(--text-muted); font-size: 12px; font-weight: 700; text-align: center; }
+.retention-badge.is-mid { background: #fff3e0; color: #e65100; }
+.retention-badge.is-high { background: var(--danger-bg); color: var(--danger); }
+.retention-confirmation { display: grid; gap: 12px; justify-content: stretch; border-top: 1px solid var(--border-color); border-left: 3px solid var(--accent-green); background: #fff; }
+.retention-confirmation.is-destructive { border-left-color: var(--danger); }
+.retention-confirmation > * { margin: 0; min-width: 0; }
+.retention-action-group { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; border: 0; padding: 0; }
+.retention-action-group legend { float: none; width: auto; margin-bottom: 6px; }
+.retention-action-card { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 6px; cursor: pointer; }
+.retention-action-card input { margin-top: 3px; accent-color: var(--accent-green); }
+.retention-action-card strong, .retention-action-card small { display: block; }
+.retention-action-card strong { font-size: 13px; color: var(--text-primary); }
+.retention-action-card small { font-size: 12px; color: var(--text-muted); }
+.retention-action-card:has(input:checked) { border-color: var(--accent-green); background: #f3f8f3; }
+.retention-action-card.is-danger input { accent-color: var(--danger); }
+.retention-action-card.is-danger:has(input:checked) { border-color: var(--danger); background: var(--danger-bg); }
+.retention-action-card:has(input:focus-visible) { outline: 2px solid var(--accent-green); outline-offset: 2px; }
+.retention-warning { padding: 10px 12px; border-left: 3px solid var(--accent-green); background: #f3f8f3; color: var(--text-primary); font-size: 13px; }
 .retention-warning.is-destructive { border-left-color: var(--danger); background: var(--danger-bg); }
+.retention-confirm-count { max-width: 320px; }
+.retention-helper { display: block; margin-top: 4px; font-size: 12px; color: var(--text-muted); }
 .retention-irreversible-check { display: inline-flex; align-items: center; gap: 9px; color: var(--text-primary); font-size: 13px; }
 .retention-irreversible-check input { width: 16px; height: 16px; accent-color: var(--accent-green); }
-.retention-actions { margin-top: 14px; }
-.retention-confirm-button:disabled { cursor: not-allowed; opacity: .65; }
+.retention-hint { min-height: 18px; font-size: 12px; color: var(--text-muted); }
+.retention-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.retention-actions > * { min-height: 40px; }
+.retention-download-button:disabled, .retention-confirm-button:disabled { cursor: not-allowed; opacity: .5; filter: grayscale(.4); }
 .retention-confirm-button.is-destructive:not(:disabled) { background: var(--danger); color: #fff; border-color: var(--danger); }
 .retention-confirm-button.is-destructive:not(:disabled):hover { background: #dc2626; border-color: #dc2626; }
-@media (min-width: 768px) {
+@media (max-width: 575.98px) {
+  .retention-actions { flex-direction: column; }
+  .retention-actions > * { width: 100%; }
+  .retention-confirm-count { max-width: none; }
+}@media (min-width: 768px) {
   .retention-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 .ps-field-label { display: block; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .4px; margin-bottom: 6px; }
