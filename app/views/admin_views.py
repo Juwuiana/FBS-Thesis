@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, make_response, render_template, request, redirect, url_for, abort, flash, session
+from flask import Blueprint, Response, jsonify, make_response, render_template, request, redirect, url_for, abort, flash, session
 import hashlib
 import hmac
 import sqlite3
@@ -1295,6 +1295,18 @@ def green_pending():
     ctx = metrics_controller.pending_page_context(
         get_db(), request.args.get("page", 1, type=int), request.args.get("status", "pending"))
     return render_template("metrics/pending_sync.html", **ctx)
+
+
+@admin_bp.route("/green-computing/export.csv")
+@role_required("medical_officer")
+def green_export():
+    csv_text = metrics_controller.build_report_csv(get_db(), request.args.get("range", "7d"))
+    stamp = datetime.now().strftime("%Y%m%d_%H%M")
+    return Response(
+        csv_text.encode("utf-8-sig"),
+        mimetype="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="green_computing_report_{stamp}.csv"'},
+    )
 
 
 @admin_bp.route("/audit-trails")

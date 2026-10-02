@@ -68,7 +68,13 @@ function initLineChart() {
       maintainAspectRatio: true,
       scales: {
         x: { grid: { display: false }, ticks: { font: { size: 11 }, maxRotation: 45 } },
-        y: { grid: { color: '#f0f4f0' }, ticks: { font: { size: 11 } }, beginAtZero: false }
+        y: {
+  grid: { color: '#f0f4f0' },
+  ticks: { font: { size: 11 }, precision: 0 },
+  beginAtZero: true,
+  min: 0,
+  suggestedMax: 5
+}
       },
       plugins: {
         legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } }
