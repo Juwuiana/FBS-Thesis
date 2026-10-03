@@ -10,9 +10,9 @@
 {# Which saved field names belong to which "Edit" section, so each section's
    pending badge only lists the fields that section actually covers --
    must mirror visit_model.PATIENT_EDITABLE_VISIT_FIELDS minus the
-   nurse-only fields (status, assessment_date, pe_*, clinical_notes and the
-   anthropometrics height/weight/waist/BMI/obesity class). #}
-   {% set ve_vitals_fields = ['bp_systolic', 'bp_diastolic', 'heart_rate', 'respiratory_rate'] %}
+   nurse-only fields (status, assessment_date, pe_*, clinical_notes). Section
+   6 (Anthropometric Measurements & Vitals) is read-only end to end, so it
+   has no field list or pending badge of its own. #}
    {% set ve_lifestyle_fields = ['smoking_status', 'alcohol_intake', 'illicit_drug_use', 'physical_activity'] %}
    {% set ve_diabetes_fields = ['diabetes_diagnosis', 'past_surgical_history',
                               'menarche_age', 'lmp_date', 'gravida', 'para'] %}
@@ -73,8 +73,195 @@
 
 <nav class="results-tabs" role="tablist">
     <button type="button" class="rtab" role="tab" data-view="history">Screening History <span class="rtab-count">{{ history|length }}</span></button>
+    <button type="button" class="rtab" role="tab" data-view="add">Add New Record</button>
     <button type="button" class="rtab" role="tab" data-view="trend">FBS Trend</button>
 </nav>
+
+{# ---------- Add New Record (patient self-entry) ---------- #}
+{% set lv = history[0] %}
+{% set lc = lv.conditions or {} %}
+{% set prev_pmh = lc.pmh or [] %}
+{% set prev_fh = lc.family_history or [] %}
+{% macro chips(name, items, checked, cls='') -%}
+<div class="rec-chips">
+    {% for it in items %}
+    <label class="rec-chip"><input type="checkbox" name="{{ name }}" value="{{ it }}" class="{{ cls }}" {{ 'checked' if it in checked }}><span>{{ it }}</span></label>
+    {% endfor %}
+</div>
+{%- endmacro %}
+{% macro rec_select(name, items, current, label, required=False) -%}
+<div class="ve-field">
+    <label>{{ label }}{% if required %} <span class="rec-req">*</span>{% endif %}</label>
+    <select name="{{ name }}" {{ 'required' if required }}>
+        <option value="">{{ 'Select…' if required else '— Skip —' }}</option>
+        {% for o in items %}<option value="{{ o }}" {{ 'selected' if current == o }}>{{ o }}</option>{% endfor %}
+    </select>
+</div>
+{%- endmacro %}
+
+<div class="trend-panel" id="addView" style="display:none;">
+    <div class="ds-label">Add New Record</div>
+    <p class="ve-note" style="margin-top:0.5rem;">
+        Use this if your health details have changed since your last visit. Your previous answers are filled in for you &mdash; please check and update anything that is different.
+       Your <strong>official FBS result and risk level are recorded by your health worker</strong> at your screening. You may add an optional home reading below; it is for reference only.
+        Height, weight, waist and vital signs are optional.
+    </p>
+
+    <form method="POST" action="{{ url_for('patient.patient_add_record') }}" class="rec-form" id="addRecordForm" novalidate>
+
+        <div class="ve-grid" style="margin-bottom:1rem;">
+            <div class="ve-field">
+                <label>Date of Record <span class="rec-req">*</span></label>
+                <input type="date" name="assessment_date" value="{{ today }}" max="{{ today }}" required>
+            </div>
+        </div>
+
+        <details class="detail-section detail-collapse" open>
+            <summary><span class="ds-label">1. Past Medical History <span class="rec-req">*</span></span></summary>
+            <div class="collapse-body">
+                <div class="rec-group" id="recPmhGroup">
+                    <label class="rec-chip"><input type="checkbox" name="pmh_none" value="1" class="rec-none" data-group="pmh" {{ 'checked' if not prev_pmh }}><span>None reported</span></label>
+                    {{ chips('pmh', record_options.pmh, prev_pmh, 'rec-pmh') }}
+                </div>
+                <div class="ve-field" style="margin-top:0.85rem;">
+                    <label>Past Surgical History</label>
+                    <input type="text" name="past_surgical_history" maxlength="200" value="{{ lv.past_surgical_history or '' }}" placeholder="e.g. Appendectomy 2019">
+                </div>
+            </div>
+        </details>
+
+        <details class="detail-section detail-collapse">
+            <summary><span class="ds-label">2. Family History (1st-degree relatives) <span class="rec-req">*</span></span></summary>
+            <div class="collapse-body">
+                <div class="rec-group" id="recFhGroup">
+                    <label class="rec-chip"><input type="checkbox" name="fh_none" value="1" class="rec-none" data-group="fh" {{ 'checked' if not prev_fh }}><span>None reported</span></label>
+                    {{ chips('family_history', record_options.family_history, prev_fh, 'rec-fh') }}
+                </div>
+            </div>
+        </details>
+
+        <details class="detail-section detail-collapse">
+            <summary><span class="ds-label">3. Chest Pain / Stroke Questionnaire</span></summary>
+            <div class="collapse-body">
+                <div class="ve-grid">
+                    {% for key, label in record_options.cvd %}
+                    <div class="ve-field">
+                        <label>{{ label }}</label>
+                        <select name="{{ key }}">
+                            <option value="No">No</option>
+                            <option value="Yes">Yes</option>
+                        </select>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </details>
+
+        <details class="detail-section detail-collapse">
+            <summary><span class="ds-label">4. Lifestyle</span></summary>
+            <div class="collapse-body">
+                <div class="ve-grid">
+                    {{ rec_select('smoking_status', record_options.smoking_status, lv.smoking_status, 'Smoking (Tobacco/Cigarette)', True) }}
+                    {{ rec_select('alcohol_intake', record_options.alcohol_intake, lv.alcohol_intake, 'Alcohol Intake', True) }}
+                    {{ rec_select('illicit_drug_use', record_options.illicit_drug_use, lv.illicit_drug_use, 'Illicit Drug Use', True) }}
+                    {{ rec_select('physical_activity', record_options.physical_activity, lv.physical_activity, 'Physical Activity') }}
+                </div>
+                <div class="dd-key" style="margin:1rem 0 0.4rem;">Dietary Factors</div>
+                {{ chips('diet', record_options.diet, lc.diet or []) }}
+            </div>
+        </details>
+
+        <details class="detail-section detail-collapse">
+            <summary><span class="ds-label">5. Diabetes History</span></summary>
+            <div class="collapse-body">
+                <div class="ve-grid">
+                    {{ rec_select('diabetes_diagnosis', record_options.diabetes_diagnosis, lv.diabetes_diagnosis, 'Were you ever diagnosed with diabetes?') }}
+                </div>
+                <div class="dd-key" style="margin:1rem 0 0.4rem;">Do you have any of these symptoms?</div>
+                {{ chips('dm_symptom', record_options.dm_symptom, lc.dm_symptom or []) }}
+            </div>
+        </details>
+
+        <details class="detail-section detail-collapse">
+            <summary><span class="ds-label">6. Immunizations <span class="rec-hint">(tick any new ones)</span></span></summary>
+            <div class="collapse-body">
+                {{ chips('immunization', record_options.immunization, lc.immunization or []) }}
+            </div>
+        </details>
+
+        {% if patient.sex == 'Female' %}
+        <details class="detail-section detail-collapse">
+            <summary><span class="ds-label">7. Menstrual &amp; Pregnancy History</span></summary>
+            <div class="collapse-body">
+                <div class="ve-grid">
+                    <div class="ve-field"><label>Age at Menarche</label><input type="number" name="menarche_age" min="5" max="25" value="{{ lv.menarche_age or '' }}"></div>
+                    <div class="ve-field"><label>Last Menstrual Period</label><input type="date" name="lmp_date" max="{{ today }}"></div>
+                    <div class="ve-field"><label>Gravida (no. of pregnancies)</label><input type="number" name="gravida" min="0" max="30" value="{{ lv.gravida if lv.gravida is not none else '' }}"></div>
+                    <div class="ve-field"><label>Para (no. of deliveries)</label><input type="number" name="para" min="0" max="30" value="{{ lv.para if lv.para is not none else '' }}"></div>
+                </div>
+            </div>
+        </details>
+        {% endif %}
+
+        <details class="detail-section detail-collapse">
+            <summary><span class="ds-label">{{ 8 if patient.sex == 'Female' else 7 }}. Height, Weight &amp; Vital Signs <span class="rec-hint">(optional)</span></span></summary>
+            <div class="collapse-body">
+                <p class="ve-note">Only fill these in if you know them (for example from a recent check-up). Your health worker may re-measure them at your screening.</p>
+                <div class="ve-grid">
+                    <div class="ve-field"><label>Height (cm)</label><input type="number" step="0.1" name="height_cm" id="recHeight" min="50" max="250"></div>
+                    <div class="ve-field"><label>Weight (kg)</label><input type="number" step="0.1" name="weight_kg" id="recWeight" min="10" max="400"></div>
+                    <div class="ve-field"><label>Waist Circumference (cm)</label><input type="number" step="0.1" name="waist_cm" min="20" max="250"></div>
+                    <div class="ve-field"><label>BMI</label><input type="text" id="recBmi" readonly placeholder="Calculated automatically"></div>
+                    <div class="ve-field"><label>BP Systolic</label><input type="number" name="bp_systolic" min="50" max="300" placeholder="e.g. 120"></div>
+                    <div class="ve-field"><label>BP Diastolic</label><input type="number" name="bp_diastolic" min="30" max="200" placeholder="e.g. 80"></div>
+                    <div class="ve-field"><label>Heart Rate (bpm)</label><input type="number" name="heart_rate" min="20" max="250"></div>
+                    <div class="ve-field"><label>Respiratory Rate (br/min)</label><input type="number" name="respiratory_rate" min="5" max="80"></div>
+                </div>
+            </div>
+        </details>
+
+        <details class="detail-section detail-collapse">
+            <summary><span class="ds-label">{{ 9 if patient.sex == 'Female' else 8 }}. Home FBS Reading <span class="rec-hint">(optional)</span></span></summary>
+            <div class="collapse-body">
+                <p class="ve-note">Only enter a reading taken after fasting at least 8 hours. Your health worker will still measure your FBS at screening, and this value is not used for your risk result.</p>
+                <div class="ve-grid">
+                    <div class="ve-field"><label>Fasting Blood Sugar</label>
+                        <input type="number" step="0.1" name="self_fbs_value" min="1" max="600" placeholder="e.g. 95"></div>
+                    <div class="ve-field"><label>Unit</label>
+                        <select name="self_fbs_unit"><option value="mg_dl">mg/dL</option><option value="mmol_l">mmol/L</option></select></div>
+                            <div class="ve-field"><label>Did you fast at least 8 hours? <span class="req-star" id="fastedStar" hidden>*</span></label>
+                        <select name="self_fbs_fasted"><option value="">Select</option><option value="yes">Yes</option><option value="no">No</option><option value="unsure">Not sure</option></select></div>
+                </div>
+            </div>
+        </details>
+
+        <div class="rec-error" id="recError" role="alert" style="display:none;"></div>
+        <div class="ve-actions">
+            <button type="submit" class="btn ve-save-btn" id="recSubmitBtn">Submit New Record</button>
+        </div>
+    </form>
+
+    {% if self_fbs_entries %}
+    <div class="ds-label" style="margin-top:1.5rem;">My Home FBS Readings</div>
+    <div class="hfbs-list">
+        {% for e in self_fbs_entries %}
+        <div class="hfbs-row">
+            <div class="hfbs-when">{{ e.date }}<span>{{ e.time }}</span></div>
+            <div class="hfbs-val">
+                <strong>{{ e.fbs_mg_dl }}</strong> mg/dL
+                <span class="range-badge {{ (e.band or '')|lower|replace(' ', '-') }}">{{ e.band }}</span>
+            </div>
+            <div class="hfbs-meta">
+                {% if e.fasted %}<span class="hfbs-fasted">{{ {'yes': 'Fasted', 'no': 'Not fasted', 'unsure': 'Fasting unsure'}.get(e.fasted, '') }}</span>{% endif %}
+                <span class="hfbs-status {{ 'done' if e.reviewed else 'wait' }}">{{ 'Reviewed by health worker' if e.reviewed else 'Waiting for review' }}</span>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    <p class="ve-note" style="margin-top:0.6rem;">Home readings are for reference only and are not a diagnosis.</p>
+    {% endif %}
+
+</div>
 
 <div class="trend-panel" id="trendView" style="display:none;">
     <div class="ds-label">FBS Trend</div>
@@ -225,6 +412,19 @@
                     </div>
                 </form>
 
+                </div>
+            </details>
+
+            <details class="detail-section detail-collapse">
+                <summary><span class="ds-label">1b. Past Medical History</span></summary>
+                <div class="collapse-body">
+                <div class="risk-factors-grid">
+                    {% for code in v.conditions.pmh %}
+                    <div class="rf-pill danger-pill">⛔ {{ code }}</div>
+                    {% else %}
+                    <div class="rf-pill ok-pill">✓ No past medical history reported</div>
+                    {% endfor %}
+                </div>
                 </div>
             </details>
 
@@ -443,16 +643,7 @@
                 <summary><span class="ds-label">6. Anthropometric Measurements &amp; Vitals</span></summary>
                 <div class="collapse-body">
 
-                <div class="ve-bar">
-                    {% set vitals_changed = v.patient_edited_fields | select('in', ve_vitals_fields) | list if v.patient_edit_pending else [] %}
-                    {{ pending_badge(vitals_changed) }}
-                    <button type="button" class="btn btn-outline btn-sm ve-edit-btn" id="veEditBtn-vitals-{{ v.visit_id }}" data-view="veView-{{ v.visit_id }}" data-form="veForm-{{ v.visit_id }}">
-                        <svg class="ve-pencil" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
-                        Edit
-                    </button>
-                </div>
-
-                <div class="detail-data-grid" id="veView-{{ v.visit_id }}">
+                <div class="detail-data-grid">
                     <div class="dd-item"><span class="dd-key">Blood Pressure</span><span class="dd-val">{{ v.bp_systolic or "—" }}/{{ v.bp_diastolic or "—" }} mmHg{{ arrow(v.trend.bp, " mmHg") }}</span></div>
                     <div class="dd-item"><span class="dd-key">Heart Rate</span><span class="dd-val">{{ v.heart_rate or "—" }}{% if v.heart_rate %} bpm{% endif %}</span></div>
                     <div class="dd-item"><span class="dd-key">Respiratory Rate</span><span class="dd-val">{{ v.respiratory_rate or "—" }}{% if v.respiratory_rate %} br/min{% endif %}</span></div>
@@ -462,20 +653,7 @@
                     <div class="dd-item"><span class="dd-key">Waist Circumference</span><span class="dd-val">{{ v.waist_cm or "—" }} cm{{ arrow(v.trend.waist_cm, " cm") }}</span></div>
                     <div class="dd-item"><span class="dd-key">Obesity Classification</span><span class="dd-val">{{ v.obesity_class or "—" }}</span></div>
                 </div>
-
-                <form method="POST" action="{{ url_for('patient.patient_edit_visit', visit_id=v.visit_id) }}" class="ve-form" id="veForm-{{ v.visit_id }}" style="display:none;">
-                    <p class="ve-note">FBS, your risk result, and your height, weight, waist and BMI are measured by your health worker and can't be changed here. Other edits are reviewed by your health worker.</p>
-                    <div class="ve-grid">
-                        <div class="ve-field"><label>BP Systolic</label><input type="number" name="bp_systolic" value="{{ v.bp_systolic or '' }}" placeholder="e.g. 120"></div>
-                        <div class="ve-field"><label>BP Diastolic</label><input type="number" name="bp_diastolic" value="{{ v.bp_diastolic or '' }}" placeholder="e.g. 80"></div>
-                        <div class="ve-field"><label>Heart Rate (bpm)</label><input type="number" name="heart_rate" value="{{ v.heart_rate or '' }}"></div>
-                        <div class="ve-field"><label>Respiratory Rate</label><input type="number" name="respiratory_rate" value="{{ v.respiratory_rate or '' }}"></div>
-                    </div>
-                    <div class="ve-actions">
-                        <button type="button" class="btn btn-outline btn-sm ve-cancel-btn" data-view="veView-{{ v.visit_id }}" data-form="veForm-{{ v.visit_id }}" data-edit-btn="veEditBtn-vitals-{{ v.visit_id }}">Cancel</button>
-                        <button type="submit" class="btn btn-sm ve-save-btn">Save Changes</button>
-                    </div>
-                </form>
+                <p class="ve-note" style="margin-top:0.75rem;">These are measured by your health worker at your screening and can't be changed from the portal.</p>
 
                 </div>
             </details>
@@ -520,6 +698,7 @@
     var trend = {{ trend | tojson }};
     var historyView = document.getElementById('historyView');
     var trendView = document.getElementById('trendView');
+    var addView = document.getElementById('addView');
     var buttons = document.querySelectorAll('.rtab');
     var chartDrawn = false;
 
@@ -553,8 +732,10 @@
 
     function show(view) {
         var isTrend = view === 'trend';
-        historyView.style.display = isTrend ? 'none' : '';
+        var isAdd = view === 'add';
+        historyView.style.display = (isTrend || isAdd) ? 'none' : '';
         trendView.style.display = isTrend ? '' : 'none';
+        if (addView) addView.style.display = isAdd ? '' : 'none';
         buttons.forEach(function (b) {
             var on = b.dataset.view === view;
             b.classList.toggle('active', on);
@@ -566,7 +747,65 @@
     buttons.forEach(function (b) {
         b.addEventListener('click', function () { show(b.dataset.view); });
     });
-    show(new URLSearchParams(location.search).get('view') === 'trend' ? 'trend' : 'history');
+    var initial = new URLSearchParams(location.search).get('view');
+    show(initial === 'trend' || initial === 'add' ? initial : 'history');
+})();
+</script>
+<script>
+(function () {
+    var form = document.getElementById('addRecordForm');
+    if (!form) return;
+    var errBox = document.getElementById('recError');
+
+    // "None reported" is exclusive within its group
+    form.querySelectorAll('.rec-none').forEach(function (none) {
+        var group = none.closest('.rec-group');
+        var boxes = group.querySelectorAll('input[type=checkbox]:not(.rec-none)');
+        none.addEventListener('change', function () {
+            if (none.checked) boxes.forEach(function (b) { b.checked = false; });
+        });
+        boxes.forEach(function (b) {
+            b.addEventListener('change', function () { if (b.checked) none.checked = false; });
+        });
+    });
+
+    // BMI preview (server recomputes it; this is just for the patient to see)
+    var h = document.getElementById('recHeight'), w = document.getElementById('recWeight'), bmi = document.getElementById('recBmi');
+    function calcBmi() {
+        var hv = parseFloat(h.value), wv = parseFloat(w.value);
+        bmi.value = (hv > 0 && wv > 0) ? (wv / Math.pow(hv / 100, 2)).toFixed(1) : '';
+    }
+    h.addEventListener('input', calcBmi); w.addEventListener('input', calcBmi);
+
+    function openFor(el) {
+        var d = el.closest('details'); if (d) d.open = true;
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    function fail(msg, el) {
+        errBox.textContent = msg; errBox.style.display = '';
+        if (el) openFor(el);
+        return false;
+    }
+
+    form.addEventListener('submit', function (e) {
+        errBox.style.display = 'none';
+        var groups = [['recPmhGroup', 'Past Medical History'], ['recFhGroup', 'Family History']];
+        for (var i = 0; i < groups.length; i++) {
+            var g = document.getElementById(groups[i][0]);
+            if (!g.querySelector('input:checked')) {
+                e.preventDefault();
+                return fail(groups[i][1] + ': select at least one, or check "None reported".', g);
+            }
+        }
+        var required = form.querySelectorAll('[required]');
+        for (var j = 0; j < required.length; j++) {
+            if (!required[j].value) {
+                e.preventDefault();
+                return fail('Please fill in all required fields marked *.', required[j]);
+            }
+        }
+        document.getElementById('recSubmitBtn').disabled = true;  // avoid double submit
+    });
 })();
 </script>
 {% endif %}
@@ -607,9 +846,9 @@
             return parent ? load('city', parent, '') : Promise.resolve(reset('city'));
         }
 
-        sel.region.addEventListener('change', function () {
-            if (hasProvinces) { reset('province'); if (sel.region.value) load('province', sel.region.value, ''); }
-            loadCities();
+           sel.region.addEventListener('change', function () {
+            if (hasProvinces) { reset('province'); reset('city'); reset('barangay'); if (sel.region.value) load('province', sel.region.value, ''); }
+            else loadCities();
         });
         if (sel.province) sel.province.addEventListener('change', loadCities);
         sel.city.addEventListener('change', function () {
@@ -633,6 +872,21 @@
             b.addEventListener('click', function () { init(form); });
         }
     });
+})();
+</script>
+<script>
+(function () {
+    var val = document.querySelector('[name="self_fbs_value"]');
+    var fasted = document.querySelector('[name="self_fbs_fasted"]');
+    var star = document.getElementById('fastedStar');
+    if (!val || !fasted || !star) return;
+    function sync() {
+        var on = val.value.trim() !== '';
+        star.hidden = !on;
+        fasted.required = on;
+    }
+    val.addEventListener('input', sync);
+    sync();
 })();
 </script>
 {% endblock %}

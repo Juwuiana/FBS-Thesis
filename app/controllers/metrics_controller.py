@@ -9,8 +9,6 @@ Definitions used on the dashboard (also documented in README):
                      FBS_POWER_FEED=solar_ups (a grid-fed phone would otherwise be punished for
                      something it cannot change).
 """
-import csv
-import io
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
 from time import perf_counter
@@ -470,87 +468,3 @@ def pending_page_context(db, page, status):
     summ = sync_block(db)
     return {"records": records, "pg": pg, "status": status, "summary": summ,
             "monitor": monitor_status(db), "timezone": current_app.config["TIMEZONE"]}
-
-# ---- CSV report export ---------------------------------------------------------------------------
-
-def build_report_csv(db, rng="7d", include_patient_rows=False):
-    """One CSV with the same sections the Green Computing page shows (same data source)."""
-    if rng not in RANGES:
-        rng = "7d"
-    gc, records, inferences = dashboard_context(db)
-    tracker = realtime_chart(db, rng)
-
-    buf = io.StringIO()
-    w = csv.writer(buf)
-
-    def section(title, header=None):
-        w.writerow([])
-        w.writerow([title.upper()])
-        if header:
-            w.writerow(header)
-
-    basis = ("whole phone (device telemetry)" if gc["energy_basis"] == "device_telemetry"
-             else "model runs only (no telemetry yet)")
-    w.writerow(["Green Computing Report - FBS Diabetes Risk Screening"])
-    w.writerow(["Generated", _local_now().strftime("%Y-%m-%d %H:%M:%S"), current_app.config["TIMEZONE"]])
-    w.writerow(["Energy basis", basis])
-    w.writerow(["Includes seeded demo data", "Yes" if gc["seeded"] else "No"])
-    if gc["seeded"]:
-        w.writerow(["Note", "Contains seeded demo data (scripts/seed_green_demo.py), not only real measurements."])
-
-    section("Summary", ["Metric", "Value", "Unit", "Comparison"])
-    w.writerow(["Energy today", gc["energy_kwh"], "kWh", gc["energy_change"]])
-    w.writerow(["Carbon footprint today", gc["carbon"], "kg CO2", gc["carbon_change"]])
-    w.writerow(["Green score", gc["green_score"], "/ 100", f'{gc["score_label"]}; {gc["score_change"]}'])
-    w.writerow(["Sync queue", gc["sync_queue"], "records", "Pending upload"])
-    w.writerow(["Uptime today", gc["uptime"], "", f'{gc["offline_gaps"]} offline gaps'])
-
-    section("Green score breakdown (last 7 days)", ["Component", "Score (%)"])
-    for b in gc["score_breakdown"]:
-        w.writerow([b["label"], "n/a" if b["na"] else b["pct"]])
-
-    section("Energy breakdown (last 24 hours)", ["Component", "Share (%)", "Energy (kWh)"])
-    for c in gc["energy_breakdown"]:
-        w.writerow([c["label"], c["pct"], c["kwh"]])
-    if gc["idle_note"]:
-        w.writerow([gc["idle_note"]])
-
-    section(f"Energy & carbon tracker ({rng}, basis: {tracker['basis']})",
-            ["Period", "Energy (kWh)", "Carbon (kg CO2)"])
-    for lbl, e, c in zip(tracker["labels"], tracker["energy_values"], tracker["carbon_values"]):
-        w.writerow([lbl, f"{e:.6g}", f"{c:.6g}"])
-
-    section("Offline & sync status", ["Metric", "Value"])
-    w.writerow(["Connection", "OFFLINE" if gc["is_offline"] else "ONLINE"])
-    w.writerow(["Last sync", gc["last_sync"]])
-    w.writerow(["Queued records", gc["queued_count"]])
-    w.writerow(["Synced records", gc["synced_count"]])
-    w.writerow(["Pending screenings", gc["queue"]["screenings"]])
-    w.writerow(["Pending patient records", gc["queue"]["patients"]])
-    w.writerow(["Pending risk assessments", gc["queue"]["assessments"]])
-    w.writerow(["Total offline today", gc["total_offline"]])
-    w.writerow(["Offline gaps today", gc["gap_count"]])
-
-    section("Offline events today", ["Time range", "Duration", "Records queued"])
-    if not gc["offline_events"]:
-        w.writerow(["No offline gaps today."])
-    for ev in gc["offline_events"]:
-        w.writerow([ev["time_range"], ev["duration"], ev["records"]])
-
-    section("Live inference log (latest model runs)",
-            ["Time", "Latency", "CPU", "Memory", "Power", "Energy", "Carbon", "Source"])
-    if not inferences:
-        w.writerow(["No inferences recorded yet."])
-    for i in inferences:
-        w.writerow([i["time"], i["latency"], i["cpu"], i["ram"], i["power"],
-                    i["energy"], i["carbon"], i["method"]])
-
-    if include_patient_rows:
-        section("Embedded screening records (offline queue)",
-                ["Patient ID", "FBS (mg/dL)", "Risk", "Status", "Time"])
-        if not records:
-            w.writerow(["No queued or synced offline records yet."])
-        for r in records:
-            w.writerow([r["id"], r["fbs"], r["risk"], r["status"], r["time"]])
-
-    return buf.getvalue()

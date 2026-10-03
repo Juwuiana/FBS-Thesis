@@ -165,8 +165,7 @@
 
         </div>
 
-        <div class="right-col">
-
+        <div class="right-col">            
             <!-- Shown immediately when the visit already has a screening; otherwise revealed by "Calculate Risk" -->
             <div id="riskResultSection" style="{{ '' if existing_screening else 'display:none;' }}">
 
@@ -215,7 +214,11 @@
                 </div>
 
             </div>
-
+            
+            {% if patient_entries %}
+                {% include "nurse/_patient_reported_fbs_card.html" %}
+            {% endif %}           
+             
             <div class="form-card">
                 <div class="card-header section-toggle collapsed" style="background:var(--green-light); border-top-color:var(--green-light);">Screening History<span class="section-toggle-icon">&#9660;</span></div>
                 <div class="card-body collapsible collapsed" style="padding: 0;">

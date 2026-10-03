@@ -2,6 +2,47 @@ document.addEventListener("DOMContentLoaded", () => {
     const form = document.getElementById("intakeForm");
     const patientId = form.dataset.patientId;
 
+    // ---------------------------------------------------------------
+    // Accordion — one section open at a time (same behavior as Nurse Intake)
+    // ---------------------------------------------------------------
+    document.querySelectorAll(".card-header.section-toggle").forEach((header) => {
+        header.addEventListener("click", () => {
+            const body = header.nextElementSibling;
+            if (!body || !body.classList.contains("card-body")) return;
+            const isCollapsed = header.classList.contains("collapsed");
+
+            if (isCollapsed) {
+                document.querySelectorAll(".card-header.section-toggle").forEach((h) => {
+                    if (h === header) return;
+                    h.classList.add("collapsed");
+                    const b = h.nextElementSibling;
+                    if (b) b.classList.add("collapsed");
+                });
+                header.classList.remove("collapsed");
+                body.classList.remove("collapsed");
+            } else {
+                header.classList.add("collapsed");
+                body.classList.add("collapsed");
+            }
+        });
+    });
+
+    function openSectionFor(input) {
+        if (!input) return;
+        const card = input.closest(".form-card");
+        if (!card) return;
+        const header = card.querySelector(".card-header.section-toggle");
+        const body = card.querySelector(".card-body");
+        if (!header || !body) return;
+        document.querySelectorAll(".card-header.section-toggle").forEach((h) => {
+            h.classList.add("collapsed");
+            const b = h.nextElementSibling;
+            if (b) b.classList.add("collapsed");
+        });
+        header.classList.remove("collapsed");
+        body.classList.remove("collapsed");
+    }
+
     // Name is locked for good once the patient exists (this page is only
     // ever reached for an EXISTING patient_code — /nurse_new_record/<id>).
     // Server also ignores these fields on update; this just makes the UI honest.
@@ -29,6 +70,81 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     wireNoneExclusive(".pmh", ".pmh-none");
     wireNoneExclusive(".fh", ".fh-none");
+
+    // Menstrual & Pregnancy History is female-only: hide the whole card for male patients
+    const FEMALE_ONLY_IDS = ["menarcheAge", "lmp", "gravida", "para"];
+    function toggleFemaleOnlyCard() {
+        const sexEl = document.getElementById("sex");
+        const isMale = !!sexEl && sexEl.value.trim().toLowerCase() === "male";
+        const card = document.getElementById("obGyneCard");
+        if (card) card.style.display = isMale ? "none" : "";
+        if (isMale) {
+            // don't submit stale values (buildPayload sends empty fields as null)
+            FEMALE_ONLY_IDS.forEach((id) => { const el = document.getElementById(id); if (el) el.value = ""; });
+        }
+    }
+    const sexSelect = document.getElementById("sex");
+    if (sexSelect) sexSelect.addEventListener("change", toggleFemaleOnlyCard);
+    toggleFemaleOnlyCard(); // sex is pre-filled, so apply on load
+
+    // ---------------------------------------------------------------
+    // Prefill from the patient's previous record (all fields stay editable).
+    // Only carries over things that tend to stay the same between visits.
+    // NOT carried over: assessment date, vitals/measurements, physical exam,
+    // CVD questionnaire answers, LMP -- those are re-taken each visit.
+    // ---------------------------------------------------------------
+    function setField(id, value) {
+        const el = document.getElementById(id);
+        if (!el || value === null || value === undefined || value === "") return;
+        el.value = value; // <option>s have no value attr, so text == value
+    }
+
+    function setChecks(className, values) {
+        const wanted = new Set(values || []);
+        document.querySelectorAll(`.${className}`).forEach((cb) => {
+            if (cb.value !== "None") cb.checked = wanted.has(cb.value);
+        });
+    }
+
+    function applyPrefill() {
+        const p = window.__prefill;
+        if (!p || !p.visit) return;
+        const v = p.visit;
+        const c = p.conditions || {};
+
+        // Section 3 & 4: PMH / Family History. Empty list on a submitted record = "None reported".
+        [["pmh", "pmh-none", c.pmh], ["fh", "fh-none", c.family_history]].forEach(([cls, noneCls, list]) => {
+            setChecks(cls, list);
+            const none = document.querySelector(`.${noneCls}`);
+            if (none && (!list || list.length === 0) && v.status === "submitted") none.checked = true;
+        });
+        setField("pastSurgical", v.past_surgical_history);
+
+        // Section 6: lifestyle
+        if (v.smoking_status) {
+            const r = Array.from(document.querySelectorAll('input[name="smoke"]')).find((x) => x.value === v.smoking_status);
+            if (r) r.checked = true;
+        }
+        setField("alcohol", v.alcohol_intake);
+        setField("illicitDrugs", v.illicit_drug_use);
+        setField("physicalActivity", v.physical_activity);
+        setChecks("diet", c.diet);
+
+        // Section 7: diabetes history
+        setField("diabetesDiagnosis", v.diabetes_diagnosis);
+        setChecks("dm-sym", c.dm_symptom);
+
+        // Section 8: immunizations (nurse ticks any new ones)
+        setChecks("immu", c.immunization);
+
+        // Section 9: menstrual history (stable parts only; LMP is re-entered)
+        setField("menarcheAge", v.menarche_age);
+        setField("gravida", v.gravida);
+        setField("para", v.para);
+    }
+    applyPrefill();
+    toggleFemaleOnlyCard(); // re-run so male patients still get the card hidden/cleared
+
 
     function clearAllErrors() {
         document.querySelectorAll(".radio-card-wrapper.group-error").forEach((g) => {
@@ -123,6 +239,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         if (firstInvalid) {
+            openSectionFor(firstInvalid);
             firstInvalid.scrollIntoView({ behavior: "smooth", block: "center" });
             if (typeof firstInvalid.focus === "function") firstInvalid.focus({ preventScroll: true });
         }
@@ -170,7 +287,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     onStay: () => {},
                 });
             } else {
-                window.location.href = `/nurse/screening/${encodeURIComponent(patientId)}`;
+                window.location.href = window.__screeningUrl || `/nurse/screening/${encodeURIComponent(patientId)}`;
             }
         } catch (err) {
             console.error(err);

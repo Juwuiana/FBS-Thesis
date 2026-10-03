@@ -1,3 +1,9 @@
+# Patient add-record merge
+
+- **Merged:** patient portal "Add New Record" (self-reported FBS entries, follow-up bell, nurse review card, nurse New Record accordion/prefill) combined with the patient record-retention fix.
+- **Changed:** patient self-reported FBS migration renumbered `0030_patient_fbs_entries.sql` -> `0032_patient_fbs_entries.sql` (0030/0031 belong to retention); table now uses `ON DELETE CASCADE` so retention delete / recycle-bin purge don't hit foreign-key errors.
+- **Fixed:** nurse New Record validation now keeps the stricter required-field checks and auto-opens the collapsed section containing the first error.
+
 # Admin privacy retention layout
 
 - **Updated:** consolidated the Recycle Bin and active-patient retention controls into matching responsive cards in Data Privacy. Saving either policy now returns to that tab.

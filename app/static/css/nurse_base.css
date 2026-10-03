@@ -777,3 +777,43 @@ svg.nav-icon { height: 24px; padding: 2px; box-sizing: border-box; fill: none; s
 .edit-flag { display: inline-flex; vertical-align: middle; margin-right: 0.4rem; color: #d97706; text-decoration: none; }
 .edit-flag svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 .edit-flag:hover, .edit-flag:focus-visible { color: #b45309; }
+/* ==========================================================================
+   Unified dropdown arrow for every <select class="field-input">.
+   appearance: none (already set on .field-input) strips the native arrow;
+   this puts one back in a single shared place, so Nurse Intake, Add New
+   Record, and the patient file View page -- which all already use the same
+   .field-input class -- render an identical dropdown by construction
+   instead of needing to be kept in sync by hand on each page.
+
+   The arrow is a thin line-drawn chevron (2px stroke, rounded caps), the
+   same visual language as .section-toggle-icon and .trend-arrow elsewhere
+   in this file, just pointing down and filled in as an SVG background
+   image since a <select>'s arrow can't be built from real DOM elements.
+   ========================================================================== */
+select.field-input {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='5 8 10 13 15 8'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 13px;
+    padding-right: 2.25rem;
+}
+
+/* .field-input:disabled / [readonly] resets `background` as a shorthand,
+   which would otherwise wipe the arrow image out along with the fill
+   colour -- this re-applies both together, dimmed, so a disabled select
+   (e.g. the View page before "Edit" is clicked) still reads as a dropdown. */
+select.field-input:disabled,
+select.field-input[disabled] {
+    background-color: var(--bg);
+    color: var(--t3);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23a3acb5' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='5 8 10 13 15 8'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 13px;
+}
+
+.card-header .header-desc { margin-left: auto; text-align: right; }
+
+/* Tooltips in a table's last column open leftward so the card edge can't clip them */
+td:last-child .tip::after, th:last-child .tip::after { left: auto; right: 0; }
+.tip::after { max-width: min(17rem, 70vw); }

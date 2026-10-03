@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, jsonify, abort, redirect, url_for, Response, current_app, session, flash, send_from_directory
-from app.models import patient_model, visit_model, lab_model, lookup_model, health_analytics_model, audit_model
+from app.models import patient_fbs_model, patient_model, visit_model, lab_model, lookup_model, health_analytics_model, audit_model
 from app.db import get_db
 from app.controllers import auth_controller, metrics_controller
 from datetime import date as date_cls
@@ -391,6 +391,7 @@ def nurse_screening(patient_id, visit_id=None):
         existing_screening=existing_screening,
         is_latest=is_latest,
         active_page='intake',
+        patient_entries=patient_fbs_model.list_entries_for_screening(patient["id"], selected_visit_id),
     )
 
 @nurse_bp.route('/nurse/patient_file_view/<patient_id>')
@@ -524,11 +525,35 @@ def nurse_new_record(patient_id):
     if patient is None:
         abort(404)
 
+    # Carry-over from the patient's most recent visit (all fields stay editable
+    # on the page). Vitals, physical exam, CVD answers, LMP and the assessment
+    # date are deliberately NOT carried over -- they are re-taken each visit.
+    prefill = None
+    visits = visit_model.list_visits_for_patient(patient["id"])  # newest first
+    if visits:
+        last_id = visits[0]["visit_id"]
+        last_visit = visit_model.get_visit_by_id(last_id)
+        if last_visit:
+            conds = visit_model.get_conditions_for_visit(last_id) or {}
+            carry = [
+                "status", "past_surgical_history", "smoking_status",
+                "alcohol_intake", "illicit_drug_use", "physical_activity",
+                "diabetes_diagnosis", "menarche_age", "gravida", "para",
+            ]
+            prefill = {
+                "visit": {k: last_visit.get(k) for k in carry},
+                "conditions": {
+                    k: list(conds.get(k) or [])
+                    for k in ("pmh", "family_history", "diet", "immunization", "dm_symptom")
+                },
+            }
+
     return render_template(
         'nurse/nurse_new_record.html',
         patient_id=patient_id,
         patient=patient,
         barangays=lookup_model.list_barangays(),
+        prefill=prefill,
         active_page='data_management',
     )
 
@@ -985,3 +1010,15 @@ def nurse_issue_portal_credentials(patient_id):
         'nurse/nurse_patient_credentials_slip.html',
         patient=patient, temp_password=temp_password,
     )
+
+@nurse_bp.route('/patient/<patient_id>/fbs_entry/<int:entry_id>/status', methods=['POST'])
+def patient_fbs_set_status(patient_id, entry_id):
+    patient = patient_model.get_patient_by_code(patient_id)
+    if not patient:
+        abort(404)
+    status = (request.get_json(silent=True) or {}).get("status")
+    try:
+        ok = patient_fbs_model.set_review_status(entry_id, patient["id"], status, session.get("user_id"))
+    except ValueError:
+        return jsonify({"error": "Invalid status"}), 400
+    return (jsonify({"status": status}), 200) if ok else (jsonify({"error": "Not found"}), 404)

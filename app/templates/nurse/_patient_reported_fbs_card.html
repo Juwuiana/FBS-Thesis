@@ -1,0 +1,190 @@
+{#
+  Patient-Reported FBS card  (nurse side, read-only reference)
+
+  WHERE TO INCLUDE: nurse_screening.html, inside <div class="right-col">,
+  directly above the "Screening History" card:
+
+      {% include "nurse/_patient_reported_fbs_card.html" %}
+
+  EXPECTED CONTEXT:
+      patient          -> existing
+      patient_entries  -> patient_fbs_model.list_entries_for_screening(patient_id, visit_id)
+          each dict has: id, date, time, fbs_mg_dl, fasted ("yes"|"no"|"unsure"),
+          review_status ("unreviewed"|"reviewed"|"flagged"), linked (1 if submitted with this visit)
+
+  NOTE: this sits inside the screening <form>, so the status buttons are
+  type="button" + fetch(). A nested <form> here would be invalid HTML.
+#}
+
+{% set patient_entries = patient_entries | selectattr('linked') | list %}
+<style>
+    .pr-pill { border: 1px solid transparent; border-radius: 999px; padding: 0.2rem 0.65rem; font-size: 0.7rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
+    .pr-pill.unreviewed { background: var(--warning-light); color: #92400e; border-color: var(--warning); }
+    .pr-pill.reviewed   { background: var(--green-light);   color: var(--green-dark); border-color: var(--green-accent); }
+    .pr-pill.flagged    { background: var(--danger-light, #fee2e2); color: var(--danger, #dc2626); border-color: var(--danger, #dc2626); }
+    .pr-tag { display: inline-block; white-space: nowrap; margin-top: 0.2rem; font-size: 0.65rem; color: var(--text-muted); border: 1px dashed var(--border); border-radius: 4px; padding: 0.05rem 0.35rem; margin-left: 0.4rem; }
+    select.pr-pill { padding-right: 0.4rem; }
+</style>
+
+<div class="form-card">
+    <div class="card-header section-toggle {% if not patient_entries or not patient_entries|selectattr('review_status', 'equalto', 'unreviewed')|list %}collapsed{% endif %}"
+         style="background:var(--green-light); border-top-color:var(--green-light);">
+        <span>
+            Patient-Reported FBS
+            {% set pending = patient_entries|selectattr('review_status', 'equalto', 'unreviewed')|list|length if patient_entries else 0 %}
+            {% if pending %}
+                <span style="background:var(--warning); color:white; border-radius:999px; padding:0.1rem 0.5rem; font-size:0.7rem; margin-left:0.4rem;">{{ pending }} new</span>
+            {% endif %}
+        </span>
+        <span class="section-toggle-icon">&#9660;</span>
+    </div>
+
+    <div class="card-body collapsible" style="padding:0;">
+        <div style="padding:0.75rem 1rem; font-size:0.75rem; color:var(--text-muted); background:var(--bg-light); border-bottom:1px solid var(--border);">
+            Entered by the patient. Unverified, for reference only. Not used in the risk calculation
+            and not part of the screening record.
+        </div>
+
+        <table style="width:100%; border-collapse:collapse; font-size:0.8rem;">
+            <tr style="border-bottom:1px solid var(--border); color:var(--text-muted);">
+                <th style="padding:0.75rem 1rem; text-align:left; font-weight:500;">Date</th>
+                <th style="padding:0.75rem 0.5rem; text-align:left; font-weight:500;">Time</th>
+                <th style="padding:0.75rem 0.5rem; text-align:left; font-weight:500;">FBS</th>
+                <th style="padding:0.75rem 0.5rem; text-align:left; font-weight:500;">Fasted</th>
+                <th style="padding:0.75rem 1rem; text-align:right; font-weight:500;">Status</th>
+            </tr>
+
+            {% for e in (patient_entries | selectattr('linked') | list)[:5] %}
+            <tr class="pr-row" style="border-bottom:1px solid var(--border);"
+                data-fbs="{{ e.fbs_mg_dl }}" data-date="{{ e.date }}" data-time="{{ e.time or '' }}"
+                data-linked="{{ 1 if e.linked else 0 }}"
+                data-status="{{ e.review_status }}">
+                <td style="padding:0.75rem 1rem;">{{ e.date }}</td>
+                <td style="padding:0.75rem 0.5rem;">{{ e.time or '—' }}</td>
+                <td style="padding:0.75rem 0.5rem;">
+                    <strong>{{ e.fbs_mg_dl }}</strong> mg/dL
+                    <span class="pr-tag">self-reported</span>
+                    {% if e.linked %}<span class="pr-tag" style="border-style:solid; color:var(--green-dark);">with this record</span>{% endif %}
+                    <div style="font-size:0.7rem; color:var(--text-muted);">
+                        {% if e.fbs_mg_dl < 100 %}in normal range
+                        {% elif e.fbs_mg_dl < 126 %}in prediabetic range
+                        {% else %}in diabetic range{% endif %}
+                    </div>
+                </td>
+                <td style="padding:0.75rem 0.5rem;">
+                    {{ {'yes': 'Yes', 'no': 'No', 'unsure': 'Unsure'}[e.fasted] }}
+                </td>
+                <td style="padding:0.75rem 1rem; text-align:right;">
+                    <select class="pr-pill pr-status {{ e.review_status }}"
+                            aria-label="Review status"
+                            data-prev="{{ e.review_status }}"
+                            data-url="{{ url_for('nurse.patient_fbs_set_status', patient_id=patient.patient_code, entry_id=e.id) }}">
+                        <option value="unreviewed" {{ 'selected' if e.review_status == 'unreviewed' }}>Unreviewed</option>
+                        <option value="reviewed" {{ 'selected' if e.review_status == 'reviewed' }}>Reviewed</option>
+                        <option value="flagged" {{ 'selected' if e.review_status == 'flagged' }}>Flagged</option>
+                    </select>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="5" style="padding:1rem; color:var(--text-muted);">No patient-reported readings.</td>
+            </tr>
+            {% endfor %}
+        </table>
+
+        {% if patient_entries|length > 5 %}
+        <div style="padding:0.75rem 1rem; text-align:right;">
+            <a href="{{ url_for('nurse.nurse_patient_file_view', patient_id=patient.patient_code) }}"
+               style="color:var(--green-accent); text-decoration:none; font-size:0.8rem;">View all {{ patient_entries|length }} entries →</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const fbs = document.getElementById('fbsInput');
+    const unit = document.getElementById('fbsUnit');
+    const dt = document.getElementById('testDateTime');
+    const canFill = !!fbs && !fbs.disabled;   // saved or locked screenings are never touched
+    let prefill = null;                        // what we wrote, so we never clobber the nurse's own typing
+
+    function hintEl() {
+        let h = document.getElementById('prefillHint');
+        if (!h) {
+            h = document.createElement('p');
+            h.id = 'prefillHint';
+            h.style.cssText = 'font-size:0.75rem; color:#92400e; margin-top:0.35rem;';
+            h.textContent = 'Prefilled from the patient\u2019s report. Replace with your glucometer reading.';
+            const anchor = document.getElementById('fbsConvertedHint');
+            if (anchor) anchor.after(h);
+        }
+        return h;
+    }
+
+    function fillFrom(row) {
+        if (!canFill) return;
+        if (fbs.value && !(prefill && fbs.value === prefill.fbs)) return;   // nurse already typed a value
+        const date = row.dataset.date;
+        const time = (row.dataset.time || '').slice(0, 5);
+        const dtVal = (/^\d{4}-\d{2}-\d{2}$/.test(date) && /^\d{2}:\d{2}$/.test(time)) ? date + 'T' + time : '';
+        fbs.value = row.dataset.fbs;
+        if (unit) unit.value = 'mg_dl';
+        if (dt && (!dt.value || (prefill && dt.value === prefill.dt))) dt.value = dtVal;
+        fbs.dispatchEvent(new Event('input', { bubbles: true }));   // refresh the converted-value hint
+        prefill = { src: row, fbs: fbs.value, dt: dtVal };
+        hintEl();
+    }
+
+    function clearPrefill(row) {
+        if (!prefill || prefill.src !== row) return;
+        if (fbs.value === prefill.fbs) fbs.value = '';
+        if (dt && dt.value === prefill.dt) dt.value = '';
+        fbs.dispatchEvent(new Event('input', { bubbles: true }));
+        const h = document.getElementById('prefillHint');
+        if (h) h.remove();
+        prefill = null;
+    }
+
+    // A real keystroke means the value is now the nurse's own.
+    if (fbs) fbs.addEventListener('input', (ev) => {
+        if (!ev.isTrusted) return;
+        prefill = null;
+        const h = document.getElementById('prefillHint');
+        if (h) h.remove();
+    });
+
+    document.querySelectorAll('.pr-status').forEach((sel) => {
+        sel.addEventListener('change', async () => {
+            const next = sel.value, prev = sel.dataset.prev;
+            const row = sel.closest('.pr-row');
+            sel.disabled = true;
+            try {
+                const res = await fetch(sel.dataset.url, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: next })
+                });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                sel.className = 'pr-pill pr-status ' + next;
+                sel.dataset.prev = next;
+                row.dataset.status = next;
+                if (next === 'reviewed') fillFrom(row);
+                else if (prev === 'reviewed') clearPrefill(row);
+            } catch (err) {
+                sel.value = prev;
+                (typeof nurseAlert === 'function' ? nurseAlert : alert)('Could not update the status (' + err.message + ').');
+            } finally {
+                sel.disabled = false;
+            }
+        });
+    });
+
+    // Page reload: a reading already marked Reviewed fills a still-empty form.
+    const rows = Array.from(document.querySelectorAll('.pr-row'));
+    const done = rows.filter((r) => r.dataset.status === 'reviewed');
+    const initial = done.find((r) => r.dataset.linked === '1') || done[0];
+    if (initial) fillFrom(initial);
+});
+</script>

@@ -4,7 +4,7 @@ eto yung nakikita ng patients
 import bisect
 import json
 from datetime import date, datetime
-from app.models import visit_model, lab_model
+from app.models import visit_model, lab_model, patient_fbs_model
 
 _RISK_LABEL_MAP = {"Low": "Low Risk", "Moderate": "Moderate Risk", "High": "High Risk"}
 
@@ -242,3 +242,10 @@ def get_dashboard_extras(patient_id: int, sex: str | None) -> dict:
         "reasons": explain_result(screened[0], sex) if screened else [],
         "trend": [{"date": h["date"], "fbs": h["fbs_score"]} for h in reversed(screened)],
     }
+
+def get_self_reported_fbs(patient_id: int) -> list[dict]:
+    return [
+        {**e, "band": classify_fbs_band(e["fbs_mg_dl"]),
+         "reviewed": e["review_status"] != "unreviewed"}
+        for e in patient_fbs_model.list_entries_for_patient(patient_id, limit=10)
+    ]
