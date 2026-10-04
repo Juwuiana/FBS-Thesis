@@ -317,6 +317,10 @@ def _patient_listing_filters(barangay=None, risk=None, date=None, q=None, status
         params.extend([like, like, like])
     if status == "draft":
         conditions.append("COALESCE(v.status, '') = 'draft'")
+    elif status == "account_help":
+        conditions.append(
+            "p.account_help_requested_at IS NOT NULL AND p.account_help_resolved_at IS NULL"
+        )
     elif status == "awaiting_lab":
         conditions.append("v.id IS NOT NULL AND COALESCE(v.status, '') != 'draft' AND ls.id IS NULL")
     elif status == "needs_review":
@@ -1367,6 +1371,141 @@ def get_recent_login_events(patient_id: int, limit: int = 5) -> list[dict]:
         {**dict(row), "device_label": describe_user_agent(row["user_agent"])}
         for row in rows
     ]
+
+_ACCOUNT_HELP_REASONS = {"forgot_password", "lost_id", "locked_out"}
+ACCOUNT_HELP_REASON_LABELS = {
+    "forgot_password": "Forgot password",
+    "lost_id": "Lost/forgot Patient ID",
+    "locked_out": "Can't sign in",
+}
+
+
+def request_account_help(patient_code: str, reason: str) -> None:
+    """
+    Flags a patient's account for nurse follow-up from the (unauthenticated)
+    login page. Deliberately silent about whether patient_code matched
+    anything real -- same reasoning as authenticate_patient()'s generic
+    "Invalid patient ID or password": a distinct response here would let
+    someone enumerate valid Patient IDs. Callers should show the same
+    message either way and treat this as always "sent".
+
+    A new request always overwrites any previous one's resolved state --
+    if the patient is reaching out again, whatever a nurse did last time
+    evidently didn't resolve it.
+    """
+    reason = reason if reason in _ACCOUNT_HELP_REASONS else "locked_out"
+    conn = get_connection()
+    conn.execute(
+        """
+        UPDATE patients
+        SET account_help_requested_at = datetime('now'),
+            account_help_reason = ?,
+            account_help_resolved_at = NULL,
+            account_help_resolved_by_staff_id = NULL
+        WHERE patient_code = ?
+        """,
+        (reason, patient_code),
+    )
+    conn.commit()
+    conn.close()
+
+
+def count_pending_account_help_requests() -> int:
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT COUNT(*) AS n FROM patients "
+        "WHERE account_help_requested_at IS NOT NULL AND account_help_resolved_at IS NULL"
+    ).fetchone()
+    conn.close()
+    return row["n"] if row else 0
+
+
+def list_pending_account_help_requests(limit: int = 20) -> list[dict]:
+    """Newest first, for the nurse notification bell."""
+    conn = get_connection()
+    rows = conn.execute(
+        """
+        SELECT id AS patient_id, patient_code, first_name, last_name,
+               account_help_requested_at AS requested_at,
+               account_help_reason AS reason
+        FROM patients
+        WHERE account_help_requested_at IS NOT NULL AND account_help_resolved_at IS NULL
+        ORDER BY account_help_requested_at DESC
+        LIMIT ?
+        """,
+        (limit,),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def attach_pending_account_help(patients: list[dict]) -> list[dict]:
+    """
+    Adds p["pending_account_help"] = {"at": iso, "reason": label} to every
+    patient row (keyed by p["patient_id"]) that has an unresolved
+    account-help request, or None when there isn't one. Same shape and
+    batching approach as visit_model.attach_pending_patient_edits -- one
+    query for the whole page, not one per row -- so nurse_data_management.html
+    can show both kinds of flag the same way.
+    """
+    ids = [p["patient_id"] for p in patients if p.get("patient_id") is not None]
+    pending: dict[int, dict] = {}
+    if ids:
+        conn = get_connection()
+        try:
+            marks = ",".join("?" * len(ids))
+            rows = conn.execute(f"""
+                SELECT id AS patient_id, account_help_requested_at, account_help_reason
+                FROM patients
+                WHERE id IN ({marks})
+                  AND account_help_requested_at IS NOT NULL AND account_help_resolved_at IS NULL
+            """, ids).fetchall()
+        finally:
+            conn.close()
+        for r in rows:
+            pending[r["patient_id"]] = {
+                "at": r["account_help_requested_at"],
+                "reason": ACCOUNT_HELP_REASON_LABELS.get(r["account_help_reason"], r["account_help_reason"]),
+            }
+    for p in patients:
+        p["pending_account_help"] = pending.get(p.get("patient_id"))
+    return patients
+
+def get_pending_account_help(patient_id: int) -> dict | None:
+    conn = get_connection()
+    row = conn.execute(
+        """
+        SELECT account_help_requested_at, account_help_reason FROM patients
+        WHERE id = ? AND account_help_requested_at IS NOT NULL AND account_help_resolved_at IS NULL
+        """,
+        (patient_id,),
+    ).fetchone()
+    conn.close()
+    if not row:
+        return None
+    return {
+        "at": row["account_help_requested_at"],
+        "reason": ACCOUNT_HELP_REASON_LABELS.get(row["account_help_reason"], row["account_help_reason"]),
+    }
+
+def resolve_account_help_request(patient_id: int, staff_id: int | None = None) -> None:
+    """Marks a pending account-help request handled. Called automatically
+    when a nurse reissues portal credentials for the patient (the most
+    common resolution), and can also be called directly to dismiss a
+    request without reissuing (e.g. it turned out to be a duplicate)."""
+    conn = get_connection()
+    conn.execute(
+        """
+        UPDATE patients
+        SET account_help_resolved_at = datetime('now'),
+            account_help_resolved_by_staff_id = ?
+        WHERE id = ? AND account_help_requested_at IS NOT NULL AND account_help_resolved_at IS NULL
+        """,
+        (staff_id, patient_id),
+    )
+    conn.commit()
+    conn.close()
+
 
 def update_patient_consent(patient_id: int, consent: bool) -> None:
     conn = get_connection()

@@ -3,6 +3,7 @@ from app.models import patient_portal_model, patient_model, visit_model, lookup_
 from app.controllers import patient_auth_controller
 from flask import Response
 from datetime import date as date_cls, datetime
+from app.rate_limit import rate_limit
 
 
 
@@ -44,7 +45,7 @@ PATIENT_RECORD_OPTIONS = {
 def _require_patient_login():
     if current_app.config.get("DEV_NO_AUTH"):
         return
-    if request.endpoint in ("patient.patient_login",):
+    if request.endpoint in ("patient.patient_login", "patient.patient_account_help"):
         return
     if (session.get("patient_id") and
             session.get("security_version") != settings_model.get_security_version("patient")):
@@ -159,6 +160,36 @@ def patient_login():
         ip_address=request.remote_addr,
     )
     return redirect(url_for('patient.patient_dashboard'))
+
+@patient_bp.route('/patient_account_help', methods=['POST'])
+@rate_limit(max_calls=5, period_seconds=300)
+def patient_account_help():
+    """
+    Unauthenticated: a patient who can't log in has no session to work
+    with. Flags their account (if the Patient ID they gave is real) for a
+    nurse to follow up on and reissue credentials in person/by phone --
+    this never sends a password or a reset link itself.
+
+    The flash message is identical whether or not patient_code matched a
+    real account, on purpose: a different response here would let someone
+    enumerate valid Patient IDs. patient_model.request_account_help()
+    already no-ops silently on no match, so there is nothing else to
+    branch on.
+    """
+    raw_code = (request.form.get('patient_code') or '').strip()
+    patient_code = patient_auth_controller.normalize_patient_code(raw_code)
+    reason = (request.form.get('reason') or '').strip()
+
+    if patient_code:
+        patient_model.request_account_help(patient_code, reason)
+
+    flash(
+        "If that Patient ID matches our records, your health worker has "
+        "been notified and will follow up with you.",
+        "success",
+    )
+    return redirect(url_for('patient.patient_login'))
+
 
 @patient_bp.route('/patient_logout', methods=['GET', 'POST'])
 def patient_logout():

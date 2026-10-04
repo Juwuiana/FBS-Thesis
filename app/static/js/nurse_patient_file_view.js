@@ -21,6 +21,38 @@
         });
     });
 
+    // --- Patient Portal Access: account-help request ---------------------
+    // Also bound before the early return below: a patient with no visit yet
+    // still has this card, and may be the one who asked for account help.
+    const portalCard = document.getElementById('portalAccessCard');
+    if (portalCard && window.location.hash === '#portalAccessCard') {
+        // Arrived from the notification bell: open the card and scroll to it.
+        const portalHeader = portalCard.querySelector('.section-toggle');
+        if (portalHeader) {
+            portalHeader.classList.remove('collapsed');
+            if (portalHeader.nextElementSibling) portalHeader.nextElementSibling.classList.remove('collapsed');
+        }
+        portalCard.scrollIntoView({ block: 'start' });
+    }
+
+    // Dismiss a request without reissuing credentials (e.g. a duplicate).
+    // Reissuing credentials resolves the request on its own.
+    const dismissHelpBtn = document.getElementById('dismissAccountHelpBtn');
+    if (dismissHelpBtn) {
+        dismissHelpBtn.addEventListener('click', async () => {
+            dismissHelpBtn.disabled = true;
+            try {
+                const res = await fetch(dismissHelpBtn.dataset.url, { method: 'POST' });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                window.location.reload();
+            } catch (err) {
+                console.error(err);
+                dismissHelpBtn.disabled = false;
+                if (typeof nurseAlert === 'function') nurseAlert('Could not dismiss the request. Please try again.');
+            }
+        });
+    }
+
     if (!editBtn) return; // no latest_visit -> nothing to edit
 
     const form = document.getElementById('recordForm');

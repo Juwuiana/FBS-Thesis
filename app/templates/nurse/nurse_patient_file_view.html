@@ -96,9 +96,20 @@
         {% endif %}
     </p>
 
-    <div class="form-card">
-        <div class="card-header section-toggle collapsed" style="background:var(--green-light); border-top-color:var(--green-light);">Patient Portal Access<span class="section-toggle-icon">&#9660;</span></div>
-        <div class="card-body collapsible collapsed">
+    <div class="form-card" id="portalAccessCard">
+        <div class="card-header section-toggle {% if not pending_account_help %}collapsed{% endif %}" style="background:var(--green-light); border-top-color:var(--green-light);"><span>Patient Portal Access{% if pending_account_help %}<span class="portal-flag">Action required</span>{% endif %}</span><span class="section-toggle-icon">&#9660;</span></div>
+        <div class="card-body collapsible {% if not pending_account_help %}collapsed{% endif %}">
+            {% if pending_account_help %}
+            <div id="accountHelpBanner" class="portal-help-banner" role="alert">
+                <div>
+                    <strong>Account help requested:</strong> {{ pending_account_help.reason }}
+                    <span style="opacity:0.8;">(on {{ pending_account_help.at[:10] }})</span>
+                    <div style="margin-top:0.25rem;">Verify the patient's identity, then click <strong>{{ 'Reset Portal Password' if patient.password_hash else 'Generate Portal Credentials' }}</strong> below to issue new login details. This clears the request automatically.</div>
+                </div>
+                <button type="button" class="btn btn-secondary" id="dismissAccountHelpBtn" style="padding:0.4rem 0.9rem; font-size:0.75rem; flex-shrink:0;"
+                        data-url="{{ url_for('nurse.nurse_resolve_account_help_request', patient_id=patient.id) }}">Dismiss request</button>
+            </div>
+            {% endif %}
             <div class="grid-3">
                 <div class="field-group">
                     <label class="field-label">Status</label>
@@ -532,4 +543,8 @@
     </script>
     <script src="{{ url_for('static', filename='js/nurse_dialog.js') }}"></script>
     <script src="{{ url_for('static', filename='js/nurse_patient_file_view.js') }}"></script>
+    <style>
+        .portal-flag { margin-left: 0.6rem; background: #fef3c7; color: #92400e; border: 1px solid #f59e0b; border-radius: 999px; padding: 0.1rem 0.6rem; font-size: 0.7rem; font-weight: 700; letter-spacing: 0; text-transform: none; }
+        .portal-help-banner { display: flex; gap: 1rem; justify-content: space-between; align-items: flex-start; background: #fffbeb; border: 1px solid #f59e0b; border-left: 4px solid #f59e0b; border-radius: 8px; padding: 0.85rem 1rem; margin-bottom: 1rem; font-size: 0.85rem; color: #92400e; }
+    </style>
 {% endblock %}

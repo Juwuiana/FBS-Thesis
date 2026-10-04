@@ -23,11 +23,23 @@ require_role_for_blueprint(nurse_bp, "health_worker", "medical_officer")
 @nurse_bp.app_context_processor
 def inject_pending_patient_edits():
     """Lets every nurse_base.html-extending page show the notification bell
-    count without each route remembering to pass it in."""
+    count(s) without each route remembering to pass them in. Edits and
+    account-help requests are separate counts (and separate dropdown
+    endpoints below) since they're different kinds of follow-up, but both
+    feed the same bell."""
     try:
-        return {"pending_patient_edits_count": visit_model.count_pending_patient_edits()}
+        edits = visit_model.count_pending_patient_edits()
     except Exception:
-        return {"pending_patient_edits_count": 0}
+        edits = 0
+    try:
+        account_help = patient_model.count_pending_account_help_requests()
+    except Exception:
+        account_help = 0
+    return {
+        "pending_patient_edits_count": edits,
+        "pending_account_help_count": account_help,
+        "pending_patient_edits_count_total": edits + account_help,
+    }
 
 @nurse_bp.route('/nurse/patient-edits')
 def nurse_patient_edits():
@@ -56,6 +68,41 @@ def nurse_patient_edits():
 @nurse_bp.route('/nurse/patient-edits/<int:visit_id>/acknowledge', methods=['POST'])
 def nurse_acknowledge_patient_edit(visit_id):
     visit_model.acknowledge_patient_edit(visit_id, staff_id=session.get("user_id"))
+    return jsonify({"ok": True})
+
+
+_ACCOUNT_HELP_REASON_LABELS = {
+    "forgot_password": "Forgot password",
+    "lost_id": "Lost/forgot Patient ID",
+    "locked_out": "Can't sign in",
+}
+
+
+@nurse_bp.route('/nurse/account-help-requests')
+def nurse_account_help_requests():
+    """Notification bell dropdown contents: patients who flagged themselves
+    as locked out from the (unauthenticated) login page."""
+    reqs = patient_model.list_pending_account_help_requests()
+    return jsonify({
+        "count": len(reqs),
+        "requests": [{
+            "patient_id": r["patient_id"],
+            "patient_code": r["patient_code"],
+            "patient_name": f'{r["first_name"]} {r["last_name"]}',
+            "requested_at": r["requested_at"],
+            "reason": _ACCOUNT_HELP_REASON_LABELS.get(r["reason"], r["reason"]),
+            "patient_file_url": url_for('nurse.nurse_patient_file_view', patient_id=r["patient_code"]),
+        } for r in reqs],
+    })
+
+
+@nurse_bp.route('/nurse/account-help-requests/<int:patient_id>/resolve', methods=['POST'])
+def nurse_resolve_account_help_request(patient_id):
+    """Dismiss a request without reissuing credentials (e.g. a duplicate,
+    or the nurse already handled it some other way). Reissuing credentials
+    (nurse_issue_portal_credentials below) resolves it automatically --
+    this is only for the case where nothing needs reissuing."""
+    patient_model.resolve_account_help_request(patient_id, staff_id=session.get("user_id"))
     return jsonify({"ok": True})
 
 
@@ -389,6 +436,7 @@ def nurse_screening(patient_id, visit_id=None):
         latest_visit=latest_visit,
         visits=visits,
         existing_screening=existing_screening,
+        pending_account_help=patient_model.get_pending_account_help(patient["id"]),
         is_latest=is_latest,
         active_page='intake',
         patient_entries=patient_fbs_model.list_entries_for_screening(patient["id"], selected_visit_id),
@@ -433,9 +481,7 @@ def nurse_patient_file_view(patient_id, visit_id=None):
         cvd_responses=cvd_responses,
         existing_screening=existing_screening,
         active_page='data_management',
-        # Carries the Data Management page's filters/page/entries back through
-        # so "Back to Data Management" restores exactly where the nurse was,
-        # instead of resetting to page 1 with no filters applied.
+        pending_account_help=patient_model.get_pending_account_help(patient["id"]),
         return_qs=request.args.get('return_qs', ''),
     )
 
@@ -629,7 +675,7 @@ def nurse_data_management():
         sort=sort, direction=direction,
     )
     patients = visit_model.attach_pending_patient_edits([dict(p) for p in patients])
-
+    patients = patient_model.attach_pending_account_help(patients)
     page_numbers = []
     if total_pages <= 7:
         page_numbers = list(range(1, total_pages + 1))
@@ -1004,6 +1050,9 @@ def nurse_issue_portal_credentials(patient_id):
     temp_password = patient_auth_controller.issue_patient_credentials(
         patient["id"], staff_id=session.get("user_id")
     )
+    # Reissuing is the normal way an account-help request gets resolved --
+    # a no-op if this patient had no pending request.
+    patient_model.resolve_account_help_request(patient["id"], staff_id=session.get("user_id"))
     _audit_event(f"Portal credentials issued: {patient_id}", "Warning")
 
     return render_template(

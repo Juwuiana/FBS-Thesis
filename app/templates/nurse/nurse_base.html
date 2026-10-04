@@ -98,7 +98,7 @@
         });
     })();
     </script>
-    <script>window.__pendingPatientEditsCount = {{ pending_patient_edits_count | default(0) }};</script>
+    <script>window.__pendingPatientEditsCount = {{ pending_patient_edits_count_total | default(0) }};</script>
     <script src="{{ url_for('static', filename='js/nurse_base.js') }}"></script>
 
     {% block scripts %}

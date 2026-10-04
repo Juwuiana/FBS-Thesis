@@ -670,3 +670,43 @@
                 display: none;
             }
         }
+
+    .link-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    font: inherit;
+    color: #2e7d32;
+    text-decoration: underline;
+    cursor: pointer;
+}
+.link-btn:hover { color: #1b5e20; }
+.link-btn:focus-visible {
+    outline: 2px solid #66bb6a;
+    outline-offset: 2px;
+    border-radius: 2px;
+}
+#accountHelpModal .modal-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+    align-items: stretch;
+    margin-top: 1.5rem;
+}
+#accountHelpModal .modal-actions button {
+    box-sizing: border-box;
+    height: 44px;
+    margin: 0;
+    padding: 0 1.25rem;
+    border-radius: 8px;
+    font: inherit;
+    font-weight: 600;
+    font-size: 0.9rem;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}

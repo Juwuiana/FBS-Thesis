@@ -201,6 +201,7 @@
                     <select class="field-input" name="status" id="filterStatus">
                         <option value="" {% if not request.args.get('status') %}selected{% endif %}>All Statuses</option>
                         <option value="needs_review" {% if request.args.get('status') == 'needs_review' %}selected{% endif %}>Needs Review (Patient Edited)</option>
+                        <option value="account_help" {% if request.args.get('status') == 'account_help' %}selected{% endif %}>Account Action Required</option>
                         <option value="awaiting_lab" {% if request.args.get('status') == 'awaiting_lab' %}selected{% endif %}>Awaiting Lab Result</option>
                         <option value="draft" {% if request.args.get('status') == 'draft' %}selected{% endif %}>Draft (Intake Only)</option>
                     </select>
@@ -270,6 +271,14 @@
                                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
                             </a>
                             {% endif %}{{ p.last_name }}, {{ p.first_name }}
+                            {% if p.pending_account_help %}
+                            <a class="edit-flag tip" tabindex="0"
+                            href="{{ url_for('nurse.nurse_patient_file_view', patient_id=p.patient_code, return_qs=qs) }}"
+                            data-tip="Account help requested on {{ p.pending_account_help.at[:10] }}: {{ p.pending_account_help.reason }}. Open the record and reissue portal access."
+                            aria-label="Patient needs account help">
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="M10.8 12.2 20 3M17 6l3 3M14 9l2 2"/></svg>
+                            </a>
+                            {% endif %}
                         </td>
                         <td>{{ p.age }}</td>
                         <td>{{ p.sex }}</td>
