@@ -6,9 +6,40 @@ from datetime import date as date_cls, datetime
 from app.rate_limit import rate_limit
 
 
-
 patient_bp = Blueprint('patient', __name__)
 
+
+
+try:
+    import geoip2.database
+    _geo = geoip2.database.Reader('instance/GeoLite2-City.mmdb')
+except Exception:          # file missing: the app still runs, locations just show as unavailable
+    _geo = None
+
+
+def lookup_location(ip):
+    if not _geo or not ip:
+        return None
+    try:
+        r = _geo.city(ip)
+        return ', '.join(p for p in [r.city.name, r.subdivisions.most_specific.name, r.country.name] if p) or None
+    except Exception:      # private/local/unknown IPs
+        return None
+
+
+@patient_bp.app_template_filter('mask_ip')
+def mask_ip(ip):
+    p = (ip or '').split('.')
+    return '.'.join(p[:2] + ['x', 'x']) if len(p) == 4 else (ip or '')[:9] + '…'
+
+
+def _with_locations(events):
+    out = []
+    for e in events:
+        e = dict(e)
+        e['location'] = lookup_location(e.get('ip_address'))
+        out.append(e)
+    return out
 
 # Allowed values for the patient "Add New Record" form. Single source of truth:
 # passed to the template (so the form renders from it) and used to validate the POST.

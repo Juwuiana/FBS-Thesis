@@ -1154,3 +1154,10 @@ svg.nav-icon { height: 24px; padding: 2px; box-sizing: border-box; fill: none; s
     .hfbs-row { grid-template-columns: 1fr; gap: 0.35rem; }
     .hfbs-meta { justify-content: flex-start; }
 }
+.patient-modal-overlay[hidden] { display: none; }
+.pm-doc { max-width: 560px; width: calc(100% - 2rem); max-height: 85vh; display: flex; flex-direction: column; text-align: left; }
+.pm-doc .pm-title { text-align: left; }
+.pm-doc .pm-body { overflow-y: auto; padding-right: .5rem; font-size: .92rem; line-height: 1.55; }
+.pm-doc .pm-body h4 { margin: 1rem 0 .25rem; font-size: .95rem; }
+.pm-doc .pm-body p { margin: 0; }
+.pm-doc .pm-actions { margin-top: 1rem; }

@@ -152,21 +152,27 @@
                 <div class="section-label">Login Activity</div>
                 <div class="login-activity-list">
                     {% for event in login_events %}
-                    <div class="la-item {{ 'la-current' if loop.first }}">
+                    {% set is_current = event.session_token == current_token %}
+                    <div class="la-item {{ 'la-current' if is_current }}">
                         <div class="la-info">
                             <div class="la-device">
                                 {{ event.device_label }}
-                                {% if loop.first %}— <span class="la-badge-current">Current Session</span>{% endif %}
+                                {% if is_current %}— <span class="la-badge-current">Current Session</span>{% endif %}
                             </div>
-                            <div class="la-meta">{{ event.ip_address or "Unknown location" }} · {{ event.created_at }}</div>
+                            <div class="la-meta">
+                                {{ event.location or "Location unavailable" }}
+                                · IP {{ event.ip_address | mask_ip }}
+                                · {{ event.created_at }}
+                            </div>
                         </div>
-                        {% if not loop.first %}
+                        {% if not is_current %}
                         <button class="btn-revoke" data-event-id="{{ event.id }}">Revoke</button>
                         {% endif %}
                     </div>
                     {% else %}
                     <p class="form-hint">No login activity recorded yet.</p>
                     {% endfor %}
+                    <p class="form-hint">Locations are approximate and based on your internet connection. If you don't recognize a login, change your password.</p>
                 </div>
             </div>
 
@@ -183,13 +189,8 @@
                             <div class="aai-title">Download My Data</div>
                             <div class="aai-sub">Export a copy of your screening history and profile as PDF</div>
                         </div>
-                        <a href="{{ url_for('patient.patient_download_data') }}" class="btn-action-outline">Download</a>                    </div>
-                    <div class="account-action-item">
-                        <div class="aai-info">
-                            <div class="aai-title">Privacy Policy</div>
-                            <div class="aai-sub">How Sta. Rosa City Health Office uses your health data</div>
-                        </div>
-                        <a href="#" class="btn-action-outline" id="viewPrivacyBtn">View <svg class="arrow-icon" aria-hidden="true"><use href="#icon-arrow"/></svg></a>                    </div>
+                        <a href="{{ url_for('patient.patient_download_data') }}" class="btn-action-outline">Download</a>                    
+                    </div>
                     <div class="account-action-item">
                         <div class="aai-info">
                             <div class="aai-title">Data Sharing Consent</div>
@@ -256,7 +257,9 @@
 <footer class="patient-footer">
     <span>©FBS Diabetes Risk System</span>
     <div class="footer-links">
-        <a href="#">Privacy Policy</a><span>·</span><a href="#">Help</a>
+        <a href="#" data-open-modal="privacyModal">Privacy Policy</a><span>·</span><a href="#" data-open-modal="helpModal">Help</a>
     </div>
 </footer>
+
+<script src="{{ url_for('static', filename='js/patient_scripts.js') }}"></script>
 {% endblock %}

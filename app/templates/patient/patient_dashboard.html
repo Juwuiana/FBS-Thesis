@@ -9,8 +9,7 @@
         <span>
             <strong>Action needed:</strong> You're still using the temporary password from your health worker. Please set a new password to secure your account.
         </span>
-        <a href="{{ url_for('patient.patient_settings', force_change=1) }}" class="btn-warning-action">
-            Change Password
+            <a href="{{ url_for('patient.patient_settings', force_change=1, _anchor='security') }}" class="btn-warning-action">            Change Password
         </a>
     </div>
 </div>
@@ -191,9 +190,7 @@
     <span>© FBS Diabetes Risk System<br>
     Your health data is confidential and protected.</span>
     <div class="footer-links">
-        <a href="#">Privacy Policy</a>
-        <span>·</span>
-        <a href="#">Help</a>
+        <a href="#" data-open-modal="privacyModal">Privacy Policy</a><span>·</span><a href="#" data-open-modal="helpModal">Help</a>
     </div>
 </footer>
 
