@@ -2,6 +2,34 @@
  * static/js/nurse_base.js
  */
 document.addEventListener('DOMContentLoaded', () => {
+    // ---- Flash messages ("Welcome back", "Screening saved", ...) ----------
+    // They sit over the top of the page, so they fade out on their own instead
+    // of covering the notification bell. Errors stay a little longer. Click to
+    // dismiss now; hovering pauses the timer so a message can still be read.
+    const flashBox = document.querySelector('.app-flash-messages');
+    if (flashBox) {
+        const dismissFlash = (el) => {
+            if (el.dataset.dismissing) return;
+            el.dataset.dismissing = '1';
+            el.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
+            el.style.opacity = '0';
+            el.style.transform = 'translateY(-6px)';
+            setTimeout(() => {
+                el.remove();
+                if (!flashBox.querySelector('.app-flash')) flashBox.remove();
+            }, 400);
+        };
+        flashBox.querySelectorAll('.app-flash').forEach((el) => {
+            const isError = el.classList.contains('app-flash-error') || el.classList.contains('app-flash-danger');
+            let timer = setTimeout(() => dismissFlash(el), isError ? 8000 : 4000);
+            el.style.cursor = 'pointer';
+            el.title = 'Click to dismiss';
+            el.addEventListener('click', () => { clearTimeout(timer); dismissFlash(el); });
+            el.addEventListener('mouseenter', () => clearTimeout(timer));
+            el.addEventListener('mouseleave', () => { timer = setTimeout(() => dismissFlash(el), 1500); });
+        });
+    }
+
     // ---- Notification bell: records a patient edited from the portal ----
     const bellWrap  = document.getElementById('nurseBellWrap');
     const bellBtn   = document.getElementById('nurseBellBtn');

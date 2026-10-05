@@ -35,8 +35,8 @@ body { display: flex; min-height: 100vh; background: var(--bg); color: var(--t1)
 .nav-item:active { background: rgba(0,0,0,0.25); }
 .nav-item.active:hover { background: var(--g-mid); } 
 .user-avatar  { width: 34px; height: 34px; background: #aaa; border-radius: 50%; flex-shrink: 0; }
-.app-flash-messages { position: fixed; top: 1rem; right: 1rem; z-index: 300; width: min(360px, calc(100vw - 2rem)); }
-.app-flash { padding: 0.7rem 1rem; margin-bottom: 0.5rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; box-shadow: 0 3px 12px rgba(0,0,0,.12); }
+.app-flash-messages { position: fixed; top: 1rem; right: 1rem; z-index: 300; width: min(360px, calc(100vw - 2rem)); pointer-events: none; }
+.app-flash { pointer-events: auto; padding: 0.7rem 1rem; margin-bottom: 0.5rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; box-shadow: 0 3px 12px rgba(0,0,0,.12); }
 .app-flash-success { background: var(--g-light); color: var(--g-dark); border: 1px solid var(--g-accent); }
 .app-flash-error { background: var(--danger-bg); color: var(--danger); border: 1px solid var(--danger); }
 
@@ -753,11 +753,15 @@ svg.nav-icon { height: 24px; padding: 2px; box-sizing: border-box; fill: none; s
     padding: 0 4px; border: 2px solid var(--white);
 }
 .nurse-bell-panel {
-    position: absolute; top: 46px; right: 0; width: 320px; max-height: 420px;
-    overflow-y: auto; background: var(--white); border: 1px solid var(--border);
+    position: absolute; top: 46px; right: 0; width: 320px; max-height: min(70vh, 520px);
+    overflow: hidden; background: var(--white); border: 1px solid var(--border);
     border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);
 }
-.nurse-bell-header { font-size: 0.78rem; font-weight: 700; color: var(--t2); padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); }
+/* :not([hidden]) so the panel still disappears when the hidden attribute is set */
+.nurse-bell-panel:not([hidden]) { display: flex; flex-direction: column; }
+.nurse-bell-header { flex: 0 0 auto; font-size: 0.78rem; font-weight: 700; color: var(--t2); padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); }
+/* only the list scrolls, so the title stays visible however long it gets */
+.nurse-bell-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
 .nurse-bell-empty { font-size: 0.8rem; color: var(--t3); padding: 1rem; margin: 0; }
 .nurse-bell-item { display: block; padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); text-decoration: none; color: inherit; }
 .nurse-bell-item:last-child { border-bottom: none; }
