@@ -97,14 +97,24 @@
     </p>
 
     <div class="form-card" id="portalAccessCard">
-        <div class="card-header section-toggle {% if not pending_account_help %}collapsed{% endif %}" style="background:var(--green-light); border-top-color:var(--green-light);"><span>Patient Portal Access{% if pending_account_help %}<span class="portal-flag">Action required</span>{% endif %}</span><span class="section-toggle-icon">&#9660;</span></div>
-        <div class="card-body collapsible {% if not pending_account_help %}collapsed{% endif %}">
+        <div class="card-header section-toggle {% if not pending_account_help and patient.portal_active != 0 %}collapsed{% endif %}" style="background:var(--green-light); border-top-color:var(--green-light);"><span>Patient Portal Access{% if patient.portal_active == 0 %}<span class="portal-flag portal-flag-off">Account deactivated</span>{% elif pending_account_help %}<span class="portal-flag">Action required</span>{% endif %}</span><span class="section-toggle-icon">&#9660;</span></div>
+        <div class="card-body collapsible {% if not pending_account_help and patient.portal_active != 0 %}collapsed{% endif %}">
             {% if pending_account_help %}
-            <div id="accountHelpBanner" class="portal-help-banner" role="alert">
+            <div id="accountHelpBanner" class="portal-help-banner {% if patient.portal_active == 0 %}is-deactivated{% endif %}" role="alert">
                 <div>
+                    {% if patient.portal_active == 0 %}
+                    <strong>Account deactivated</strong>
+                    {% else %}
                     <strong>Account help requested:</strong> {{ pending_account_help.reason }}
+                    {% endif %}
                     <span style="opacity:0.8;">(on {{ pending_account_help.at[:10] }})</span>
-                    <div style="margin-top:0.25rem;">Verify the patient's identity, then click <strong>{{ 'Reset Portal Password' if patient.password_hash else 'Generate Portal Credentials' }}</strong> below to issue new login details. This clears the request automatically.</div>
+                    <div style="margin-top:0.25rem;">
+                        {% if patient.portal_active == 0 %}
+                        The patient deactivated their own portal account. Verify their identity, then click <strong>Reactivate Portal Access</strong> below. Their current password will keep working.
+                        {% else %}
+                        Verify the patient's identity, then click <strong>{{ 'Reset Portal Password' if patient.password_hash else 'Generate Portal Credentials' }}</strong> below to issue new login details. This clears the request automatically.
+                        {% endif %}
+                    </div>
                 </div>
                 <button type="button" class="btn btn-secondary" id="dismissAccountHelpBtn" style="padding:0.4rem 0.9rem; font-size:0.75rem; flex-shrink:0;"
                         data-url="{{ url_for('nurse.nurse_resolve_account_help_request', patient_id=patient.id) }}">Dismiss request</button>
@@ -114,7 +124,8 @@
                 <div class="field-group">
                     <label class="field-label">Status</label>
                     <input type="text" class="field-input"
-                        value="{{ 'Active — awaiting first login' if patient.must_change_password else 'Active' if patient.password_hash else 'Not set up' }}"
+                        value="{{ 'Deactivated' if patient.portal_active == 0 else 'Active — awaiting first login' if patient.must_change_password else 'Active' if patient.password_hash else 'Not set up' }}"
+                        {% if patient.portal_active == 0 %}style="color:#b91c1c; font-weight:600;"{% endif %}
                         disabled>
                 </div>
                 <div class="field-group">
@@ -126,14 +137,23 @@
                     <input type="text" class="field-input" value="{{ patient.credentials_issued_at or '—' }}" disabled>
                 </div>
             </div>
-            <form method="POST"
-                action="{{ url_for('nurse.nurse_issue_portal_credentials', patient_id=patient_id) }}"
-                data-confirm="{% if patient.password_hash %}Reset this patient's portal password? Their current password will stop working immediately.{% else %}Generate a portal account for this patient?{% endif %}"
-                style="margin-top:1rem;">
-                <button type="submit" class="btn btn-primary" style="padding:0.5rem 1rem; font-size:0.8rem;">
-                    {{ 'Reset Portal Password' if patient.password_hash else 'Generate Portal Credentials' }}
-                </button>
-            </form>
+                <div style="display:flex; gap:0.75rem; flex-wrap:wrap; margin-top:1rem;">
+                {% if patient.portal_active == 0 %}
+                <form method="POST"
+                    action="{{ url_for('nurse.nurse_reactivate_portal', patient_id=patient_id) }}"
+                    data-confirm="Reactivate this patient's portal access? They will be able to sign in again with their current password.">
+                    <button type="submit" class="btn btn-primary" style="padding:0.5rem 1rem; font-size:0.8rem;">Reactivate Portal Access</button>
+                </form>
+                {% endif %}
+
+                <form method="POST"
+                    action="{{ url_for('nurse.nurse_issue_portal_credentials', patient_id=patient_id) }}"
+                    data-confirm="{% if patient.password_hash %}Reset this patient's portal password? Their current password will stop working immediately.{% else %}Generate a portal account for this patient?{% endif %}">
+                    <button type="submit" class="btn btn-secondary" style="padding:0.5rem 1rem; font-size:0.8rem;">
+                        {{ 'Reset Portal Password' if patient.password_hash else 'Generate Portal Credentials' }}
+                    </button>
+                </form>
+            </div>
         </div>
     </div>
 
@@ -545,6 +565,8 @@
     <script src="{{ url_for('static', filename='js/nurse_patient_file_view.js') }}"></script>
     <style>
         .portal-flag { margin-left: 0.6rem; background: #fef3c7; color: #92400e; border: 1px solid #f59e0b; border-radius: 999px; padding: 0.1rem 0.6rem; font-size: 0.7rem; font-weight: 700; letter-spacing: 0; text-transform: none; }
+        .portal-flag-off { background: #fee2e2; color: #b91c1c; border-color: #f87171; }
+        .portal-help-banner.is-deactivated { background: #fef2f2; border-color: #f87171; border-left-color: #dc2626; color: #991b1b; }
         .portal-help-banner { display: flex; gap: 1rem; justify-content: space-between; align-items: flex-start; background: #fffbeb; border: 1px solid #f59e0b; border-left: 4px solid #f59e0b; border-radius: 8px; padding: 0.85rem 1rem; margin-bottom: 1rem; font-size: 0.85rem; color: #92400e; }
     </style>
 {% endblock %}

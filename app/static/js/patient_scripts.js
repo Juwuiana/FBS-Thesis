@@ -280,14 +280,22 @@ document.addEventListener('DOMContentLoaded', () => {
     const deactivateBtn   = document.getElementById('deactivateBtn');
     const deactivateModal = document.getElementById('deactivateModal');
     const modalCancelBtn  = document.getElementById('modalCancelBtn');
-    const modalConfirmBtn = document.getElementById('modalConfirmBtn');
 
-    if (deactivateBtn)   deactivateBtn.addEventListener('click',   () => { deactivateModal.style.display = 'flex'; });
-    if (modalCancelBtn)  modalCancelBtn.addEventListener('click',  () => { deactivateModal.style.display = 'none'; });
-    if (modalConfirmBtn) modalConfirmBtn.addEventListener('click', () => {
-        showToast('Account deactivation request submitted.');
+    const deactivatePw = document.getElementById('deactivatePw');
+    const closeDeactivate = () => {
+        if (!deactivateModal) return;
         deactivateModal.style.display = 'none';
+        if (deactivatePw) deactivatePw.value = '';      // never leave a typed password sitting in the page
+    };
+    if (deactivateBtn) deactivateBtn.addEventListener('click', () => {
+        deactivateModal.style.display = 'flex';
+        if (deactivatePw) deactivatePw.focus();
     });
+    if (modalCancelBtn) modalCancelBtn.addEventListener('click', closeDeactivate);
+    if (deactivateModal) {
+        deactivateModal.addEventListener('click', e => { if (e.target === deactivateModal) closeDeactivate(); });
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDeactivate(); });
+    }
 
     // Sign-out-all button
     const signOutAllBtn = document.getElementById('signOutAllBtn');

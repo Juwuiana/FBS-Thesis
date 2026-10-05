@@ -1,4 +1,5 @@
 from flask import Blueprint, abort, current_app, flash, jsonify, render_template, request, session, redirect, url_for
+from app.db import get_connection
 from app.models import patient_portal_model, patient_model, visit_model, lookup_model, patient_fbs_model, settings as settings_model
 from app.controllers import patient_auth_controller
 from flask import Response
@@ -41,8 +42,24 @@ def _with_locations(events):
         out.append(e)
     return out
 
-# Allowed values for the patient "Add New Record" form. Single source of truth:
-# passed to the template (so the form renders from it) and used to validate the POST.
+def _group_login_events(events):
+    """Collapse repeated logins from the same IP + device into one row.
+    Assumes events are newest first, so the first one seen is the latest."""
+    groups = {}
+    for e in events:
+        key = (e.get('ip_address'), e.get('device_label'))
+        g = groups.get(key)
+        if g is None:
+            g = dict(e)
+            g['count'] = 1
+            g['first_seen'] = e.get('created_at')
+            groups[key] = g
+        else:
+            g['count'] += 1
+            g['first_seen'] = e.get('created_at')  
+    return list(groups.values())
+
+
 PATIENT_RECORD_OPTIONS = {
     "smoking_status": ["Never smoked", "Stopped > 1 year", "Stopped < 1 year", "Current Smoker", "Passive Smoker"],
     "alcohol_intake": ["Never Consumed", "Yes", "Yes (Binge: 5+ drinks in one occasion past month)"],
@@ -85,6 +102,13 @@ def _require_patient_login():
         return redirect(url_for("patient.patient_login"))
     if not session.get("patient_id"):
         return redirect(url_for('patient.patient_login'))
+
+    state = patient_model.get_session_state(session["patient_id"])
+    if (not state or not state["is_active"]
+            or state["session_version"] != session.get("patient_sv")):
+        session.clear()
+        flash("You've been signed out. Please log in again.", "error")
+        return redirect(url_for("patient.patient_login"))
 
 
 @patient_bp.app_context_processor
@@ -185,6 +209,8 @@ def patient_login():
     session.clear()
     session['patient_id'] = patient['id']
     session['security_version'] = settings_model.get_security_version("patient")
+    state = patient_model.get_session_state(patient['id'])
+    session['patient_sv'] = state['session_version'] if state else 0
     patient_model.record_login_event(
         patient['id'],
         user_agent=request.headers.get('User-Agent'),
@@ -210,7 +236,9 @@ def patient_account_help():
     raw_code = (request.form.get('patient_code') or '').strip()
     patient_code = patient_auth_controller.normalize_patient_code(raw_code)
     reason = (request.form.get('reason') or '').strip()
-
+    
+    if reason not in ("forgot_password", "lost_id", "locked_out"):
+        reason = "locked_out"
     if patient_code:
         patient_model.request_account_help(patient_code, reason)
 
@@ -227,6 +255,33 @@ def patient_logout():
     session.pop('patient_id', None)
     return redirect(url_for('patient.patient_login'))
 
+@patient_bp.route('/patient_sign_out_all', methods=['POST'])
+def patient_sign_out_all():
+    patient_id = patient_portal_model.get_current_patient_id()
+    session['patient_sv'] = patient_model.bump_session_version(patient_id)  # current device stays signed in
+    flash("All other devices have been signed out.", "success")
+    return redirect(url_for('patient.patient_settings'))
+
+
+@patient_bp.route('/patient_deactivate', methods=['POST'])
+@rate_limit(max_calls=5, period_seconds=300)
+def patient_deactivate():
+    patient_id = patient_portal_model.get_current_patient_id()
+    patient = patient_model.get_patient_by_id(patient_id)
+    _, error = patient_auth_controller.authenticate_patient(
+        patient['patient_code'], request.form.get('password', ''))
+    if error:
+        flash("Incorrect password. Your account was not deactivated.", "error")
+        return redirect(url_for('patient.patient_settings'))
+
+    patient_model.set_portal_active(patient_id, False)
+    patient_model.request_account_help(
+        patient_auth_controller.normalize_patient_code(patient['patient_code']),
+        "self_deactivated",
+    )
+    session.clear()
+    flash("Your portal account has been deactivated.", "success")
+    return redirect(url_for('patient.patient_login'))
 
 @patient_bp.route('/patient_dashboard')
 def patient_dashboard():
@@ -256,8 +311,9 @@ def patient_health_results():
 def patient_settings():
     patient_id = patient_portal_model.get_current_patient_id()
     patient = patient_model.get_patient_by_id(patient_id)
-    login_events = patient_model.get_recent_login_events(patient_id)
-
+    login_events = _group_login_events(
+        _with_locations(patient_model.get_recent_login_events(patient_id))
+    )
     if request.method == 'GET':
         return render_template(
             'patient/patient_settings.html',

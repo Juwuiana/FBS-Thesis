@@ -75,25 +75,27 @@ _ACCOUNT_HELP_REASON_LABELS = {
     "forgot_password": "Forgot password",
     "lost_id": "Lost/forgot Patient ID",
     "locked_out": "Can't sign in",
+    "self_deactivated": "Account deactivated",
 }
-
 
 @nurse_bp.route('/nurse/account-help-requests')
 def nurse_account_help_requests():
-    """Notification bell dropdown contents: patients who flagged themselves
-    as locked out from the (unauthenticated) login page."""
-    reqs = patient_model.list_pending_account_help_requests()
-    return jsonify({
-        "count": len(reqs),
-        "requests": [{
+    items = []
+    for r in patient_model.list_pending_account_help_requests():
+        reason = r["reason"]
+        patient = dict(patient_model.get_patient_by_id(r["patient_id"]) or {})
+        if patient.get("portal_active") == 0:
+            reason = "self_deactivated"
+        items.append({
             "patient_id": r["patient_id"],
             "patient_code": r["patient_code"],
             "patient_name": f'{r["first_name"]} {r["last_name"]}',
             "requested_at": r["requested_at"],
-            "reason": _ACCOUNT_HELP_REASON_LABELS.get(r["reason"], r["reason"]),
+            "reason": _ACCOUNT_HELP_REASON_LABELS.get(reason, reason),
+            "reason_code": reason,
             "patient_file_url": url_for('nurse.nurse_patient_file_view', patient_id=r["patient_code"]),
-        } for r in reqs],
-    })
+        })
+    return jsonify({"count": len(items), "requests": items})
 
 
 @nurse_bp.route('/nurse/account-help-requests/<int:patient_id>/resolve', methods=['POST'])
@@ -1050,8 +1052,7 @@ def nurse_issue_portal_credentials(patient_id):
     temp_password = patient_auth_controller.issue_patient_credentials(
         patient["id"], staff_id=session.get("user_id")
     )
-    # Reissuing is the normal way an account-help request gets resolved --
-    # a no-op if this patient had no pending request.
+    patient_model.set_portal_active(patient["id"], True)
     patient_model.resolve_account_help_request(patient["id"], staff_id=session.get("user_id"))
     _audit_event(f"Portal credentials issued: {patient_id}", "Warning")
 
@@ -1071,3 +1072,15 @@ def patient_fbs_set_status(patient_id, entry_id):
     except ValueError:
         return jsonify({"error": "Invalid status"}), 400
     return (jsonify({"status": status}), 200) if ok else (jsonify({"error": "Not found"}), 404)
+
+@nurse_bp.route('/nurse/patient/<patient_id>/reactivate_portal', methods=['POST'])
+@rate_limit(max_calls=10, period_seconds=60)
+def nurse_reactivate_portal(patient_id):
+    patient = patient_model.get_patient_by_code(patient_id)
+    if patient is None:
+        abort(404)
+    patient_model.set_portal_active(patient["id"], True)
+    patient_model.resolve_account_help_request(patient["id"], staff_id=session.get("user_id"))
+    _audit_event(f"Portal reactivated: {patient_id}", "Warning")
+    flash("Portal access reactivated. The patient can sign in again with their current password.", "success")
+    return redirect(url_for('nurse.nurse_patient_file_view', patient_id=patient_id))

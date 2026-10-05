@@ -58,7 +58,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 return `<div class="nurse-bell-item" data-patient-id="${r.patient_id}">
                     <a href="${escapeHtml(r.patient_file_url)}#portalAccessCard" style="text-decoration:none; color:inherit; display:block;">
                         <div class="nurse-bell-name">${escapeHtml(r.patient_name)}<span class="nurse-bell-code">${escapeHtml(r.patient_code)}</span></div>
-                        <div class="nurse-bell-fields">${escapeHtml(r.reason)}: portal access needs to be reissued</div>
+                        <div class="nurse-bell-fields">${r.reason_code === 'self_deactivated'
+                            ? 'Account deactivated: reactivate portal access once verified'
+                            : escapeHtml(r.reason) + ': portal access needs to be reissued'}</div>
                         <div class="nurse-bell-time">${escapeHtml(when)}</div>
                     </a>
                     <button type="button" class="nurse-bell-ack nurse-bell-dismiss" data-patient-id="${r.patient_id}" title="Mark as handled without reissuing access">Dismiss</button>

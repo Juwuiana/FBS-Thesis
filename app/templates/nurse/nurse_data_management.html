@@ -274,8 +274,7 @@
                             {% if p.pending_account_help %}
                             <a class="edit-flag tip" tabindex="0"
                             href="{{ url_for('nurse.nurse_patient_file_view', patient_id=p.patient_code, return_qs=qs) }}"
-                            data-tip="Account help requested on {{ p.pending_account_help.at[:10] }}: {{ p.pending_account_help.reason }}. Open the record and reissue portal access."
-                            aria-label="Patient needs account help">
+                            data-tip="{% if p.pending_account_help.reason in ['self_deactivated', 'Account deactivated by patient'] %}Patient deactivated their own portal account on {{ p.pending_account_help.at[:10] }}. Open the record to reactivate portal access if they ask.{% else %}Account help requested on {{ p.pending_account_help.at[:10] }}: {{ p.pending_account_help.reason }}. Open the record and reissue portal access.{% endif %}"
                                 <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="M10.8 12.2 20 3M17 6l3 3M14 9l2 2"/></svg>
                             </a>
                             {% endif %}

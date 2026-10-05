@@ -19,7 +19,7 @@ from openpyxl.worksheet.datavalidation import DataValidation
 from openpyxl.comments import Comment
 from openpyxl.formatting.rule import FormulaRule
 from openpyxl.styles import PatternFill, Font
-
+from app.db import get_connection
 
 _RETENTION_PURGE_INTERVAL_SECONDS = 60 * 60
 _last_retention_purge_at = None
@@ -1372,11 +1372,12 @@ def get_recent_login_events(patient_id: int, limit: int = 5) -> list[dict]:
         for row in rows
     ]
 
-_ACCOUNT_HELP_REASONS = {"forgot_password", "lost_id", "locked_out"}
+_ACCOUNT_HELP_REASONS = {"forgot_password", "lost_id", "locked_out", "self_deactivated"}
 ACCOUNT_HELP_REASON_LABELS = {
     "forgot_password": "Forgot password",
     "lost_id": "Lost/forgot Patient ID",
     "locked_out": "Can't sign in",
+    "self_deactivated": "Account deactivated",
 }
 
 
@@ -1515,3 +1516,34 @@ def update_patient_consent(patient_id: int, consent: bool) -> None:
     )
     conn.commit()
     conn.close()
+
+def get_session_state(patient_id):
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT session_version, portal_active FROM patients WHERE id = ?",
+        (patient_id,),
+    ).fetchone()
+    if not row:
+        return None
+    return {"session_version": row[0], "is_active": bool(row[1])}
+
+
+def bump_session_version(patient_id):
+    conn = get_connection()
+    conn.execute(
+        "UPDATE patients SET session_version = session_version + 1 WHERE id = ?",
+        (patient_id,),
+    )
+    conn.commit()
+    return conn.execute(
+        "SELECT session_version FROM patients WHERE id = ?", (patient_id,)
+    ).fetchone()[0]
+
+
+def set_portal_active(patient_id, active):
+    conn = get_connection()
+    conn.execute(
+        "UPDATE patients SET portal_active = ? WHERE id = ?",
+        (1 if active else 0, patient_id),
+    )
+    conn.commit()

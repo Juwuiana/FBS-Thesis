@@ -57,6 +57,11 @@ def authenticate_patient(patient_code: str, password: str):
 
     if not patient or not patient["password_hash"] or not password_ok:
         return None, "Invalid patient ID or password."
+
+    state = patient_model.get_session_state(patient['id'])
+    if state and not state['is_active']:
+        return None, "This account is deactivated. Request help using the account help link below, or visit the Sta. Rosa City Health Office to reactivate it."
+
     return patient, None
 
 def change_patient_password(patient, form) -> list[str]:
@@ -80,6 +85,8 @@ def change_patient_password(patient, form) -> list[str]:
 
     patient_model.update_patient_password(patient["id"], generate_password_hash(new_password))
     return []
+
+    
 
 def describe_user_agent(ua: str | None) -> str:
     if not ua:
