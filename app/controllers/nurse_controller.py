@@ -6,7 +6,7 @@ from datetime import date as date_cls
 from app.rate_limit import rate_limit
 from app.controllers import patient_auth_controller
 import os
-
+from datetime import date as date_cls, datetime as datetime_cls, timedelta
 
 nurse_bp = Blueprint('nurse', __name__)
 from app.views.auth_views import require_role_for_blueprint
@@ -605,6 +605,24 @@ def nurse_new_record(patient_id):
         active_page='data_management',
     )
 
+def _count_due_soon(worklist, days=7):
+    """Worklist patients whose follow-up date is today or within the next `days` days.
+    Overdue ones are excluded because they already have their own count."""
+    today = date_cls.today()
+    end = today + timedelta(days=days)
+    n = 0
+    for w in worklist:
+        raw = str(w["follow_up_date"] or "").strip()[:10]
+        due = None
+        for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
+            try:
+                due = datetime_cls.strptime(raw, fmt).date()
+                break
+            except ValueError:
+                continue
+        if due and today <= due <= end:
+            n += 1
+    return n
 
 @nurse_bp.route('/nurse/health_results')
 def nurse_health_results():
@@ -618,6 +636,7 @@ def nurse_health_results():
         followup=health_analytics_model.get_followup_summary(),
         referral=health_analytics_model.get_referral_funnel(),
         worklist=worklist,
+        due_soon=_count_due_soon(worklist),
         worklist_barangays=sorted({w["barangay"] for w in worklist if w["barangay"]}),
         red_flags=health_analytics_model.get_red_flags(),
         barangay_rows=health_analytics_model.get_barangay_summary(),
@@ -780,12 +799,85 @@ def nurse_dashboard_barangay_patients():
     return jsonify({"patients": patients})
 
 
+_AUDIT_PER_PAGE_CHOICES = (10, 25, 50)
+
+
+def _parse_iso_date(value):
+    try:
+        return date_cls.fromisoformat((value or "").strip())
+    except ValueError:
+        return None
+
+
+def _page_window(page, total_pages):
+    """Page numbers to show: all of them when few, otherwise first, last and the
+    neighbours of the current page, with None where a gap collapses to an ellipsis."""
+    if total_pages <= 7:
+        return list(range(1, total_pages + 1))
+    keep = sorted(p for p in {1, total_pages, page - 1, page, page + 1} if 1 <= p <= total_pages)
+    out = []
+    for p in keep:
+        if out and p - out[-1] > 1:
+            out.append(None)
+        out.append(p)
+    return out
+
+
 @nurse_bp.route('/nurse/privacy_security')
 def nurse_privacy_security():
-    audit_logs = audit_model.get_recent_logs_for_user(get_db(), session.get("user_id"))
+    """Privacy & Security. The Audit Trail tab is this nurse's own actions only,
+    filtered (severity / text / date range) and paged in SQL."""
+    db, user_id = get_db(), session.get("user_id")
+
+    severity_options = audit_model.list_severities_for_user(db, user_id)
+    severity = request.args.get('severity', '')
+    if severity not in severity_options:
+        severity = ''
+    q = (request.args.get('q') or '').strip()[:100]
+    date_from = _parse_iso_date(request.args.get('date_from'))
+    date_to = _parse_iso_date(request.args.get('date_to'))
+    if date_from and date_to and date_from > date_to:
+        date_from, date_to = date_to, date_from
+    try:
+        per_page = int(request.args.get('per', _AUDIT_PER_PAGE_CHOICES[0]))
+    except ValueError:
+        per_page = _AUDIT_PER_PAGE_CHOICES[0]
+    if per_page not in _AUDIT_PER_PAGE_CHOICES:
+        per_page = _AUDIT_PER_PAGE_CHOICES[0]
+
+    filters = dict(severity=severity or None, q=q or None, date_from=date_from, date_to=date_to)
+    total = audit_model.count_logs_for_user(db, user_id, **filters)
+    total_pages = max(1, -(-total // per_page))
+    try:
+        page = int(request.args.get('page', 1))
+    except ValueError:
+        page = 1
+    page = min(max(page, 1), total_pages)
+    logs = audit_model.get_logs_for_user_page(
+        db, user_id, **filters, limit=per_page, offset=(page - 1) * per_page
+    )
+
+    filters_active = bool(severity or q or date_from or date_to)
+    on_audit_tab = request.args.get('tab') == 'audit' or filters_active or 'page' in request.args
     return render_template(
         'nurse/nurse_privacy_security.html',
-        audit_logs=audit_logs,
+        audit_logs=logs,
+        audit_total=total,
+        audit_page=page,
+        audit_total_pages=total_pages,
+        audit_page_numbers=_page_window(page, total_pages),
+        audit_first_row=(page - 1) * per_page + 1 if total else 0,
+        audit_last_row=(page - 1) * per_page + len(logs),
+        audit_per=per_page,
+        audit_per_choices=_AUDIT_PER_PAGE_CHOICES,
+        audit_severities=severity_options,
+        audit_filters={
+            'severity': severity, 'q': q,
+            'date_from': date_from.isoformat() if date_from else '',
+            'date_to': date_to.isoformat() if date_to else '',
+        },
+        audit_filters_active=filters_active,
+        active_tab='audit' if on_audit_tab else 'security',
         active_page='privacy',
     )
 

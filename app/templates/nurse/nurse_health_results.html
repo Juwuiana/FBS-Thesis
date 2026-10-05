@@ -16,26 +16,51 @@
 </div>
 
 <!-- Headline: what needs attention right now -->
-<p class="hr-headline">
-    {% if referral.at_risk %}
-        <b>{{ referral.at_risk }}</b> patient{{ '' if referral.at_risk == 1 else 's' }} at moderate or high risk.
-        {% if followup.overdue %}<span class="is-alert"><b>{{ followup.overdue }}</b> {{ 'is' if followup.overdue == 1 else 'are' }} overdue for follow-up</span>{% else %}None are overdue for follow-up{% endif %}{% if followup.no_action %}, and <b>{{ followup.no_action }}</b> {{ 'has' if followup.no_action == 1 else 'have' }} no referral recorded{% endif %}.
-    {% else %}
-        No patients are waiting on follow-up.
-    {% endif %}
-</p>
-
+{% set at_risk = referral.at_risk or 0 %}
 {% if risk_total %}
-<div class="hr-ribbon" role="img" aria-label="Risk mix of {{ risk_total }} screened patients">
-    {% for key, cls in (('Low', 'low'), ('Moderate', 'mod'), ('High', 'high')) %}
-        {% if risk.get(key) %}<span class="{{ cls }}" style="flex-grow: {{ risk[key] }}"></span>{% endif %}
-    {% endfor %}
-</div>
-<div class="hr-ribbon-legend">
-    {% for key, cls in (('Low', 'low'), ('Moderate', 'mod'), ('High', 'high')) %}
-        <span><i class="dot {{ cls }}"></i>{{ key }} <b>{{ risk.get(key, 0) }}</b> ({{ (risk.get(key, 0) / risk_total * 100)|round(0)|int }}%)</span>
-    {% endfor %}
-    {% if risk.get('Pending') %}<span class="hr-muted">Pending <b>{{ risk['Pending'] }}</b></span>{% endif %}
+<div class="hr-hero">
+    <div class="hr-hero-main">
+        <div class="hr-hero-num">{{ at_risk }}</div>
+        <div class="hr-hero-text">
+            <strong>patient{{ '' if at_risk == 1 else 's' }} at moderate or high risk</strong>
+            <span>{{ (at_risk / risk_total * 100)|round(0)|int }}% of the {{ risk_total }} screened patients</span>
+        </div>
+    </div>
+
+    <div class="hr-hero-alerts">
+        <button type="button" class="hr-hero-alert bad" data-tab-target="followup" title="Date passed, no newer visit">
+            <b>{{ followup.overdue }}</b><span>overdue for follow-up</span>
+        </button>
+        <div class="hr-hero-alert warn" title="Moderate or high risk, no action logged">
+            <b>{{ followup.no_action }}</b><span>no referral recorded</span>
+        </div>
+    </div>
+
+    <div class="hr-hero-ribbon" role="img" aria-label="Risk mix of {{ risk_total }} screened patients">
+        {% for key, cls in (('Low', 'low'), ('Moderate', 'mod'), ('High', 'high')) %}
+            {% if risk.get(key) %}
+                {% set pct = (risk[key] / risk_total * 100)|round(0)|int %}
+                <span class="{{ cls }}" style="flex-grow: {{ risk[key] }}">{% if pct >= 8 %}{{ pct }}%{% endif %}</span>
+            {% endif %}
+        {% endfor %}
+    </div>
+
+    <div class="hr-hero-legend">
+        {% for key, cls in (('Low', 'low'), ('Moderate', 'mod'), ('High', 'high')) %}
+        <div class="hr-hero-tile {{ cls }}">
+            <b>{{ risk.get(key, 0) }}</b>
+            <span>{{ key }} risk</span>
+            <small>{{ (risk.get(key, 0) / risk_total * 100)|round(0)|int }}% of screened</small>
+        </div>
+        {% endfor %}
+        {% if risk.get('Pending') %}
+        <div class="hr-hero-tile pending">
+            <b>{{ risk['Pending'] }}</b>
+            <span>Pending</span>
+            <small>awaiting result</small>
+        </div>
+        {% endif %}
+    </div>
 </div>
 {% endif %}
 
@@ -51,16 +76,6 @@
 <section class="hr-panel is-active" id="panel-overview" role="tabpanel">
     <div class="dash-grid-mid">
         <div class="stat-card">
-            <div class="stat-title">No referral recorded</div>
-            <div class="stat-value">{{ followup.no_action }}</div>
-            <div class="stat-trend hr-muted">Moderate or high risk, no action logged</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-title">Follow-up overdue</div>
-            <div class="stat-value {{ 'trend-bad' if followup.overdue }}">{{ followup.overdue }}</div>
-            <div class="stat-trend hr-muted">Date passed, no newer visit</div>
-        </div>
-        <div class="stat-card">
             <div class="stat-title">Chest pain / stroke flags</div>
             <div class="stat-value {{ 'trend-bad' if red_flags }}">{{ red_flags|length }}</div>
             <div class="stat-trend"><button type="button" class="hr-link hr-noprint" data-tab-target="followup">Review in Follow-up</button></div>
@@ -69,6 +84,16 @@
             <div class="stat-title">Awaiting lab result</div>
             <div class="stat-value">{{ followup.awaiting_lab }}</div>
             <div class="stat-trend"><a class="hr-link" href="{{ url_for('nurse.nurse_data_management', status='awaiting_lab') }}">View list in Data Management</a></div>
+        </div>
+                <div class="stat-card">
+            <div class="stat-title">Follow-ups due in the next 7 days</div>
+            <div class="stat-value">{{ due_soon }}</div>
+            <div class="stat-trend"><button type="button" class="hr-link hr-noprint" data-tab-target="followup">View in Follow-up</button></div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-title">Patient updates to review</div>
+            <div class="stat-value">{{ pending_patient_edits_count }}</div>
+            <div class="stat-trend"><button type="button" class="hr-link hr-noprint" onclick="event.stopPropagation(); document.getElementById('nurseBellBtn').click();">Open notifications</button></div>
         </div>
     </div>
 
@@ -180,11 +205,22 @@
         </div>
         <div class="card-body hr-scroll tall">
             <table class="data-table hr-sticky">
-                <thead><tr><th>Patient</th><th>Age / Sex</th><th>Barangay</th><th>Last visit</th><th>FBS</th><th>Risk</th><th>Status</th><th>Follow-up by</th></tr></thead>
+                <thead><tr>
+                    <th data-sort="name">Patient</th><th data-sort="age">Age / Sex</th><th data-sort="barangay">Barangay</th>
+                    <th data-sort="date">Last visit</th><th data-sort="fbs">FBS</th><th data-sort="risk">Risk</th>
+                    <th data-sort="status">Status</th><th data-sort="fu">Follow-up by</th>
+                </tr></thead>
                 <tbody id="worklistBody">
                 {% for w in worklist %}
                     <tr data-risk="{{ w.risk }}" data-status="{{ w.status_key }}" data-barangay="{{ w.barangay or '' }}"
-                        data-search="{{ (w.last_name ~ ' ' ~ w.first_name ~ ' ' ~ w.patient_code)|lower }}">
+                        data-search="{{ (w.last_name ~ ' ' ~ w.first_name ~ ' ' ~ w.patient_code)|lower }}"
+                        data-name="{{ (w.last_name ~ ' ' ~ w.first_name)|lower }}"
+                        data-age="{{ w.age if w.age is not none else '' }}"
+                        data-date="{{ w.assessment_date or '' }}"
+                        data-fbs="{{ w.fbs_mg_dl if w.fbs_mg_dl is not none else '' }}"
+                        data-riskrank="{{ 2 if w.risk == 'High' else 1 }}"
+                        data-statusrank="{{ {'overdue': 0, 'none': 1, 'ok': 2}.get(w.status_key, 3) }}"
+                        data-fu="{{ w.follow_up_date or '' }}">
                         <td>
                             <a class="patient-name-link" href="{{ url_for('nurse.nurse_patient_file_view', patient_id=w.patient_code) }}">{{ w.last_name }}, {{ w.first_name }}</a>
                             <div class="hr-sub">{{ w.patient_code }}</div>
