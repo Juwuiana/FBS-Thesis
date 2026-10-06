@@ -35,6 +35,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const body = card.querySelector(".card-body");
         if (!header || !body) return;
         document.querySelectorAll(".card-header.section-toggle").forEach((h) => {
+            if (h === header) return;
             h.classList.add("collapsed");
             const b = h.nextElementSibling;
             if (b) b.classList.add("collapsed");
@@ -146,16 +147,127 @@ document.addEventListener("DOMContentLoaded", () => {
     toggleFemaleOnlyCard(); // re-run so male patients still get the card hidden/cleared
 
 
-    function clearAllErrors() {
-        document.querySelectorAll(".radio-card-wrapper.group-error").forEach((g) => {
-            g.classList.remove("group-error");
-            const msg = g.parentElement.querySelector(".group-error-text");
-            if (msg) msg.remove();
+
+    // ---------------------------------------------------------------
+    // Validation feedback: open the section(s) holding missing fields,
+    // wait for the expand animation to finish, THEN scroll to the first
+    // missing field (scrolling while the section is still collapsed lands
+    // in the wrong place), shake/pulse every missing field, flag the section
+    // headers, and show a short toast.
+    // ---------------------------------------------------------------
+    (function injectValidationStyles() {
+        if (document.getElementById('validation-fx-style')) return;
+        const s = document.createElement('style');
+        s.id = 'validation-fx-style';
+        s.textContent = `
+        @keyframes nurse-shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-7px)} 40%{transform:translateX(7px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} }
+        @keyframes nurse-pulse { 0%{box-shadow:0 0 0 0 rgba(220,38,38,.55)} 100%{box-shadow:0 0 0 14px rgba(220,38,38,0)} }
+        .nurse-attn { animation: nurse-shake .45s ease, nurse-pulse .9s ease-out 2; }
+        .field-input.field-error, .group-error { border-color:#dc2626; }
+        .card-header.section-has-error { color:#b91c1c; }
+        .section-error-badge { margin-left:auto; margin-right:.75rem; padding:.15rem .6rem; border-radius:999px; background:#fee2e2; color:#b91c1c; font-size:.7rem; font-weight:700; text-transform:none; white-space:nowrap; }
+        .validation-toast { position:fixed; top:16px; left:50%; transform:translate(-50%,-12px); background:#b91c1c; color:#fff; padding:.65rem 1.1rem; border-radius:10px; font-size:.9rem; font-weight:600; box-shadow:0 8px 24px rgba(0,0,0,.25); opacity:0; transition:opacity .2s ease, transform .2s ease; z-index:10000; pointer-events:none; }
+        .validation-toast.visible { opacity:1; transform:translate(-50%,0); }
+        @media (prefers-reduced-motion: reduce) { .nurse-attn { animation:none; outline:3px solid #dc2626; } }
+`;
+        document.head.appendChild(s);
+    })();
+
+    function refreshSectionBadges() {
+        document.querySelectorAll('.form-card').forEach((card) => {
+            const header = card.querySelector('.card-header.section-toggle');
+            if (!header) return;
+            const has = !!card.querySelector('.field-error, .group-error');
+            header.classList.toggle('section-has-error', has);
+            let badge = header.querySelector('.section-error-badge');
+            if (has && !badge) {
+                badge = document.createElement('span');
+                badge.className = 'section-error-badge';
+                badge.textContent = 'Required fields missing';
+                header.insertBefore(badge, header.querySelector('.section-toggle-icon'));
+            } else if (!has && badge) {
+                badge.remove();
+            }
         });
-        const dateInput = document.getElementById("dateAssessment");
-        dateInput.classList.remove("field-error");
-        const dateMsg = dateInput.parentElement.querySelector(".field-error-text");
-        if (dateMsg) dateMsg.remove();
+    }
+    (function wireBadgeRefresh() {
+        const f = document.getElementById('intakeForm');
+        if (!f) return;
+        const sched = () => setTimeout(refreshSectionBadges, 0);
+        f.addEventListener('input', sched);
+        f.addEventListener('change', sched);
+    })();
+
+    let toastTimer = null;
+    function showValidationToast(message) {
+        let t = document.querySelector('.validation-toast');
+        if (!t) {
+            t = document.createElement('div');
+            t.className = 'validation-toast';
+            t.setAttribute('role', 'alert');
+            document.body.appendChild(t);
+        }
+        t.textContent = message;
+        requestAnimationFrame(() => t.classList.add('visible'));
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => t.classList.remove('visible'), 4000);
+    }
+
+    function attention(el) {
+        el.classList.remove('nurse-attn');
+        void el.offsetWidth; // restart the animation if it is already running
+        el.classList.add('nurse-attn');
+        el.addEventListener('animationend', () => el.classList.remove('nurse-attn'), { once: true });
+    }
+
+    function afterExpand(el, wasCollapsed, cb) {
+        const body = el.closest('.card-body');
+        if (!wasCollapsed || !body) { cb(); return; }
+        let done = false;
+        const finish = () => {
+            if (done) return;
+            done = true;
+            body.removeEventListener('transitionend', onEnd);
+            cb();
+        };
+        const onEnd = (e) => { if (e.target === body) finish(); };
+        body.addEventListener('transitionend', onEnd);
+        const dur = parseFloat(getComputedStyle(body).transitionDuration) || 0;
+        if (!dur) requestAnimationFrame(finish);
+        else setTimeout(finish, dur * 1000 + 150); // fallback if transitionend never fires
+    }
+
+    // Returns true when there is at least one missing field.
+    function revealErrors(invalids) {
+        refreshSectionBadges();
+        if (!invalids.length) return false;
+
+        // First missing field in page order, not in the order we happened to check.
+        invalids.sort((a, b) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) ? -1 : 1);
+        const first = invalids[0];
+
+        const firstBody = first.closest('.card-body');
+        const wasCollapsed = !!(firstBody && firstBody.classList.contains('collapsed'));
+        openSectionFor(first);
+        refreshSectionBadges();
+
+        const n = invalids.length;
+        showValidationToast(`Please complete ${n} required field${n > 1 ? 's' : ''} (highlighted in red).`);
+
+        afterExpand(first, wasCollapsed, () => {
+            first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            if (!first.matches('input, select, textarea, button') && !first.hasAttribute('tabindex')) first.tabIndex = -1;
+            first.focus({ preventScroll: true });
+            invalids.forEach(attention);
+        });
+        return true;
+    }
+
+    function clearAllErrors() {
+        document.querySelectorAll(".field-input.field-error").forEach((el) => el.classList.remove("field-error"));
+        document.querySelectorAll(".field-error-text, .group-error-text").forEach((m) => m.remove());
+        document.querySelectorAll(".group-error").forEach((g) => g.classList.remove("group-error"));
+        refreshSectionBadges();
     }
 
     function markGroupError(groupEl, message, clearOnSelector) {
@@ -184,19 +296,34 @@ document.addEventListener("DOMContentLoaded", () => {
             input.insertAdjacentElement("afterend", msg);
         }
         msg.textContent = message;
+        const clearOnce = () => {
+            input.classList.remove("field-error");
+            const m = input.parentElement.querySelector(".field-error-text");
+            if (m) m.remove();
+            input.removeEventListener("input", clearOnce);
+            input.removeEventListener("change", clearOnce);
+        };
+        input.addEventListener("input", clearOnce);
+        input.addEventListener("change", clearOnce);
     }
 
     // requireClinicalGroups: only enforced on final submit, not a draft save --
     // a draft is explicitly allowed to be incomplete.
-    function validateRecord(assessmentDate, requireClinicalGroups) {
+    // Returns true when the record is valid.
+    function validateRecord(visit, requireClinicalGroups) {
         clearAllErrors();
-        let firstInvalid = null;
+        const invalids = [];
 
-        if (!assessmentDate) {
-            const dateInput = document.getElementById("dateAssessment");
-            markFieldError(dateInput, "Date of Assessment is required.");
-            firstInvalid = dateInput;
-        }
+        const need = (id, value, message) => {
+            const input = document.getElementById(id);
+            if (!input) return;
+            if (value === null || value === undefined || value === "") {
+                markFieldError(input, message);
+                invalids.push(input);
+            }
+        };
+
+        need("dateAssessment", visit.assessment_date, "Date of Assessment is required.");
 
         if (requireClinicalGroups) {
             [
@@ -207,17 +334,26 @@ document.addEventListener("DOMContentLoaded", () => {
                 const anyChecked = Array.from(document.querySelectorAll(selector)).some((cb) => cb.checked);
                 if (!anyChecked) {
                     markGroupError(wrapper, 'Select at least one, or check "None reported".', selector);
-                    if (!firstInvalid) firstInvalid = wrapper;
+                    invalids.push(wrapper);
                 }
             });
+
+            const smokeWrapper = document.querySelector('input[name="smoke"]')?.closest(".radio-card-wrapper");
+            if (smokeWrapper && !document.querySelector('input[name="smoke"]:checked')) {
+                markGroupError(smokeWrapper, "Please select an option.", 'input[name="smoke"]');
+                invalids.push(smokeWrapper);
+            }
+
+            need("bpSystolic",  visit.bp_systolic,       "Systolic BP is required.");
+            need("bpDiastolic", visit.bp_diastolic,      "Diastolic BP is required.");
+            need("hr",          visit.heart_rate,        "Heart Rate is required.");
+            need("rr",          visit.respiratory_rate,  "Respiratory Rate is required.");
+            need("height",      visit.height_cm,         "Height is required.");
+            need("weight",      visit.weight_kg,         "Weight is required.");
+            need("waist",       visit.waist_cm,          "Waist Circumference is required.");
         }
 
-        if (firstInvalid) {
-            openSectionFor(firstInvalid);
-            firstInvalid.scrollIntoView({ behavior: "smooth", block: "center" });
-            if (typeof firstInvalid.focus === "function") firstInvalid.focus({ preventScroll: true });
-        }
-        return firstInvalid === null;
+        return !revealErrors(invalids);
     }
 
     const submitBtn = document.getElementById("submitIntakeBtn");
@@ -229,7 +365,7 @@ document.addEventListener("DOMContentLoaded", () => {
     async function submitRecord(status) {
         const payload = buildPayload(status);
 
-        if (!validateRecord(payload.visit.assessment_date, status === "submitted")) {
+        if (!validateRecord(payload.visit, status === "submitted")) {
             return;
         }
 

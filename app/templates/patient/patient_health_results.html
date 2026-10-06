@@ -14,8 +14,8 @@
    6 (Anthropometric Measurements & Vitals) is read-only end to end, so it
    has no field list or pending badge of its own. #}
    {% set ve_lifestyle_fields = ['smoking_status', 'alcohol_intake', 'illicit_drug_use', 'physical_activity'] %}
-   {% set ve_diabetes_fields = ['diabetes_diagnosis', 'past_surgical_history',
-                              'menarche_age', 'lmp_date', 'gravida', 'para'] %}
+   {% set ve_surgical_fields = ['past_surgical_history'] %}
+   {% set ve_repro_fields = ['menarche_age', 'lmp_date', 'gravida', 'para'] %}
 
 {% macro pending_badge(changed_fields) -%}
 {%- if changed_fields -%}
@@ -594,50 +594,77 @@
             </details>
 
             <details class="detail-section detail-collapse">
-                <summary><span class="ds-label">5b. Surgical &amp; Reproductive History</span></summary>
+                <summary><span class="ds-label">5b. Past Surgical History</span></summary>
                 <div class="collapse-body">
 
                 <div class="ve-bar">
-                    {% set surg_repro_changed = v.patient_edited_fields | select('in', ve_diabetes_fields) | list if v.patient_edit_pending else [] %}
-                    {{ pending_badge(surg_repro_changed) }}
-                    <button type="button" class="btn btn-outline btn-sm ve-edit-btn" id="veEditBtn-surgrepro-{{ v.visit_id }}" data-view="veView-surgrepro-{{ v.visit_id }}" data-form="veForm-surgrepro-{{ v.visit_id }}">
+                    {% set surgical_changed = v.patient_edited_fields | select('in', ve_surgical_fields) | list if v.patient_edit_pending else [] %}
+                    {{ pending_badge(surgical_changed) }}
+                    <button type="button" class="btn btn-outline btn-sm ve-edit-btn" id="veEditBtn-surgical-{{ v.visit_id }}" data-view="veView-surgical-{{ v.visit_id }}" data-form="veForm-surgical-{{ v.visit_id }}">
                         <svg class="ve-pencil" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
                         Edit
                     </button>
                 </div>
 
-                <div class="detail-data-grid" id="veView-surgrepro-{{ v.visit_id }}">
+                <div class="detail-data-grid" id="veView-surgical-{{ v.visit_id }}">
                     <div class="dd-item" style="grid-column:1/-1;"><span class="dd-key">Past Surgical History</span><span class="dd-val">{{ v.past_surgical_history or "—" }}</span></div>
-                    {% if patient.sex == 'Female' %}
-                    <div class="dd-item"><span class="dd-key">Menarche Age</span><span class="dd-val">{{ v.menarche_age or "—" }}</span></div>
-                    <div class="dd-item"><span class="dd-key">Last Menstrual Period</span><span class="dd-val">{{ v.lmp_date or "—" }}</span></div>
-                    <div class="dd-item"><span class="dd-key">Gravida</span><span class="dd-val">{{ v.gravida if v.gravida is not none else "—" }}</span></div>
-                    <div class="dd-item"><span class="dd-key">Para</span><span class="dd-val">{{ v.para if v.para is not none else "—" }}</span></div>
-                    {% endif %}
                 </div>
 
-                <form method="POST" action="{{ url_for('patient.patient_edit_visit', visit_id=v.visit_id) }}" class="ve-form" id="veForm-surgrepro-{{ v.visit_id }}" style="display:none;">
+                <form method="POST" action="{{ url_for('patient.patient_edit_visit', visit_id=v.visit_id) }}" class="ve-form" id="veForm-surgical-{{ v.visit_id }}" style="display:none;">
                     <p class="ve-note">Edits are reviewed by your health worker before they're final.</p>
                     <div class="ve-grid">
                         <div class="ve-field" style="grid-column:1/-1;">
                             <label>Past Surgical History</label>
-                            <input type="text" name="past_surgical_history" value="{{ v.past_surgical_history or '' }}" placeholder="e.g. Appendectomy 2019">
+                            <input type="text" name="past_surgical_history" maxlength="200" value="{{ v.past_surgical_history or '' }}" placeholder="e.g. Appendectomy 2019">
                         </div>
-                        {% if patient.sex == 'Female' %}
-                        <div class="ve-field"><label>Menarche Age</label><input type="number" name="menarche_age" value="{{ v.menarche_age or '' }}"></div>
-                        <div class="ve-field"><label>Last Menstrual Period</label><input type="date" name="lmp_date" value="{{ v.lmp_date or '' }}"></div>
-                        <div class="ve-field"><label>Gravida</label><input type="number" name="gravida" value="{{ v.gravida if v.gravida is not none else '' }}"></div>
-                        <div class="ve-field"><label>Para</label><input type="number" name="para" value="{{ v.para if v.para is not none else '' }}"></div>
-                        {% endif %}
                     </div>
                     <div class="ve-actions">
-                        <button type="button" class="btn btn-outline btn-sm ve-cancel-btn" data-view="veView-surgrepro-{{ v.visit_id }}" data-form="veForm-surgrepro-{{ v.visit_id }}" data-edit-btn="veEditBtn-surgrepro-{{ v.visit_id }}">Cancel</button>
+                        <button type="button" class="btn btn-outline btn-sm ve-cancel-btn" data-view="veView-surgical-{{ v.visit_id }}" data-form="veForm-surgical-{{ v.visit_id }}" data-edit-btn="veEditBtn-surgical-{{ v.visit_id }}">Cancel</button>
                         <button type="submit" class="btn btn-sm ve-save-btn">Save Changes</button>
                     </div>
                 </form>
 
                 </div>
             </details>
+
+            {% if patient.sex == 'Female' %}
+            <details class="detail-section detail-collapse">
+                <summary><span class="ds-label">5c. Menstrual &amp; Pregnancy History</span></summary>
+                <div class="collapse-body">
+
+                <div class="ve-bar">
+                    {% set repro_changed = v.patient_edited_fields | select('in', ve_repro_fields) | list if v.patient_edit_pending else [] %}
+                    {{ pending_badge(repro_changed) }}
+                    <button type="button" class="btn btn-outline btn-sm ve-edit-btn" id="veEditBtn-repro-{{ v.visit_id }}" data-view="veView-repro-{{ v.visit_id }}" data-form="veForm-repro-{{ v.visit_id }}">
+                        <svg class="ve-pencil" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                        Edit
+                    </button>
+                </div>
+
+                <div class="detail-data-grid" id="veView-repro-{{ v.visit_id }}">
+                    <div class="dd-item"><span class="dd-key">Age at Menarche</span><span class="dd-val">{{ v.menarche_age if v.menarche_age is not none else "—" }}{% if v.menarche_age is not none %} years old{% endif %}</span></div>
+                    <div class="dd-item"><span class="dd-key">Last Menstrual Period</span><span class="dd-val">{{ v.lmp_date or "—" }}</span></div>
+                    <div class="dd-item"><span class="dd-key">Gravida</span><span class="dd-val">{{ v.gravida if v.gravida is not none else "—" }}</span></div>
+                    <div class="dd-item"><span class="dd-key">Para</span><span class="dd-val">{{ v.para if v.para is not none else "—" }}</span></div>
+                </div>
+
+                <form method="POST" action="{{ url_for('patient.patient_edit_visit', visit_id=v.visit_id) }}" class="ve-form" id="veForm-repro-{{ v.visit_id }}" style="display:none;">
+                    <p class="ve-note">Edits are reviewed by your health worker before they're final.</p>
+                    <div class="ve-grid">
+                        <div class="ve-field"><label>Age at Menarche</label><input type="number" name="menarche_age" min="5" max="25" value="{{ v.menarche_age if v.menarche_age is not none else '' }}"></div>
+                        <div class="ve-field"><label>Last Menstrual Period</label><input type="date" name="lmp_date" max="{{ today }}" value="{{ v.lmp_date or '' }}"></div>
+                        <div class="ve-field"><label>Gravida (no. of pregnancies)</label><input type="number" name="gravida" min="0" max="30" value="{{ v.gravida if v.gravida is not none else '' }}"></div>
+                        <div class="ve-field"><label>Para (no. of deliveries)</label><input type="number" name="para" min="0" max="30" value="{{ v.para if v.para is not none else '' }}"></div>
+                    </div>
+                    <div class="ve-actions">
+                        <button type="button" class="btn btn-outline btn-sm ve-cancel-btn" data-view="veView-repro-{{ v.visit_id }}" data-form="veForm-repro-{{ v.visit_id }}" data-edit-btn="veEditBtn-repro-{{ v.visit_id }}">Cancel</button>
+                        <button type="submit" class="btn btn-sm ve-save-btn">Save Changes</button>
+                    </div>
+                </form>
+
+                </div>
+            </details>
+            {% endif %}
 
             <details class="detail-section detail-collapse" open>
                 <summary><span class="ds-label">6. Anthropometric Measurements &amp; Vitals</span></summary>

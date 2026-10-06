@@ -35,7 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const header = card.querySelector('.card-header.section-toggle');
         const body = card.querySelector('.card-body');
         if (!header || !body) return;
-        // Only open the section holding the invalid field; leave the rest alone.
+        // Opens the section holding the invalid field; leaves the rest alone.
         header.classList.remove('collapsed');
         body.classList.remove('collapsed');
     }
@@ -397,6 +397,122 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll(clearOnSelector).forEach(cb => cb.addEventListener('change', clearOnce));
     }
 
+
+    // ---------------------------------------------------------------
+    // Validation feedback: open the section(s) holding missing fields,
+    // wait for the expand animation to finish, THEN scroll to the first
+    // missing field (scrolling while the section is still collapsed lands
+    // in the wrong place), shake/pulse every missing field, flag the section
+    // headers, and show a short toast.
+    // ---------------------------------------------------------------
+    (function injectValidationStyles() {
+        if (document.getElementById('validation-fx-style')) return;
+        const s = document.createElement('style');
+        s.id = 'validation-fx-style';
+        s.textContent = `
+        @keyframes nurse-shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-7px)} 40%{transform:translateX(7px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} }
+        @keyframes nurse-pulse { 0%{box-shadow:0 0 0 0 rgba(220,38,38,.55)} 100%{box-shadow:0 0 0 14px rgba(220,38,38,0)} }
+        .nurse-attn { animation: nurse-shake .45s ease, nurse-pulse .9s ease-out 2; }
+        .field-input.field-error, .group-error { border-color:#dc2626; }
+        .card-header.section-has-error { color:#b91c1c; }
+        .section-error-badge { margin-left:auto; margin-right:.75rem; padding:.15rem .6rem; border-radius:999px; background:#fee2e2; color:#b91c1c; font-size:.7rem; font-weight:700; text-transform:none; white-space:nowrap; }
+        .validation-toast { position:fixed; top:16px; left:50%; transform:translate(-50%,-12px); background:#b91c1c; color:#fff; padding:.65rem 1.1rem; border-radius:10px; font-size:.9rem; font-weight:600; box-shadow:0 8px 24px rgba(0,0,0,.25); opacity:0; transition:opacity .2s ease, transform .2s ease; z-index:10000; pointer-events:none; }
+        .validation-toast.visible { opacity:1; transform:translate(-50%,0); }
+        @media (prefers-reduced-motion: reduce) { .nurse-attn { animation:none; outline:3px solid #dc2626; } }
+`;
+        document.head.appendChild(s);
+    })();
+
+    function refreshSectionBadges() {
+        document.querySelectorAll('.form-card').forEach((card) => {
+            const header = card.querySelector('.card-header.section-toggle');
+            if (!header) return;
+            const has = !!card.querySelector('.field-error, .group-error');
+            header.classList.toggle('section-has-error', has);
+            let badge = header.querySelector('.section-error-badge');
+            if (has && !badge) {
+                badge = document.createElement('span');
+                badge.className = 'section-error-badge';
+                badge.textContent = 'Required fields missing';
+                header.insertBefore(badge, header.querySelector('.section-toggle-icon'));
+            } else if (!has && badge) {
+                badge.remove();
+            }
+        });
+    }
+    (function wireBadgeRefresh() {
+        const f = document.getElementById('intakeForm');
+        if (!f) return;
+        const sched = () => setTimeout(refreshSectionBadges, 0);
+        f.addEventListener('input', sched);
+        f.addEventListener('change', sched);
+    })();
+
+    let toastTimer = null;
+    function showValidationToast(message) {
+        let t = document.querySelector('.validation-toast');
+        if (!t) {
+            t = document.createElement('div');
+            t.className = 'validation-toast';
+            t.setAttribute('role', 'alert');
+            document.body.appendChild(t);
+        }
+        t.textContent = message;
+        requestAnimationFrame(() => t.classList.add('visible'));
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => t.classList.remove('visible'), 4000);
+    }
+
+    function attention(el) {
+        el.classList.remove('nurse-attn');
+        void el.offsetWidth; // restart the animation if it is already running
+        el.classList.add('nurse-attn');
+        el.addEventListener('animationend', () => el.classList.remove('nurse-attn'), { once: true });
+    }
+
+    function afterExpand(el, wasCollapsed, cb) {
+        const body = el.closest('.card-body');
+        if (!wasCollapsed || !body) { cb(); return; }
+        let done = false;
+        const finish = () => {
+            if (done) return;
+            done = true;
+            body.removeEventListener('transitionend', onEnd);
+            cb();
+        };
+        const onEnd = (e) => { if (e.target === body) finish(); };
+        body.addEventListener('transitionend', onEnd);
+        const dur = parseFloat(getComputedStyle(body).transitionDuration) || 0;
+        if (!dur) requestAnimationFrame(finish);
+        else setTimeout(finish, dur * 1000 + 150); // fallback if transitionend never fires
+    }
+
+    // Returns true when there is at least one missing field.
+    function revealErrors(invalids) {
+        refreshSectionBadges();
+        if (!invalids.length) return false;
+
+        // First missing field in page order, not in the order we happened to check.
+        invalids.sort((a, b) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) ? -1 : 1);
+        const first = invalids[0];
+
+        const firstBody = first.closest('.card-body');
+        const wasCollapsed = !!(firstBody && firstBody.classList.contains('collapsed'));
+        invalids.forEach(openSectionFor);
+        refreshSectionBadges();
+
+        const n = invalids.length;
+        showValidationToast(`Please complete ${n} required field${n > 1 ? 's' : ''} (highlighted in red).`);
+
+        afterExpand(first, wasCollapsed, () => {
+            first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            if (!first.matches('input, select, textarea, button') && !first.hasAttribute('tabindex')) first.tabIndex = -1;
+            first.focus({ preventScroll: true });
+            invalids.forEach(attention);
+        });
+        return true;
+    }
+
     function validate(patient, visit, { requireClinicalGroups } = {}) {
         clearAllFieldErrors();
 
@@ -408,11 +524,11 @@ document.addEventListener('DOMContentLoaded', () => {
             { input: $('dateAssessment'), value: visit.assessment_date,   message: 'Date of Assessment is required.' },
         ];
 
-        let firstInvalid = null;
+        const invalids = [];
         requiredFields.forEach(({ input, value, message }) => {
             if (!value) {
                 markFieldError(input, message);
-                if (!firstInvalid) firstInvalid = input;
+                invalids.push(input);
             }
         });
 
@@ -426,7 +542,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const anyChecked = Array.from(document.querySelectorAll(selector)).some(cb => cb.checked);
                 if (!anyChecked) {
                     markGroupError(wrapper, message, selector);
-                    if (!firstInvalid) firstInvalid = wrapper;
+                    invalids.push(wrapper);
                 }
             });
 
@@ -435,7 +551,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const smokeWrapper = document.querySelector('input[name="smoke"]')?.closest('.radio-card-wrapper');
             if (smokeWrapper && !document.querySelector('input[name="smoke"]:checked')) {
                 markGroupError(smokeWrapper, 'Please select an option.', 'input[name="smoke"]');
-                if (!firstInvalid) firstInvalid = smokeWrapper;
+                invalids.push(smokeWrapper);
             }
 
             const vitalsFields = [
@@ -453,18 +569,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!input) return;
                 if (value === null || value === undefined || value === '') {
                     markFieldError(input, message);
-                    if (!firstInvalid) firstInvalid = input;
+                    invalids.push(input);
                 }
             });
         }
 
-        if (firstInvalid) {
-            openSectionFor(firstInvalid);
-            firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            if (typeof firstInvalid.focus === 'function') firstInvalid.focus({ preventScroll: true });
-        }
-
-        return firstInvalid !== null; 
+        return revealErrors(invalids);
     }
 
     async function submitIntake(redirectAfter) {
