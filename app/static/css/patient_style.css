@@ -1154,3 +1154,32 @@ svg.nav-icon { height: 24px; padding: 2px; box-sizing: border-box; fill: none; s
     .hfbs-row { grid-template-columns: 1fr; gap: 0.35rem; }
     .hfbs-meta { justify-content: flex-start; }
 }
+.patient-modal-overlay[hidden] { display: none; }
+.pm-doc { max-width: 560px; width: calc(100% - 2rem); max-height: 85vh; display: flex; flex-direction: column; text-align: left; }
+.pm-doc .pm-title { text-align: left; }
+.pm-doc .pm-body { overflow-y: auto; padding-right: .5rem; font-size: .92rem; line-height: 1.55; }
+.pm-doc .pm-body h4 { margin: 1rem 0 .25rem; font-size: .95rem; }
+.pm-doc .pm-body p { margin: 0; }
+.pm-doc .pm-actions { margin-top: 1rem; }
+.la-badge-newip { background:#fef3c7; color:#92400e; border:1px solid #f59e0b; border-radius:999px; padding:0.05rem 0.5rem; font-size:0.7rem; font-weight:700; margin-left:0.4rem; }
+#deactivateModal .modal-box { max-width: 440px; width: 100%; }
+#deactivateModal .modal-title { text-align: center; }
+#deactivateModal .form-input {
+    width: 100%; box-sizing: border-box; height: 44px;
+    padding: 0 0.9rem; border-radius: 8px;
+}
+#deactivateModal .modal-actions {
+    display: flex; gap: 0.75rem; justify-content: center;
+    align-items: stretch; margin-top: 1.5rem;
+}
+#deactivateModal .modal-actions button {
+    -webkit-appearance: none; appearance: none; box-sizing: border-box;
+    height: 44px; margin: 0; padding: 0 1.4rem; border-radius: 8px;
+    box-shadow: none; font: inherit; font-weight: 600; font-size: 0.9rem;
+    line-height: 1; white-space: nowrap; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+}
+#deactivateModal .btn-outline { background: #fff; color: #374151; border: 1.5px solid #d1d5db; }
+#deactivateModal .btn-outline:hover { background: #f9fafb; }
+#deactivateModal .btn-danger { background: #ef4444; color: #fff; border: 1.5px solid #ef4444; }
+#deactivateModal .btn-danger:hover { background: #dc2626; border-color: #dc2626; }

@@ -29,6 +29,7 @@ def _patient_client(app, pid):
     client = app.test_client()
     with client.session_transaction() as s:
         s["patient_id"] = pid
+        s["patient_sv"] = 0
         s["security_version"] = settings_model.get_security_version("patient") if False else None
     with app.app_context():
         with client.session_transaction() as s:

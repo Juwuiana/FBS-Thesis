@@ -21,6 +21,38 @@
         });
     });
 
+    // --- Patient Portal Access: account-help request ---------------------
+    // Also bound before the early return below: a patient with no visit yet
+    // still has this card, and may be the one who asked for account help.
+    const portalCard = document.getElementById('portalAccessCard');
+    if (portalCard && window.location.hash === '#portalAccessCard') {
+        // Arrived from the notification bell: open the card and scroll to it.
+        const portalHeader = portalCard.querySelector('.section-toggle');
+        if (portalHeader) {
+            portalHeader.classList.remove('collapsed');
+            if (portalHeader.nextElementSibling) portalHeader.nextElementSibling.classList.remove('collapsed');
+        }
+        portalCard.scrollIntoView({ block: 'start' });
+    }
+
+    // Dismiss a request without reissuing credentials (e.g. a duplicate).
+    // Reissuing credentials resolves the request on its own.
+    const dismissHelpBtn = document.getElementById('dismissAccountHelpBtn');
+    if (dismissHelpBtn) {
+        dismissHelpBtn.addEventListener('click', async () => {
+            dismissHelpBtn.disabled = true;
+            try {
+                const res = await fetch(dismissHelpBtn.dataset.url, { method: 'POST' });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                window.location.reload();
+            } catch (err) {
+                console.error(err);
+                dismissHelpBtn.disabled = false;
+                if (typeof nurseAlert === 'function') nurseAlert('Could not dismiss the request. Please try again.');
+            }
+        });
+    }
+
     if (!editBtn) return; // no latest_visit -> nothing to edit
 
     const form = document.getElementById('recordForm');
@@ -119,7 +151,53 @@
         citySel.addEventListener('change', () => fillBarangays(regionSel.value, citySel.value));
     }).catch(err => console.error('Could not load PSGC data', err));
 
+    // Email is optional, but if one is typed it has to look like an email.
+    // Flags the field inline, opens its section if collapsed, and scrolls to it
+    // once the section has finished expanding. Returns true when valid.
+    const emailInput = document.querySelector('[data-field="patient.email"]');
+    const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    function clearEmailError() {
+        if (!emailInput) return;
+        emailInput.classList.remove('field-error');
+        const m = emailInput.parentElement.querySelector('.field-error-text');
+        if (m) m.remove();
+    }
+    if (emailInput) emailInput.addEventListener('input', clearEmailError);
+
+    function validateEmail(reveal = true) {
+        clearEmailError();
+        if (!emailInput) return true;
+        const v = emailInput.value.trim();
+        if (!v || EMAIL_RE.test(v)) return true;
+
+        emailInput.classList.add('field-error');
+        const msg = document.createElement('span');
+        msg.className = 'field-error-text';
+        msg.textContent = 'Enter a valid email address (e.g. name@example.com).';
+        emailInput.insertAdjacentElement('afterend', msg);
+
+        if (!reveal) return false; // live check on blur: just flag it, don't move the page
+
+        const body = emailInput.closest('.card-body');
+        const header = body && body.previousElementSibling;
+        const wasCollapsed = !!(body && body.classList.contains('collapsed'));
+        if (wasCollapsed) {
+            body.classList.remove('collapsed');
+            if (header) header.classList.remove('collapsed');
+        }
+        setTimeout(() => {
+            emailInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            emailInput.focus({ preventScroll: true });
+        }, wasCollapsed ? 350 : 0);
+        return false;
+    }
+
+    // Live check as soon as the nurse leaves the field (only while editing).
+    if (emailInput) emailInput.addEventListener('blur', () => { if (!emailInput.disabled) validateEmail(false); });
+
     saveBtn.addEventListener('click', async () => {
+        if (!validateEmail()) return;
         const payload = { patient: {}, visit: {}, conditions: {}, cvd_responses: {} };
 
         editableFields.forEach(el => {
@@ -135,6 +213,7 @@
                 return;
             }
             if (value === '') value = null;
+            else if (field === 'patient.email') value = value.toLowerCase();
             else if (el.type === 'number' && value !== null) value = Number(value);
             payload[scope][key] = value;
         });

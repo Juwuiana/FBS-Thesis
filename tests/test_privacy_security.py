@@ -57,7 +57,7 @@ def active_session(client, user_id, role="medical_officer"):
 
 def active_patient_session(client, patient_id, version=1):
     with client.session_transaction() as session:
-        session.update({"patient_id": patient_id, "security_version": version})
+        session.update({"patient_id": patient_id, "security_version": version, "patient_sv": 0})
 
 
 def add_deleted_patient(app, code, age_days):

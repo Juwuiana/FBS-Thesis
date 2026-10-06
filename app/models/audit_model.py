@@ -1,4 +1,5 @@
 from datetime import datetime
+from datetime import timedelta
 
 
 def log_event(db, *, user_id, user_name, role, action, ip_address, severity="Info"):
@@ -107,5 +108,66 @@ def get_recent_logs_for_user(db, user_id, limit=20):
         LIMIT ?
         """,
         (user_id, limit),
+    ).fetchall()
+    return _format_logs(rows)
+
+def _ph_midnight_as_utc(day):
+    """Stored timestamps are UTC but people think in Manila time, so a picked
+    calendar day is converted: Manila 00:00 of that day -> the matching UTC string."""
+    local = datetime(day.year, day.month, day.day, tzinfo=PH_TZ)
+    return local.astimezone(_UTC).strftime("%Y-%m-%d %H:%M:%S")
+
+_UTC = ZoneInfo("UTC")
+_MAX_SEARCH_LEN = 100
+
+def _user_log_where(user_id, severity=None, q=None, date_from=None, date_to=None):
+    """(WHERE clause, params). Everything user-supplied is a bound parameter;
+    the LIKE wildcards in a search are escaped so '%' and '_' match literally."""
+    where, params = ["user_id = ?"], [user_id]
+    if severity:
+        where.append("severity = ?")
+        params.append(severity)
+    if q:
+        q = q.strip()[:_MAX_SEARCH_LEN]
+        escaped = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        where.append("action LIKE ? ESCAPE '\\'")
+        params.append(f"%{escaped}%")
+    if date_from:
+        where.append("created_at >= ?")
+        params.append(_ph_midnight_as_utc(date_from))
+    if date_to:
+        where.append("created_at < ?")                       # end of day = start of next day
+        params.append(_ph_midnight_as_utc(date_to + timedelta(days=1)))
+    return " AND ".join(where), params
+
+
+def list_severities_for_user(db, user_id):
+    """Severity values this account actually has, in a sensible order, for the filter dropdown."""
+    rows = db.execute(
+        "SELECT DISTINCT severity FROM audit_log WHERE user_id = ? AND severity IS NOT NULL", (user_id,)
+    ).fetchall()
+    found = {r["severity"] for r in rows}
+    order = ["Info", "Success", "Warning", "Critical"]
+    return [s for s in order if s in found] + sorted(found - set(order))
+
+
+def count_logs_for_user(db, user_id, *, severity=None, q=None, date_from=None, date_to=None):
+    where, params = _user_log_where(user_id, severity, q, date_from, date_to)
+    return db.execute(f"SELECT COUNT(*) FROM audit_log WHERE {where}", params).fetchone()[0]
+
+
+def get_logs_for_user_page(db, user_id, *, severity=None, q=None, date_from=None, date_to=None,
+                           limit=10, offset=0):
+    """One page of this account's own log, newest first, same shape as get_recent_logs_for_user."""
+    where, params = _user_log_where(user_id, severity, q, date_from, date_to)
+    rows = db.execute(
+        f"""
+        SELECT id, user_id, user_name, role, action, ip_address, severity, created_at
+        FROM audit_log
+        WHERE {where}
+        ORDER BY created_at DESC, id DESC
+        LIMIT ? OFFSET ?
+        """,
+        (*params, int(limit), int(offset)),
     ).fetchall()
     return _format_logs(rows)

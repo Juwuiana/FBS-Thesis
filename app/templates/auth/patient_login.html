@@ -104,8 +104,50 @@
                 </svg>
                 <div class="security-notice-text">
                     <span class="security-notice-title">Lost your Patient ID or password?</span>
-                    Ask your health worker at your next visit to reissue your portal access.
+                    Ask your health worker at your next visit to reissue your portal access,
+                    or <button type="button" class="link-btn" id="openAccountHelpBtn">send a request now</button>.
                 </div>
+            </div>
+        </div>
+
+        <!-- ACCOUNT HELP REQUEST MODAL -->
+        <div class="modal-overlay" id="accountHelpModal" style="display:none;">
+            <div class="modal-box">
+                <h2 class="modal-title">Request Account Help</h2>
+                <p class="modal-body" style="margin-bottom:1.25rem;">
+                    Tell us your Patient ID and we'll flag your account for your health worker
+                    to follow up at the LHU. This doesn't reset your password by itself --
+                    you'll still need to come in or be reached by your health worker to receive
+                    new login details.
+                </p>
+
+                <form method="POST" action="{{ url_for('patient.patient_account_help') }}" style="text-align:left;">
+                    <div class="field-group">
+                        <label class="field-label" for="help_patient_code">Patient ID</label>
+                        <input
+                            class="field-input"
+                            type="text"
+                            id="help_patient_code"
+                            name="patient_code"
+                            placeholder="SRCHO-2026-0001"
+                            style="text-transform:uppercase;"
+                            maxlength="16"
+                            required
+                        >
+                    </div>
+                    <div class="field-group">
+                        <label class="field-label" for="help_reason">What do you need help with?</label>
+                        <select class="field-input" id="help_reason" name="reason">
+                            <option value="forgot_password">Forgot my password</option>
+                            <option value="lost_id">Lost/forgot my Patient ID</option>
+                            <option value="locked_out">Can't sign in for another reason</option>
+                        </select>
+                    </div>
+                    <div class="modal-actions" style="margin-top:1.25rem; display:flex; gap:0.75rem; justify-content:flex-end;">
+                        <button type="button" class="btn-outline" id="closeAccountHelpBtn">Cancel</button>
+                        <button type="submit" class="btn-signin" style="width:auto; padding:0.6rem 1.25rem;">Send Request</button>
+                    </div>
+                </form>
             </div>
         </div>
 
@@ -113,7 +155,41 @@
             © 2026 FBS Diabetes Risk Prediction System · LHU Sta Rosa
         </div>
     </div>
+<style>
+    #accountHelpModal {
+        position: fixed; inset: 0; z-index: 1000;
+        background: rgba(0, 0, 0, 0.45);
+        align-items: center; justify-content: center;
+        padding: 1rem;
+    }
+    #accountHelpModal .modal-box {
+        background: #fff; border-radius: 12px; padding: 1.75rem;
+        width: 100%; max-width: 440px; max-height: 90vh; overflow-y: auto;
+    }
+</style>
 
+<script>
+(function () {
+    var modal = document.getElementById('accountHelpModal');
+    var openBtn = document.getElementById('openAccountHelpBtn');
+    var closeBtn = document.getElementById('closeAccountHelpBtn');
+    if (!modal || !openBtn) return;
+
+    function openModal() {
+        modal.style.display = 'flex';
+        var help = document.getElementById('help_patient_code');
+        var login = document.getElementById('patient_code');
+        if (help && login && login.value && !help.value) help.value = login.value;
+        if (help) help.focus();
+    }
+    function closeModal() { modal.style.display = 'none'; }
+
+    openBtn.addEventListener('click', openModal);
+    if (closeBtn) closeBtn.addEventListener('click', closeModal);
+    modal.addEventListener('click', function (e) { if (e.target === modal) closeModal(); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeModal(); });
+})();
+</script>
 <script src="{{ url_for('static', filename='js/patient_scripts.js') }}"></script>
 
 </body>

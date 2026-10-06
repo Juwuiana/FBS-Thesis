@@ -40,6 +40,7 @@
 
     <div class="settings-content-panel">
 
+        <!-- ══ TAB: PROFILE ══ -->
         <div class="settings-pane active" id="pane-profile">
 
             <div class="settings-section">
@@ -78,9 +79,9 @@
                 </p>
             </div>
 
-
         </div>
 
+        <!-- ══ TAB: CONTACT ══ -->
         <div class="settings-pane" id="pane-contact">
 
             <div class="settings-section">
@@ -95,19 +96,20 @@
 
             <div class="settings-section">
                 <div class="section-label">Home Address</div>
-                    <div class="settings-form-grid">
-                        <div class="form-group" style="grid-column: 1 / -1;">
-                            <label class="form-label">Address</label>
-                            <input class="form-input" type="text" id="addrFull" value="{{ patient.address or '' }}" placeholder="Street, Purok, Barangay, City">
-                        </div>
+                <div class="settings-form-grid">
+                    <div class="form-group" style="grid-column: 1 / -1;">
+                        <label class="form-label">Address</label>
+                        <input class="form-input" type="text" id="addrFull" value="{{ patient.address or '' }}" placeholder="Street, Purok, Barangay, City">
                     </div>
-                    <div class="form-actions">
-                        <button class="btn-save">Save Changes</button>
+                </div>
+                <div class="form-actions">
+                    <button class="btn-save">Save Changes</button>
                 </div>
             </div>
 
         </div>
 
+        <!-- ══ TAB: SECURITY ══ -->
         <div class="settings-pane" id="pane-security">
 
             <div class="settings-section">
@@ -151,22 +153,35 @@
             <div class="settings-section">
                 <div class="section-label">Login Activity</div>
                 <div class="login-activity-list">
+
+                    {% set current_ip = login_events[0].ip_address if login_events else None %}
                     {% for event in login_events %}
-                    <div class="la-item {{ 'la-current' if loop.first }}">
+                    {% set is_current = loop.first %}
+                    <div class="la-item {{ 'la-current' if is_current }}">
                         <div class="la-info">
                             <div class="la-device">
                                 {{ event.device_label }}
-                                {% if loop.first %}— <span class="la-badge-current">Current Session</span>{% endif %}
+                                {% if is_current %}— <span class="la-badge-current">Current Session</span>{% endif %}
+                                {% if not is_current and event.ip_address != current_ip %}
+                                <span class="la-badge-newip">Different IP</span>
+                                {% endif %}
                             </div>
-                            <div class="la-meta">{{ event.ip_address or "Unknown location" }} · {{ event.created_at }}</div>
+                            <div class="la-meta">
+                                {{ event.location or "Location unavailable" }}
+                                · IP {{ event.ip_address | mask_ip }}
+                                · Last login {{ event.created_at }}
+                                {% if event.count > 1 %}· {{ event.count }} logins since {{ event.first_seen }}{% endif %}
+                            </div>
                         </div>
-                        {% if not loop.first %}
+                        {% if not is_current %}
                         <button class="btn-revoke" data-event-id="{{ event.id }}">Revoke</button>
                         {% endif %}
                     </div>
                     {% else %}
                     <p class="form-hint">No login activity recorded yet.</p>
                     {% endfor %}
+
+                    <p class="form-hint">Locations are approximate and based on your internet connection. If you don't recognize a login, change your password.</p>
                 </div>
             </div>
 
@@ -183,13 +198,8 @@
                             <div class="aai-title">Download My Data</div>
                             <div class="aai-sub">Export a copy of your screening history and profile as PDF</div>
                         </div>
-                        <a href="{{ url_for('patient.patient_download_data') }}" class="btn-action-outline">Download</a>                    </div>
-                    <div class="account-action-item">
-                        <div class="aai-info">
-                            <div class="aai-title">Privacy Policy</div>
-                            <div class="aai-sub">How Sta. Rosa City Health Office uses your health data</div>
-                        </div>
-                        <a href="#" class="btn-action-outline" id="viewPrivacyBtn">View <svg class="arrow-icon" aria-hidden="true"><use href="#icon-arrow"/></svg></a>                    </div>
+                        <a href="{{ url_for('patient.patient_download_data') }}" class="btn-action-outline">Download</a>
+                    </div>
                     <div class="account-action-item">
                         <div class="aai-info">
                             <div class="aai-title">Data Sharing Consent</div>
@@ -211,14 +221,16 @@
                             <div class="dz-title">Sign Out All Devices</div>
                             <div class="dz-sub">This will end all active sessions except the current one</div>
                         </div>
-                        <button class="btn-danger-outline">Sign Out All</button>
+                        <form method="POST" action="{{ url_for('patient.patient_sign_out_all') }}" style="margin:0;">
+                            <button type="submit" class="btn-danger-outline">Sign Out All</button>
+                        </form>
                     </div>
                     <div class="dz-item">
                         <div class="dz-info">
                             <div class="dz-title">Deactivate Account</div>
                             <div class="dz-sub">Your records will remain at the LHU but portal access will be disabled</div>
                         </div>
-                        <button class="btn-danger">Deactivate</button>
+                        <button type="button" class="btn-danger" id="deactivateBtn">Deactivate</button>
                     </div>
                 </div>
             </div>
@@ -244,19 +256,27 @@
 <!-- DEACTIVATE MODAL -->
 <div class="modal-overlay" id="deactivateModal" style="display:none;">
     <div class="modal-box">
-        <div class="modal-title">Deactivate Account?</div>
-        <div class="modal-body">This will disable your access to the patient portal. Your health records at the LHU will not be deleted. You may re-activate by visiting the Sta. Rosa City Health Office.</div>
-        <div class="modal-actions">
-            <button class="btn-outline">Cancel</button>
-            <button class="btn-danger">Yes, Deactivate</button>
-        </div>
+        <form method="POST" action="{{ url_for('patient.patient_deactivate') }}">
+            <div class="modal-title">Deactivate Account?</div>
+            <div class="modal-body">
+                This will disable your access to the patient portal. Your health records at the LHU will not be deleted. You may re-activate by visiting the Sta. Rosa City Health Office.
+                <div class="form-group" style="margin-top:1rem;">
+                    <label class="form-label" for="deactivatePw">Enter your password to confirm</label>
+                    <input class="form-input" type="password" id="deactivatePw" name="password" autocomplete="current-password" required>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn-outline" id="modalCancelBtn">Cancel</button>
+                <button type="submit" class="btn-danger" id="modalConfirmBtn">Yes, Deactivate</button>
+            </div>
+        </form>
     </div>
 </div>
 
 <footer class="patient-footer">
     <span>©FBS Diabetes Risk System</span>
     <div class="footer-links">
-        <a href="#">Privacy Policy</a><span>·</span><a href="#">Help</a>
+        <a href="#" data-open-modal="privacyModal">Privacy Policy</a><span>·</span><a href="#" data-open-modal="helpModal">Help</a>
     </div>
 </footer>
 {% endblock %}

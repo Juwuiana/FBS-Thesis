@@ -1,3 +1,14 @@
+# Patient-record branch merged onto fourth merge
+
+- **Base:** fourth-merge (record retention, anonymization, staff recovery, admin privacy controls) kept intact.
+- **Added (patient):** self-service account-help request from the login page, portal deactivate (password-confirmed) and per-patient "sign out all other devices", optional patient email (editable in portal settings), privacy/help modals, grouped login activity with location and "Different IP" flag, split surgical/reproductive history sections.
+- **Added (nurse):** account-help requests in the notification bell with dismiss, portal reactivation and credential reissue resolving requests, Portal Access card banner, patient email on intake/new record/patient file and in Excel import/export, "account help" filter and flag in Data Management, health-results hero summary and sortable worklist, due-soon count, activity log search/filter/pagination.
+- **Migrations:** renumbered to `0033_add_patient_account_help_requests`, `0034_add_patient_session_version_and_portal_active`, `0035_add_patient_email` (0032 is the retention-safe `patient_fbs_entries`).
+- **Retention:** anonymization now also clears email, account-help fields and deactivates/invalidates the portal session.
+- **Kept from base:** stricter nurse New Record validation (including Alcohol and Illicit Drug required checks), draft-modal close button, anonymized-patient filtering everywhere.
+- **Not taken:** the branch's older admin pages (staff CSV import UI, old privacy tab) and the UTF-16 `requirements.txt`; `geoip2==5.3.0` was added to the base requirements.
+- **Housekeeping:** `reset_data.py` taken from the branch (backs up first); stray `_tmp_*`/`_old_hash.txt` files dropped; session helpers in tests now set `patient_sv`.
+
 # Patient add-record merge
 
 - **Merged:** patient portal "Add New Record" (self-reported FBS entries, follow-up bell, nurse review card, nurse New Record accordion/prefill) combined with the patient record-retention fix.

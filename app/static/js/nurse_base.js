@@ -2,6 +2,34 @@
  * static/js/nurse_base.js
  */
 document.addEventListener('DOMContentLoaded', () => {
+    // ---- Flash messages ("Welcome back", "Screening saved", ...) ----------
+    // They sit over the top of the page, so they fade out on their own instead
+    // of covering the notification bell. Errors stay a little longer. Click to
+    // dismiss now; hovering pauses the timer so a message can still be read.
+    const flashBox = document.querySelector('.app-flash-messages');
+    if (flashBox) {
+        const dismissFlash = (el) => {
+            if (el.dataset.dismissing) return;
+            el.dataset.dismissing = '1';
+            el.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
+            el.style.opacity = '0';
+            el.style.transform = 'translateY(-6px)';
+            setTimeout(() => {
+                el.remove();
+                if (!flashBox.querySelector('.app-flash')) flashBox.remove();
+            }, 400);
+        };
+        flashBox.querySelectorAll('.app-flash').forEach((el) => {
+            const isError = el.classList.contains('app-flash-error') || el.classList.contains('app-flash-danger');
+            let timer = setTimeout(() => dismissFlash(el), isError ? 8000 : 4000);
+            el.style.cursor = 'pointer';
+            el.title = 'Click to dismiss';
+            el.addEventListener('click', () => { clearTimeout(timer); dismissFlash(el); });
+            el.addEventListener('mouseenter', () => clearTimeout(timer));
+            el.addEventListener('mouseleave', () => { timer = setTimeout(() => dismissFlash(el), 1500); });
+        });
+    }
+
     // ---- Notification bell: records a patient edited from the portal ----
     const bellWrap  = document.getElementById('nurseBellWrap');
     const bellBtn   = document.getElementById('nurseBellBtn');
@@ -44,10 +72,38 @@ document.addEventListener('DOMContentLoaded', () => {
         setBadge(window.__pendingPatientEditsCount);
     }
 
-    function renderBellList(edits) {
+    const SECTION_STYLE = 'padding:0.5rem 1.25rem; font-size:0.7rem; font-weight:700; letter-spacing:0.04em; text-transform:uppercase; ';
+
+    // Patients who asked for account help from the login page (forgot
+    // password / lost ID / locked out). Opening one lands on the Portal
+    // Access card of their file, where the nurse reissues credentials --
+    // which also resolves the request. Dismiss is for duplicates.
+    function renderAccountHelp(requests) {
+        if (!requests.length) return '';
+        return `<div class="nurse-bell-section" style="${SECTION_STYLE}color:#92400e; background:#fef3c7;">Account action required (${requests.length})</div>` +
+            requests.map(r => {
+                const when = r.requested_at ? new Date(r.requested_at.replace(' ', 'T') + 'Z').toLocaleString() : '';
+                return `<div class="nurse-bell-item" data-patient-id="${r.patient_id}">
+                    <a href="${escapeHtml(r.patient_file_url)}#portalAccessCard" style="text-decoration:none; color:inherit; display:block;">
+                        <div class="nurse-bell-name">${escapeHtml(r.patient_name)}<span class="nurse-bell-code">${escapeHtml(r.patient_code)}</span></div>
+                        <div class="nurse-bell-fields">${r.reason_code === 'self_deactivated'
+                            ? 'Account deactivated: reactivate portal access once verified'
+                            : escapeHtml(r.reason) + ': portal access needs to be reissued'}</div>
+                        <div class="nurse-bell-time">${escapeHtml(when)}</div>
+                    </a>
+                    <button type="button" class="nurse-bell-ack nurse-bell-dismiss" data-patient-id="${r.patient_id}" title="Mark as handled without reissuing access">Dismiss</button>
+                </div>`;
+            }).join('');
+    }
+
+    function renderBellList(edits, requests = []) {
         if (!bellList) return;
-        if (!edits.length) { bellList.innerHTML = '<p class="nurse-bell-empty">No pending updates.</p>'; return; }
-        bellList.innerHTML = edits.map(e => {
+        if (!edits.length && !requests.length) { bellList.innerHTML = '<p class="nurse-bell-empty">No pending updates.</p>'; return; }
+        const helpHtml = renderAccountHelp(requests);
+        const editsHeader = (helpHtml && edits.length)
+            ? `<div class="nurse-bell-section" style="${SECTION_STYLE}color:#4b5563; background:#f3f4f6;">Records updated by patients (${edits.length})</div>`
+            : '';
+        bellList.innerHTML = helpHtml + editsHeader + edits.map(e => {
             // 2. Map through FIELD_LABELS or humanize unknown keys, avoiding the 'Vitals' default:
             const rawFields = e.fields || [];
             const mappedList = [...new Set(rawFields.map(f => FIELD_LABELS[f] || f.replace(/_/g, ' ')))];
@@ -68,11 +124,17 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadBell() {
         if (!bellList) return;
         try {
-            const res = await fetch('/nurse/patient-edits');
-            if (!res.ok) throw new Error('bad status');
-            const data = await res.json();
-            setBadge(data.count || 0);
-            renderBellList(data.edits || []);
+            const [editsRes, helpRes] = await Promise.all([
+                fetch('/nurse/patient-edits'),
+                // If this one fails it must not hide the edits list, so it falls back to "none".
+                fetch('/nurse/account-help-requests').catch(() => null),
+            ]);
+            if (!editsRes.ok) throw new Error('bad status');
+            const editsData = await editsRes.json();
+            let helpData = { count: 0, requests: [] };
+            if (helpRes && helpRes.ok) helpData = await helpRes.json().catch(() => helpData);
+            setBadge((editsData.count || 0) + (helpData.count || 0));
+            renderBellList(editsData.edits || [], helpData.requests || []);
             bellLoaded = true;
         } catch (e) {
             bellList.innerHTML = '<p class="nurse-bell-empty">Could not load updates.</p>';
@@ -90,6 +152,18 @@ document.addEventListener('DOMContentLoaded', () => {
             if (bellWrap && !bellWrap.contains(e.target)) { bellPanel.hidden = true; bellBtn.setAttribute('aria-expanded', 'false'); }
         });
         bellList && bellList.addEventListener('click', async (e) => {
+            const dismiss = e.target.closest('.nurse-bell-dismiss');
+            if (dismiss) {
+                e.preventDefault();
+                dismiss.disabled = true;
+                try {
+                    const res = await fetch(`/nurse/account-help-requests/${dismiss.dataset.patientId}/resolve`, { method: 'POST' });
+                    if (!res.ok) throw new Error('bad status');
+                    bellLoaded = false;
+                    loadBell();
+                } catch (err) { dismiss.disabled = false; }
+                return;
+            }
             const btn = e.target.closest('.nurse-bell-ack');
             if (!btn) return;
             e.preventDefault();

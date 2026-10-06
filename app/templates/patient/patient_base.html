@@ -105,7 +105,47 @@
     </main>
 
     <button class="scroll-top-btn" id="scrollTopBtn" aria-label="Back to top">↑</button>
+    <div class="patient-modal-overlay" id="privacyModal" hidden>
+        <div class="patient-modal-card pm-doc" role="dialog" aria-modal="true" aria-labelledby="privacyTitle">
+            <h3 class="pm-title" id="privacyTitle">Privacy Policy</h3>
+            <div class="pm-body">
+                <p>The LHU Patient Portal collects and uses your health information only to support your diabetes risk screening at the Local Health Unit.</p>
+                <h4>What we collect</h4>
+                <p>Your name, contact details, address, medical and family history, lifestyle information, vital signs, fasting blood sugar (FBS) results, and any home readings you enter.</p>
+                <h4>How we use it</h4>
+                <p>To compute your risk level, show your screening history and trends, and let your health worker follow up with you. Your data may also be used in de-identified form for research.</p>
+                <h4>Who can see it</h4>
+                <p>Only you and authorized LHU health workers. We do not sell or share your personal information with third parties.</p>
+                <h4>Your rights</h4>
+                <p>Under the Data Privacy Act of 2012 (RA 10173), you may ask to access or correct your information, or raise a concern about how it is handled. Contact your LHU health worker to do so.</p>
+                <h4>Security</h4>
+                <p>Access to your record requires your login. Please do not share your password, and sign out on shared devices.</p>
+            </div>
+            <div class="pm-actions">
+                <button type="button" class="btn-patient-ok" data-close-modal>Close</button>
+            </div>
+        </div>
+    </div>
 
+    <div class="patient-modal-overlay" id="helpModal" hidden>
+        <div class="patient-modal-card pm-doc" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+            <h3 class="pm-title" id="helpTitle">Help</h3>
+            <div class="pm-body">
+                <h4>Reading your results</h4>
+                <p>My Results shows every screening, your latest risk level, and how your FBS changed since your last visit. Use the tabs to switch between history, adding a record, and your FBS trend.</p>
+                <h4>Updating your information</h4>
+                <p>Use <strong>Add New Record</strong> if your health details changed, or <strong>Edit</strong> on a past screening. Changes are reviewed by your health worker before they become final.</p>
+                <h4>Home FBS readings</h4>
+                <p>Home readings are for reference only. Your official FBS and risk level come from your screening at the LHU.</p>
+                <h4>Need more help?</h4>
+                <p>Visit or contact your LHU health worker. If you feel very unwell, seek medical care right away instead of waiting for a portal update.</p>
+            </div>
+            <div class="pm-actions">
+                <button type="button" class="btn-patient-ok" data-close-modal>Close</button>
+            </div>
+        </div>
+    </div>
+   
     <script>
     (function () {
         var btn = document.getElementById('sidebarPin');
@@ -157,26 +197,19 @@
     {% block scripts %}{% endblock %}
 
     <script>
-    document.addEventListener('DOMContentLoaded', () => {
-        const modal = document.getElementById('flashModalOverlay');
-        const okBtn = document.getElementById('closeFlashModalBtn');
-        
-        if (modal && okBtn) {
-            const dismiss = () => {
-                modal.style.opacity = '0';
-                modal.style.transition = 'opacity 0.2s ease';
-                setTimeout(() => modal.remove(), 200);
-            };
-            okBtn.addEventListener('click', dismiss);
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) dismiss();
-            });
-            document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape') dismiss();
-            });
-            okBtn.focus();
-        }
+(function () {
+    function dismissAll() {
+        document.querySelectorAll('[id="flashModalOverlay"]').forEach(function (m) {
+            m.style.transition = 'opacity 0.2s ease';
+            m.style.opacity = '0';
+            setTimeout(function () { m.remove(); }, 200);
+        });
+    }
+    document.addEventListener('click', function (e) {
+        if (e.target.closest('[id="closeFlashModalBtn"]') || e.target.matches('[id="flashModalOverlay"]')) dismissAll();
     });
-    </script>
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') dismissAll(); });
+})();
+</script>
 </body>
 </html>

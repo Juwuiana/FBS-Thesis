@@ -83,6 +83,26 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // ---- Login page: "Request Account Help" modal -----------------------
+    const helpModal    = document.getElementById('accountHelpModal');
+    const openHelpBtn  = document.getElementById('openAccountHelpBtn');
+    const closeHelpBtn = document.getElementById('closeAccountHelpBtn');
+    if (helpModal && openHelpBtn) {
+        const openHelp = () => {
+            helpModal.style.display = 'flex';
+            const helpCode  = document.getElementById('help_patient_code');
+            const loginCode = document.getElementById('patient_code');
+            // Carry over a Patient ID the patient already typed on the login form.
+            if (helpCode && loginCode && loginCode.value && !helpCode.value) helpCode.value = loginCode.value;
+            if (helpCode) helpCode.focus();
+        };
+        const closeHelp = () => { helpModal.style.display = 'none'; };
+        openHelpBtn.addEventListener('click', openHelp);
+        if (closeHelpBtn) closeHelpBtn.addEventListener('click', closeHelp);
+        helpModal.addEventListener('click', e => { if (e.target === helpModal) closeHelp(); });
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') closeHelp(); });
+    }
+
     /* 2. AVATAR UPLOAD  (all pages — sidebar + settings) */
 
     // Sidebar avatar (patient_base.html)
@@ -197,6 +217,21 @@ document.addEventListener('DOMContentLoaded', () => {
         tab.addEventListener('click', () => switchTab(tab.dataset.tab));
     });
 
+    // Deep link into a tab: /patient_settings#security, ?tab=security, or
+    // ?force_change=1 (the "change your password" warning button).
+    (function openRequestedSettingsTab() {
+        if (!document.querySelector('.settings-tab')) return;
+        const params = new URLSearchParams(window.location.search);
+        let wanted = params.get('tab') || window.location.hash.replace('#', '');
+        if (!wanted && params.get('force_change') === '1') wanted = 'security';
+        if (!wanted || !document.getElementById('pane-' + wanted)) return;
+        switchTab(wanted);
+        if (wanted === 'security') {
+            const pwForm = document.getElementById('pwChangeForm');
+            if (pwForm) pwForm.scrollIntoView({ block: 'center' });
+        }
+    })();
+
     // Password show/hide toggles
     const EYE_OPEN = `<svg class="pw-eye-icon" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M1 10C3.5 5.5 7 3 10 3s6.5 2.5 9 7c-2.5 4.5-6 7-9 7s-6.5-2.5-9-7z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5"/></svg>`;
     const EYE_SHUT = `<svg class="pw-eye-icon" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M1 10C3.5 5.5 7 3 10 3s6.5 2.5 9 7c-2.5 4.5-6 7-9 7s-6.5-2.5-9-7z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5"/><line x1="3" y1="3" x2="17" y2="17" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
@@ -245,14 +280,22 @@ document.addEventListener('DOMContentLoaded', () => {
     const deactivateBtn   = document.getElementById('deactivateBtn');
     const deactivateModal = document.getElementById('deactivateModal');
     const modalCancelBtn  = document.getElementById('modalCancelBtn');
-    const modalConfirmBtn = document.getElementById('modalConfirmBtn');
 
-    if (deactivateBtn)   deactivateBtn.addEventListener('click',   () => { deactivateModal.style.display = 'flex'; });
-    if (modalCancelBtn)  modalCancelBtn.addEventListener('click',  () => { deactivateModal.style.display = 'none'; });
-    if (modalConfirmBtn) modalConfirmBtn.addEventListener('click', () => {
-        showToast('Account deactivation request submitted.');
+    const deactivatePw = document.getElementById('deactivatePw');
+    const closeDeactivate = () => {
+        if (!deactivateModal) return;
         deactivateModal.style.display = 'none';
+        if (deactivatePw) deactivatePw.value = '';      // never leave a typed password sitting in the page
+    };
+    if (deactivateBtn) deactivateBtn.addEventListener('click', () => {
+        deactivateModal.style.display = 'flex';
+        if (deactivatePw) deactivatePw.focus();
     });
+    if (modalCancelBtn) modalCancelBtn.addEventListener('click', closeDeactivate);
+    if (deactivateModal) {
+        deactivateModal.addEventListener('click', e => { if (e.target === deactivateModal) closeDeactivate(); });
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDeactivate(); });
+    }
 
     // Sign-out-all button
     const signOutAllBtn = document.getElementById('signOutAllBtn');
@@ -481,3 +524,34 @@ function showToast(msg, type) {
     clearTimeout(toast._t);
     toast._t = setTimeout(() => toast.classList.remove('show'), 3200);
 }
+
+
+/* PRIVACY / HELP MODALS (all pages)
+   Triggers: [data-open-modal="<id>"]; close: [data-close-modal], overlay click, Esc */
+(function () {
+    let openEl = null, lastTrigger = null;
+
+    function openModal(id, trigger) {
+        const m = document.getElementById(id);
+        if (!m) return;
+        openEl = m; lastTrigger = trigger;
+        m.hidden = false;
+        document.body.style.overflow = 'hidden';
+        const btn = m.querySelector('[data-close-modal]');
+        if (btn) btn.focus();
+    }
+
+    function closeModal() {
+        if (!openEl) return;
+        openEl.hidden = true; openEl = null;
+        document.body.style.overflow = '';
+        if (lastTrigger) lastTrigger.focus();
+    }
+
+    document.addEventListener('click', e => {
+        const t = e.target.closest('[data-open-modal]');
+        if (t) { e.preventDefault(); openModal(t.dataset.openModal, t); return; }
+        if (e.target.closest('[data-close-modal]') || e.target === openEl) closeModal();
+    });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+})();

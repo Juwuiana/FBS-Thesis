@@ -20,7 +20,6 @@ from openpyxl.comments import Comment
 from openpyxl.formatting.rule import FormulaRule
 from openpyxl.styles import PatternFill, Font
 
-
 _RETENTION_PURGE_INTERVAL_SECONDS = 60 * 60
 _last_retention_purge_at = None
 _retention_purge_lock = Lock()
@@ -58,6 +57,25 @@ def generate_next_patient_code(conn=None) -> str:
     if own_conn:
         conn.close()
     return f"{prefix}{next_seq:04d}"
+
+
+_EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
+
+
+def is_valid_email(value) -> bool:
+    """True for blank (email is optional) or something shaped like name@domain.tld."""
+    v = (value or "").strip()
+    return v == "" or (len(v) <= 254 and bool(_EMAIL_RE.match(v)))
+
+
+def _normalize_email(value) -> str | None:
+    """Trim + lowercase; blank becomes NULL so "no email" is never stored as ''.
+    Raises ValueError for a malformed address so a bad value never reaches the DB
+    even if a page skipped its own check."""
+    v = (value or "").strip().lower()
+    if v and not is_valid_email(v):
+        raise ValueError("Enter a valid email address (e.g. name@example.com).")
+    return v or None
 
 
 def _normalize_name_part(s: str | None) -> str:
@@ -116,15 +134,16 @@ def create_patient(data: dict, staff_id: int | None = None) -> int:
                 INSERT INTO patients (
                     patient_code, last_name, first_name, middle_name,
                     father_last_name, father_first_name, mother_last_name, mother_first_name,
-                    spouse_last_name, spouse_first_name, contact_number,
+                    spouse_last_name, spouse_first_name, contact_number, email,
                     birthdate, sex, civil_status, religion, occupation, education,
                     barangay_id, address, phic_membership, phic_type, maiden_name, created_by_staff_id
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 patient_code, data["last_name"], data["first_name"], data.get("middle_name"),
                 data.get("father_last_name"), data.get("father_first_name"),
                 data.get("mother_last_name"), data.get("mother_first_name"),
                 data.get("spouse_last_name"), data.get("spouse_first_name"), data.get("contact_number"),
+                _normalize_email(data.get("email")),
                 data["birthdate"], data["sex"], data.get("civil_status"), data.get("religion"),
                 data.get("occupation"), data.get("education"), data.get("barangay_id"),
                 data.get("address"), data.get("phic_membership"), data.get("phic_type"),
@@ -265,7 +284,7 @@ def update_patient(patient_id: int, data: dict, allow_name_edit: bool = False, a
     allowed = {
         "middle_name", "father_last_name",
         "father_first_name", "mother_last_name", "mother_first_name",
-        "spouse_last_name", "spouse_first_name", "contact_number",
+        "spouse_last_name", "spouse_first_name", "contact_number", "email",
         "birthdate", "sex", "civil_status", "religion", "occupation",
         "education", "barangay_id", "address", "phic_membership", "phic_type",
         "maiden_name",
@@ -280,6 +299,8 @@ def update_patient(patient_id: int, data: dict, allow_name_edit: bool = False, a
         return
     if not data:
         return
+    if "email" in data:
+        data["email"] = _normalize_email(data["email"])
     columns = ", ".join(f"{k} = ?" for k in data.keys())
     values = list(data.values()) + [patient_id]
     conn = get_connection()
@@ -318,6 +339,10 @@ def _patient_listing_filters(barangay=None, risk=None, date=None, q=None, status
         params.extend([like, like, like])
     if status == "draft":
         conditions.append("COALESCE(v.status, '') = 'draft'")
+    elif status == "account_help":
+        conditions.append(
+            "p.account_help_requested_at IS NOT NULL AND p.account_help_resolved_at IS NULL"
+        )
     elif status == "awaiting_lab":
         conditions.append("v.id IS NOT NULL AND COALESCE(v.status, '') != 'draft' AND ls.id IS NULL")
     elif status == "needs_review":
@@ -797,7 +822,10 @@ def apply_patient_retention_action(ids, action: str) -> dict:
                     mother_last_name = NULL, mother_first_name = NULL,
                     spouse_last_name = NULL, spouse_first_name = NULL,
                     maiden_name = NULL, married_name = NULL,
-                    contact_number = NULL, address = NULL, religion = NULL, occupation = NULL,
+                    contact_number = NULL, email = NULL, address = NULL, religion = NULL, occupation = NULL,
+                    account_help_requested_at = NULL, account_help_reason = NULL,
+                    account_help_resolved_at = NULL, account_help_resolved_by_staff_id = NULL,
+                    portal_active = 0, session_version = session_version + 1,
                     birthdate = SUBSTR(birthdate, 1, 4) || '-01-01',
                     password_hash = NULL, portal_activated_at = NULL,
                     credentials_issued_by_staff_id = NULL, credentials_issued_at = NULL,
@@ -1333,7 +1361,7 @@ MULTI_VALUE_FIELDS = {
 COLUMNS = [
     "last_name", "first_name", "middle_name", "maiden_name",
     "birthdate", "sex", "civil_status", "religion", "occupation", "education",
-    "region", "city", "barangay", "address", "contact_number",
+    "region", "city", "barangay", "address", "contact_number", "email",
     "phic_membership", "phic_type",
     "assessment_date",
     "smoking_status", "alcohol_intake", "illicit_drug_use", "physical_activity",
@@ -1422,6 +1450,13 @@ def _build_codes_sheet(wb):
         row += 2
     ws.column_dimensions["A"].width = 45
 
+def _add_email_hint(ws):
+    col_letter = _col_letter(ws, "email")
+    ws.cell(row=1, column=COLUMNS.index("email") + 1).comment = Comment(
+        "Optional. Format: name@example.com\nInvalid addresses turn red and are ignored on import.", "System")
+    cell = f"{col_letter}2"
+    formula = f'AND({cell}<>"",OR(ISNUMBER(FIND(" ",{cell})),ISERROR(FIND(".",{cell},FIND("@",{cell})))))'
+    ws.conditional_formatting.add(f"{col_letter}2:{col_letter}{MAX_ROWS}", FormulaRule(formula=[formula], fill=RED_FILL))
 
 def generate_import_template_xlsx() -> bytes:
     wb = openpyxl.Workbook()
@@ -1441,6 +1476,8 @@ def generate_import_template_xlsx() -> bytes:
     for field, choices in MULTI_VALUE_FIELDS.items():
         _add_multi_value_comment(ws, field, choices)
         _add_multi_value_formatting(ws, field, choices)
+
+    _add_email_hint(ws)
 
     _build_codes_sheet(wb)
 
@@ -1539,7 +1576,15 @@ def import_patients_from_csv(file_stream, staff_id: int | None = None) -> dict:
             )
             if barangay_warning:
                 errors.append(f"Row {i}: {barangay_warning}")
-
+            
+            email_raw = (row.get("email") or "").strip()
+            email = None
+            if email_raw:
+                if is_valid_email(email_raw):
+                    email = email_raw.lower()
+                else:
+                    errors.append(f"Row {i}: email {email_raw!r} is not a valid address (name@example.com), ignored.")
+                    
             patient_data = {
                 "last_name": last_name, "first_name": first_name,
                 "middle_name": (row.get("middle_name") or "").strip() or None,
@@ -1552,6 +1597,7 @@ def import_patients_from_csv(file_stream, staff_id: int | None = None) -> dict:
                 "barangay_id": barangay_id,
                 "address": (row.get("address") or "").strip() or None,
                 "contact_number": (row.get("contact_number") or "").strip() or None,
+                "email": email,
                 "phic_membership": (row.get("phic_membership") or "").strip() or None,
                 "phic_type": (row.get("phic_type") or "").strip() or None,
             }
@@ -1563,6 +1609,10 @@ def import_patients_from_csv(file_stream, staff_id: int | None = None) -> dict:
             if existing_patient_id is not None:
                 patient_id = existing_patient_id
                 matched_existing += 1
+                if email:
+                    existing = get_patient_by_id(existing_patient_id)
+                    if existing and not existing.get("email"):
+                        update_patient(existing_patient_id, {"email": email})
             else:
                 patient_id = create_patient(patient_data, staff_id=staff_id)
                 new_patients += 1
@@ -1746,3 +1796,181 @@ def update_patient_consent(patient_id: int, consent: bool) -> None:
     )
     conn.commit()
     conn.close()
+
+
+_ACCOUNT_HELP_REASONS = {"forgot_password", "lost_id", "locked_out", "self_deactivated"}
+ACCOUNT_HELP_REASON_LABELS = {
+    "forgot_password": "Forgot password",
+    "lost_id": "Lost/forgot Patient ID",
+    "locked_out": "Can't sign in",
+    "self_deactivated": "Account deactivated",
+}
+
+
+def request_account_help(patient_code: str, reason: str) -> None:
+    """
+    Flags a patient's account for nurse follow-up from the (unauthenticated)
+    login page. Deliberately silent about whether patient_code matched
+    anything real -- same reasoning as authenticate_patient()'s generic
+    "Invalid patient ID or password": a distinct response here would let
+    someone enumerate valid Patient IDs. Callers should show the same
+    message either way and treat this as always "sent".
+
+    A new request always overwrites any previous one's resolved state --
+    if the patient is reaching out again, whatever a nurse did last time
+    evidently didn't resolve it.
+    """
+    reason = reason if reason in _ACCOUNT_HELP_REASONS else "locked_out"
+    conn = get_connection()
+    conn.execute(
+        """
+        UPDATE patients
+        SET account_help_requested_at = datetime('now'),
+            account_help_reason = ?,
+            account_help_resolved_at = NULL,
+            account_help_resolved_by_staff_id = NULL
+        WHERE patient_code = ?
+        """,
+        (reason, patient_code),
+    )
+    conn.commit()
+    conn.close()
+
+
+def count_pending_account_help_requests() -> int:
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT COUNT(*) AS n FROM patients "
+        "WHERE account_help_requested_at IS NOT NULL AND account_help_resolved_at IS NULL"
+    ).fetchone()
+    conn.close()
+    return row["n"] if row else 0
+
+
+def list_pending_account_help_requests(limit: int = 20) -> list[dict]:
+    """Newest first, for the nurse notification bell."""
+    conn = get_connection()
+    rows = conn.execute(
+        """
+        SELECT id AS patient_id, patient_code, first_name, last_name,
+               account_help_requested_at AS requested_at,
+               account_help_reason AS reason
+        FROM patients
+        WHERE account_help_requested_at IS NOT NULL AND account_help_resolved_at IS NULL
+        ORDER BY account_help_requested_at DESC
+        LIMIT ?
+        """,
+        (limit,),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def attach_pending_account_help(patients: list[dict]) -> list[dict]:
+    """
+    Adds p["pending_account_help"] = {"at": iso, "reason": label} to every
+    patient row (keyed by p["patient_id"]) that has an unresolved
+    account-help request, or None when there isn't one. Same shape and
+    batching approach as visit_model.attach_pending_patient_edits -- one
+    query for the whole page, not one per row -- so nurse_data_management.html
+    can show both kinds of flag the same way.
+    """
+    ids = [p["patient_id"] for p in patients if p.get("patient_id") is not None]
+    pending: dict[int, dict] = {}
+    if ids:
+        conn = get_connection()
+        try:
+            marks = ",".join("?" * len(ids))
+            rows = conn.execute(f"""
+                SELECT id AS patient_id, account_help_requested_at, account_help_reason
+                FROM patients
+                WHERE id IN ({marks})
+                  AND account_help_requested_at IS NOT NULL AND account_help_resolved_at IS NULL
+            """, ids).fetchall()
+        finally:
+            conn.close()
+        for r in rows:
+            pending[r["patient_id"]] = {
+                "at": r["account_help_requested_at"],
+                "reason": ACCOUNT_HELP_REASON_LABELS.get(r["account_help_reason"], r["account_help_reason"]),
+            }
+    for p in patients:
+        p["pending_account_help"] = pending.get(p.get("patient_id"))
+    return patients
+
+def get_pending_account_help(patient_id: int) -> dict | None:
+    conn = get_connection()
+    row = conn.execute(
+        """
+        SELECT account_help_requested_at, account_help_reason FROM patients
+        WHERE id = ? AND account_help_requested_at IS NOT NULL AND account_help_resolved_at IS NULL
+        """,
+        (patient_id,),
+    ).fetchone()
+    conn.close()
+    if not row:
+        return None
+    return {
+        "at": row["account_help_requested_at"],
+        "reason": ACCOUNT_HELP_REASON_LABELS.get(row["account_help_reason"], row["account_help_reason"]),
+    }
+
+def resolve_account_help_request(patient_id: int, staff_id: int | None = None) -> None:
+    """Marks a pending account-help request handled. Called automatically
+    when a nurse reissues portal credentials for the patient (the most
+    common resolution), and can also be called directly to dismiss a
+    request without reissuing (e.g. it turned out to be a duplicate)."""
+    conn = get_connection()
+    conn.execute(
+        """
+        UPDATE patients
+        SET account_help_resolved_at = datetime('now'),
+            account_help_resolved_by_staff_id = ?
+        WHERE id = ? AND account_help_requested_at IS NOT NULL AND account_help_resolved_at IS NULL
+        """,
+        (staff_id, patient_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def update_patient_consent(patient_id: int, consent: bool) -> None:
+    conn = get_connection()
+    conn.execute(
+        "UPDATE patients SET consent_research = ? WHERE id = ?",
+        (1 if consent else 0, patient_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_session_state(patient_id):
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT session_version, portal_active FROM patients WHERE id = ?",
+        (patient_id,),
+    ).fetchone()
+    if not row:
+        return None
+    return {"session_version": row[0], "is_active": bool(row[1])}
+
+
+def bump_session_version(patient_id):
+    conn = get_connection()
+    conn.execute(
+        "UPDATE patients SET session_version = session_version + 1 WHERE id = ?",
+        (patient_id,),
+    )
+    conn.commit()
+    return conn.execute(
+        "SELECT session_version FROM patients WHERE id = ?", (patient_id,)
+    ).fetchone()[0]
+
+
+def set_portal_active(patient_id, active):
+    conn = get_connection()
+    conn.execute(
+        "UPDATE patients SET portal_active = ? WHERE id = ?",
+        (1 if active else 0, patient_id),
+    )
+    conn.commit()

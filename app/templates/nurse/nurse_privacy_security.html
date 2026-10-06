@@ -5,7 +5,7 @@
 <div class="settings-header">
     <div>
         <h1 class="settings-title">Privacy &amp; Security</h1>
-        <p class="settings-subtitle">Manage your password and activity log</p>
+        <p class="settings-subtitle">Manage your password and review your activity log</p>
     </div>
 </div>
 
@@ -13,13 +13,13 @@
 
     <!-- LEFT: Tab Navigation -->
     <div class="settings-nav-panel">
-        <button class="settings-tab active" data-tab="security">
+        <button class="settings-tab {{ 'active' if active_tab != 'audit' }}" data-tab="security">
             <span class="stab-text">
                 <span class="stab-title">Password &amp; Login</span>
                 <span class="stab-sub">Change password, recent logins</span>
             </span>
         </button>
-        <button class="settings-tab" data-tab="audit">
+        <button class="settings-tab {{ 'active' if active_tab == 'audit' }}" data-tab="audit">
             <span class="stab-text">
                 <span class="stab-title">Audit Trail</span>
                 <span class="stab-sub">Your recorded actions</span>
@@ -29,7 +29,7 @@
 
     <div class="settings-content-panel">
 
-        <div class="settings-pane active" id="pane-security">
+        <div class="settings-pane {{ 'active' if active_tab != 'audit' }}" id="pane-security">
 
             <div class="settings-section">
                 <div class="section-label">Change Password</div>
@@ -39,12 +39,24 @@
                         <label class="form-label">Current Password</label>
                         <div class="pw-field-wrap">
                             <input class="form-input" type="password" id="pwCurrent" name="current_password" placeholder="••••••••" autocomplete="current-password">
+                            <button type="button" class="pw-toggle" data-pw-toggle="pwCurrent" aria-label="Show password" aria-pressed="false" title="Show password">
+                                <svg class="pw-eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <g class="eye-open"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></g>
+                                    <g class="eye-off" style="display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 19c-7 0-11-7-11-7a18.5 18.5 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 5c7 0 11 7 11 7a18.5 18.5 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/></g>
+                                </svg>
+                            </button>
                         </div>
                     </div>
                     <div class="form-group">
                         <label class="form-label">New Password</label>
                         <div class="pw-field-wrap">
                             <input class="form-input" type="password" id="pwNew" name="new_password" placeholder="At least 12 characters" autocomplete="new-password">
+                            <button type="button" class="pw-toggle" data-pw-toggle="pwNew" aria-label="Show password" aria-pressed="false" title="Show password">
+                                <svg class="pw-eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <g class="eye-open"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></g>
+                                    <g class="eye-off" style="display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 19c-7 0-11-7-11-7a18.5 18.5 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 5c7 0 11 7 11 7a18.5 18.5 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/></g>
+                                </svg>
+                            </button>
                         </div>
                         <div class="pw-strength-bar" id="pwStrengthBar">
                             <div class="pw-strength-fill" id="pwStrengthFill"></div>
@@ -55,6 +67,12 @@
                         <label class="form-label">Confirm New Password</label>
                         <div class="pw-field-wrap">
                             <input class="form-input" type="password" id="pwConfirm" name="confirm_password" placeholder="Re-enter new password" autocomplete="new-password">
+                            <button type="button" class="pw-toggle" data-pw-toggle="pwConfirm" aria-label="Show password" aria-pressed="false" title="Show password">
+                                <svg class="pw-eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <g class="eye-open"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></g>
+                                    <g class="eye-off" style="display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 19c-7 0-11-7-11-7a18.5 18.5 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 5c7 0 11 7 11 7a18.5 18.5 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/></g>
+                                </svg>
+                            </button>
                         </div>
                         <span class="form-hint" id="pwMatchHint"></span>
                     </div>
@@ -95,32 +113,102 @@
         </div>
 
         <!-- ══ TAB: AUDIT TRAIL ══ -->
-        <div class="settings-pane" id="pane-audit">
+        <div class="settings-pane {{ 'active' if active_tab == 'audit' }}" id="pane-audit">
             <div class="settings-section">
                 <p class="form-hint" style="margin-bottom: 0.875rem;">
                     Tracks report downloads, patient record printing, intake entries, and credential
                     updates made by your account.
                 </p>
+
+                <form method="GET" action="{{ url_for('nurse.nurse_privacy_security') }}" class="audit-filters" id="auditFilterForm">
+                    <input type="hidden" name="tab" value="audit">
+                    <div class="form-group af-search">
+                        <label class="form-label" for="afQ">Search</label>
+                        <input class="form-input" id="afQ" type="search" name="q" maxlength="100"
+                               value="{{ audit_filters.q }}" placeholder="e.g. Screening saved, P-007">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="afSeverity">Type</label>
+                        <select class="form-input" id="afSeverity" name="severity">
+                            <option value="">All types</option>
+                            {% for s in audit_severities %}
+                            <option value="{{ s }}" {{ 'selected' if audit_filters.severity == s }}>{{ s }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="afFrom">From</label>
+                        <input class="form-input" id="afFrom" type="date" name="date_from" value="{{ audit_filters.date_from }}">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="afTo">To</label>
+                        <input class="form-input" id="afTo" type="date" name="date_to" value="{{ audit_filters.date_to }}">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="afPer">Per page</label>
+                        <select class="form-input" id="afPer" name="per">
+                            {% for n in audit_per_choices %}
+                            <option value="{{ n }}" {{ 'selected' if audit_per == n }}>{{ n }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="af-actions">
+                        <button type="submit" class="btn-save">Apply</button>
+                        {% if audit_filters_active %}
+                        <a class="btn-action-outline" href="{{ url_for('nurse.nurse_privacy_security', tab='audit') }}">Reset</a>
+                        {% endif %}
+                    </div>
+                </form>
+
+                <p class="form-hint" style="margin-bottom: 0.25rem;">
+                    {% if audit_total %}
+                    Showing {{ audit_first_row }}&ndash;{{ audit_last_row }} of {{ audit_total }} action{{ 's' if audit_total != 1 }}{{ ' (filtered)' if audit_filters_active }}
+                    {% else %}
+                    {{ 'No actions match these filters.' if audit_filters_active else 'No actions recorded yet.' }}
+                    {% endif %}
+                </p>
+
                 <div class="account-action-list">
                     {% for log in audit_logs %}
                     <div class="account-action-item">
                         <div class="aai-info">
                             <div class="aai-title">{{ log.action }}</div>
                             <div class="aai-sub">
-                                {{ log.date }}, {{ log.time }}{% if log.severity != 'Info' %} · {{ log.severity }}{% endif %}
-                            </div>
-                        </div>
-                    </div>
-                    {% else %}
-                    <div class="account-action-item">
-                        <div class="aai-info">
-                            <div class="aai-title" style="color:var(--text-muted); font-weight:400;">
-                                No actions recorded yet.
+                                {{ log.timestamp }}
+                                {% if log.severity and log.severity != 'Info' %}<span class="sev-pill sev-{{ log.severity|lower }}">{{ log.severity }}</span>{% endif %}
                             </div>
                         </div>
                     </div>
                     {% endfor %}
                 </div>
+
+                {% if audit_total_pages > 1 %}
+                {% set base_args = request.args.to_dict() %}
+                <div class="audit-pager">
+                    <span class="audit-pager-info">Page {{ audit_page }} of {{ audit_total_pages }}</span>
+                    <div class="audit-pager-btns">
+                        {% if audit_page > 1 %}
+                        <a href="{{ url_for('nurse.nurse_privacy_security', **dict(base_args, tab='audit', page=audit_page - 1)) }}" class="btn btn-secondary" title="Previous page">&larr;</a>
+                        {% else %}
+                        <span class="btn btn-secondary is-off">&larr;</span>
+                        {% endif %}
+                        {% for p in audit_page_numbers %}
+                            {% if p is none %}
+                            <span class="audit-pager-gap">&hellip;</span>
+                            {% elif p == audit_page %}
+                            <span class="btn btn-primary is-current" aria-current="page">{{ p }}</span>
+                            {% else %}
+                            <a href="{{ url_for('nurse.nurse_privacy_security', **dict(base_args, tab='audit', page=p)) }}" class="btn btn-secondary">{{ p }}</a>
+                            {% endif %}
+                        {% endfor %}
+                        {% if audit_page < audit_total_pages %}
+                        <a href="{{ url_for('nurse.nurse_privacy_security', **dict(base_args, tab='audit', page=audit_page + 1)) }}" class="btn btn-secondary" title="Next page">&rarr;</a>
+                        {% else %}
+                        <span class="btn btn-secondary is-off">&rarr;</span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
             </div>
         </div>
 
@@ -131,6 +219,31 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/settings_shared.css') }}">
+<style>
+    /* two tabs on this page, so the stacked mobile tab bar needs two columns, not three */
+    @media (max-width: 900px) { .settings-nav-panel { grid-template-columns: repeat(2, 1fr); } }
+
+    .audit-filters { display: grid; grid-template-columns: minmax(180px, 2fr) repeat(4, minmax(100px, 1fr)) auto; gap: 0.75rem; align-items: end; margin-bottom: 0.9rem; }
+    .audit-filters .af-actions { display: flex; gap: 0.5rem; align-items: center; }
+    .audit-filters .btn-save, .audit-filters .btn-action-outline { padding: 0.6rem 1rem; }
+    @media (max-width: 1100px) {
+        .audit-filters { grid-template-columns: repeat(2, 1fr); }
+        .audit-filters .af-search, .audit-filters .af-actions { grid-column: 1 / -1; }
+    }
+
+    .sev-pill { display: inline-block; margin-left: 0.4rem; padding: 0.05rem 0.5rem; border-radius: 20px; font-size: 0.68rem; font-weight: 600; vertical-align: middle; background: #eef2ee; color: #3f5a3f; }
+    .sev-success  { background: #dcfce7; color: #166534; }
+    .sev-warning  { background: #fef3c7; color: #92400e; }
+    .sev-critical { background: #fee2e2; color: #991b1b; }
+
+    .audit-pager { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+    .audit-pager-info { font-size: 0.8rem; color: var(--t3); }
+    .audit-pager-btns { display: flex; align-items: center; gap: 0.3rem; flex-wrap: wrap; }
+    .audit-pager-btns .btn { padding: 0.35rem 0.7rem; font-size: 0.8rem; text-decoration: none; }
+    .audit-pager-btns .is-off { opacity: 0.4; cursor: default; }
+    .audit-pager-btns .is-current { cursor: default; }
+    .audit-pager-gap { padding: 0 0.35rem; color: var(--t3); }
+</style>
 {% endblock %}
 
 {% block scripts %}
@@ -146,6 +259,31 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('pane-' + tab.dataset.tab).classList.add('active');
         });
     });
+
+    // Show / hide password: one eye button per field, each controls only its own input.
+    document.querySelectorAll('[data-pw-toggle]').forEach(btn => {
+        const input = document.getElementById(btn.dataset.pwToggle);
+        if (!input) return;
+        btn.addEventListener('click', () => {
+            const show = input.type === 'password';
+            input.type = show ? 'text' : 'password';
+            btn.setAttribute('aria-pressed', show ? 'true' : 'false');
+            const label = show ? 'Hide password' : 'Show password';
+            btn.setAttribute('aria-label', label);
+            btn.title = label;
+            btn.querySelector('.eye-open').style.display = show ? 'none' : '';
+            btn.querySelector('.eye-off').style.display = show ? '' : 'none';
+        });
+    });
+
+    // Type / per-page dropdowns apply as soon as they change; search and dates use the Apply button.
+    const auditForm = document.getElementById('auditFilterForm');
+    if (auditForm) {
+        ['afSeverity', 'afPer'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.addEventListener('change', () => auditForm.submit());
+        });
+    }
 });
 </script>
 {% endblock %}

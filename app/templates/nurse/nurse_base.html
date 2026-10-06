@@ -67,7 +67,7 @@
             <span class="nurse-bell-badge" id="nurseBellBadge" hidden>0</span>
         </button>
         <div class="nurse-bell-panel" id="nurseBellPanel" hidden>
-            <div class="nurse-bell-header">Updated by patients</div>
+            <div class="nurse-bell-header">Patient notifications</div>
             <div class="nurse-bell-list" id="nurseBellList">
                 <p class="nurse-bell-empty">Loading…</p>
             </div>
@@ -98,7 +98,7 @@
         });
     })();
     </script>
-    <script>window.__pendingPatientEditsCount = {{ pending_patient_edits_count | default(0) }};</script>
+    <script>window.__pendingPatientEditsCount = {{ pending_patient_edits_count_total | default(0) }};</script>
     <script src="{{ url_for('static', filename='js/nurse_base.js') }}"></script>
 
     {% block scripts %}

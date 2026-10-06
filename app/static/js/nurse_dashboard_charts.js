@@ -63,6 +63,72 @@ document.addEventListener('DOMContentLoaded', async () => {
     [wl.risk, wl.status, wl.brgy].forEach(el => el && el.addEventListener('change', applyWorklistFilters));
     if (wl.search) wl.search.addEventListener('input', applyWorklistFilters);
 
+        // ---- Follow-up worklist sorting (click a heading: ascending, descending, back to default) ----
+    const wlBody = document.getElementById('worklistBody');
+    const SORTS = {
+        name: ['name', 'text'], age: ['age', 'num'], barangay: ['barangay', 'text'], date: ['date', 'date'],
+        fbs: ['fbs', 'num'], risk: ['riskrank', 'num'], status: ['statusrank', 'num'], fu: ['fu', 'date'],
+    };
+    const ICON = {
+        none: '<svg viewBox="0 0 24 24"><path d="M8 19V5M3 10l5-5 5 5"/><path d="M16 5v14M11 14l5 5 5-5"/></svg>',
+        asc:  '<svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg>',
+        desc: '<svg viewBox="0 0 24 24"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>',
+    };
+    const toTime = (s) => {
+        const m = /^(\d{2})\/(\d{2})\/(\d{4})/.exec(s);          // DD/MM/YYYY
+        const t = (m ? new Date(m[3] + '-' + m[2] + '-' + m[1]) : new Date(s)).getTime();
+        return isNaN(t) ? null : t;
+    };
+    function sortValue(tr, key) {
+        const [attr, type] = SORTS[key];
+        const raw = (tr.dataset[attr] || '').trim();
+        if (raw === '') return null;                              // blanks always sort last
+        if (type === 'num') { const n = parseFloat(raw); return isNaN(n) ? null : n; }
+        if (type === 'date') return toTime(raw);
+        return raw.toLowerCase();
+    }
+    wlRows.forEach((tr, i) => { tr.dataset.i = i; });             // remember the server order
+    const sortHeads = Array.from(document.querySelectorAll('.hr-worklist th[data-sort]'));
+    let wlSort = { key: null, dir: 'asc' };
+
+    function applyWorklistSort() {
+        const rows = wlRows.slice();
+        if (wlSort.key) {
+            const sign = wlSort.dir === 'asc' ? 1 : -1;
+            rows.sort((a, b) => {
+                const va = sortValue(a, wlSort.key), vb = sortValue(b, wlSort.key);
+                if (va === null && vb === null) return a.dataset.i - b.dataset.i;
+                if (va === null) return 1;
+                if (vb === null) return -1;
+                const c = typeof va === 'string' ? va.localeCompare(vb) : va - vb;
+                return c ? c * sign : a.dataset.i - b.dataset.i;
+            });
+        } else {
+            rows.sort((a, b) => a.dataset.i - b.dataset.i);
+        }
+        rows.forEach(tr => wlBody.appendChild(tr));               // hidden (filtered) rows stay hidden
+        sortHeads.forEach(th => {
+            const on = th.dataset.sort === wlSort.key;
+            const dir = on ? wlSort.dir : 'none';
+            th.setAttribute('aria-sort', on ? (dir === 'asc' ? 'ascending' : 'descending') : 'none');
+            const btn = th.querySelector('.th-sort');
+            btn.classList.toggle('active', on);
+            btn.querySelector('.sort-ind').innerHTML = ICON[dir];
+        });
+    }
+    sortHeads.forEach(th => {
+        const label = th.textContent.trim();
+        th.innerHTML = '<button type="button" class="th-sort"><span>' + esc(label) + '</span><span class="sort-ind" aria-hidden="true">' + ICON.none + '</span></button>';
+        th.setAttribute('aria-sort', 'none');
+        th.querySelector('.th-sort').addEventListener('click', () => {
+            const key = th.dataset.sort;
+            if (wlSort.key !== key) wlSort = { key, dir: 'asc' };
+            else if (wlSort.dir === 'asc') wlSort.dir = 'desc';
+            else wlSort = { key: null, dir: 'asc' };
+            applyWorklistSort();
+        });
+    });
+    
     // ---- Barangay table -> CSV ----
     const csvBtn = document.getElementById('barangayCsvBtn');
     if (csvBtn) csvBtn.addEventListener('click', () => {

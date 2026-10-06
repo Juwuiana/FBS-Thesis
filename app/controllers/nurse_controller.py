@@ -6,7 +6,7 @@ from datetime import date as date_cls
 from app.rate_limit import rate_limit
 from app.controllers import patient_auth_controller
 import os
-
+from datetime import date as date_cls, datetime as datetime_cls, timedelta
 
 nurse_bp = Blueprint('nurse', __name__)
 from app.views.auth_views import require_role_for_blueprint
@@ -23,11 +23,23 @@ require_role_for_blueprint(nurse_bp, "health_worker", "medical_officer")
 @nurse_bp.app_context_processor
 def inject_pending_patient_edits():
     """Lets every nurse_base.html-extending page show the notification bell
-    count without each route remembering to pass it in."""
+    count(s) without each route remembering to pass them in. Edits and
+    account-help requests are separate counts (and separate dropdown
+    endpoints below) since they're different kinds of follow-up, but both
+    feed the same bell."""
     try:
-        return {"pending_patient_edits_count": visit_model.count_pending_patient_edits()}
+        edits = visit_model.count_pending_patient_edits()
     except Exception:
-        return {"pending_patient_edits_count": 0}
+        edits = 0
+    try:
+        account_help = patient_model.count_pending_account_help_requests()
+    except Exception:
+        account_help = 0
+    return {
+        "pending_patient_edits_count": edits,
+        "pending_account_help_count": account_help,
+        "pending_patient_edits_count_total": edits + account_help,
+    }
 
 @nurse_bp.route('/nurse/patient-edits')
 def nurse_patient_edits():
@@ -56,6 +68,43 @@ def nurse_patient_edits():
 @nurse_bp.route('/nurse/patient-edits/<int:visit_id>/acknowledge', methods=['POST'])
 def nurse_acknowledge_patient_edit(visit_id):
     visit_model.acknowledge_patient_edit(visit_id, staff_id=session.get("user_id"))
+    return jsonify({"ok": True})
+
+
+_ACCOUNT_HELP_REASON_LABELS = {
+    "forgot_password": "Forgot password",
+    "lost_id": "Lost/forgot Patient ID",
+    "locked_out": "Can't sign in",
+    "self_deactivated": "Account deactivated",
+}
+
+@nurse_bp.route('/nurse/account-help-requests')
+def nurse_account_help_requests():
+    items = []
+    for r in patient_model.list_pending_account_help_requests():
+        reason = r["reason"]
+        patient = dict(patient_model.get_patient_by_id(r["patient_id"]) or {})
+        if patient.get("portal_active") == 0:
+            reason = "self_deactivated"
+        items.append({
+            "patient_id": r["patient_id"],
+            "patient_code": r["patient_code"],
+            "patient_name": f'{r["first_name"]} {r["last_name"]}',
+            "requested_at": r["requested_at"],
+            "reason": _ACCOUNT_HELP_REASON_LABELS.get(reason, reason),
+            "reason_code": reason,
+            "patient_file_url": url_for('nurse.nurse_patient_file_view', patient_id=r["patient_code"]),
+        })
+    return jsonify({"count": len(items), "requests": items})
+
+
+@nurse_bp.route('/nurse/account-help-requests/<int:patient_id>/resolve', methods=['POST'])
+def nurse_resolve_account_help_request(patient_id):
+    """Dismiss a request without reissuing credentials (e.g. a duplicate,
+    or the nurse already handled it some other way). Reissuing credentials
+    (nurse_issue_portal_credentials below) resolves it automatically --
+    this is only for the case where nothing needs reissuing."""
+    patient_model.resolve_account_help_request(patient_id, staff_id=session.get("user_id"))
     return jsonify({"ok": True})
 
 
@@ -206,7 +255,11 @@ def create_patient():
 
     staff_id = None  # wire up once auth/session (staff table) is in place
 
-    patient_id = patient_model.create_patient(patient_data, staff_id=staff_id)
+    try:
+        patient_id = patient_model.create_patient(patient_data, staff_id=staff_id)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    
     visit_id = visit_model.create_visit(patient_id, "intake", visit_data, staff_id=staff_id)
 
     for category, codes in conditions.items():
@@ -254,7 +307,12 @@ def create_followup_record(patient_id):
         barangay_id = _resolve_barangay(demographic_updates)
         if barangay_id is not None:
             demographic_updates["barangay_id"] = barangay_id
-        patient_model.update_patient(patient["id"], demographic_updates)
+        if not (demographic_updates.get("email") or "").strip():
+            demographic_updates.pop("email", None)
+        try:
+            patient_model.update_patient(patient["id"], demographic_updates)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
 
     visit_id = visit_model.create_visit(patient["id"], "follow_up", visit_data, staff_id=staff_id)
 
@@ -389,6 +447,7 @@ def nurse_screening(patient_id, visit_id=None):
         latest_visit=latest_visit,
         visits=visits,
         existing_screening=existing_screening,
+        pending_account_help=patient_model.get_pending_account_help(patient["id"]),
         is_latest=is_latest,
         active_page='intake',
         patient_entries=patient_fbs_model.list_entries_for_screening(patient["id"], selected_visit_id),
@@ -433,6 +492,7 @@ def nurse_patient_file_view(patient_id, visit_id=None):
         cvd_responses=cvd_responses,
         existing_screening=existing_screening,
         active_page='data_management',
+        pending_account_help=patient_model.get_pending_account_help(patient["id"]),
         # Carries the Data Management page's filters/page/entries back through
         # so "Back to Data Management" restores exactly where the nurse was,
         # instead of resetting to page 1 with no filters applied.
@@ -507,6 +567,8 @@ def nurse_patient_file_edit(patient_id, visit_id):
 
         if cvd_answers:
             visit_model.save_cvd_responses(visit_id, cvd_answers)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
     except Exception as e:
         # Surface the real reason instead of a bare 500 -- the frontend
         # shows this in its "Could not save changes" alert, so a data
@@ -557,6 +619,24 @@ def nurse_new_record(patient_id):
         active_page='data_management',
     )
 
+def _count_due_soon(worklist, days=7):
+    """Worklist patients whose follow-up date is today or within the next `days` days.
+    Overdue ones are excluded because they already have their own count."""
+    today = date_cls.today()
+    end = today + timedelta(days=days)
+    n = 0
+    for w in worklist:
+        raw = str(w["follow_up_date"] or "").strip()[:10]
+        due = None
+        for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
+            try:
+                due = datetime_cls.strptime(raw, fmt).date()
+                break
+            except ValueError:
+                continue
+        if due and today <= due <= end:
+            n += 1
+    return n
 
 @nurse_bp.route('/nurse/health_results')
 def nurse_health_results():
@@ -570,6 +650,7 @@ def nurse_health_results():
         followup=health_analytics_model.get_followup_summary(),
         referral=health_analytics_model.get_referral_funnel(),
         worklist=worklist,
+        due_soon=_count_due_soon(worklist),
         worklist_barangays=sorted({w["barangay"] for w in worklist if w["barangay"]}),
         red_flags=health_analytics_model.get_red_flags(),
         barangay_rows=health_analytics_model.get_barangay_summary(),
@@ -629,7 +710,7 @@ def nurse_data_management():
         sort=sort, direction=direction,
     )
     patients = visit_model.attach_pending_patient_edits([dict(p) for p in patients])
-
+    patients = patient_model.attach_pending_account_help(patients)
     page_numbers = []
     if total_pages <= 7:
         page_numbers = list(range(1, total_pages + 1))
@@ -732,12 +813,85 @@ def nurse_dashboard_barangay_patients():
     return jsonify({"patients": patients})
 
 
+_AUDIT_PER_PAGE_CHOICES = (10, 25, 50)
+
+
+def _parse_iso_date(value):
+    try:
+        return date_cls.fromisoformat((value or "").strip())
+    except ValueError:
+        return None
+
+
+def _page_window(page, total_pages):
+    """Page numbers to show: all of them when few, otherwise first, last and the
+    neighbours of the current page, with None where a gap collapses to an ellipsis."""
+    if total_pages <= 7:
+        return list(range(1, total_pages + 1))
+    keep = sorted(p for p in {1, total_pages, page - 1, page, page + 1} if 1 <= p <= total_pages)
+    out = []
+    for p in keep:
+        if out and p - out[-1] > 1:
+            out.append(None)
+        out.append(p)
+    return out
+
+
 @nurse_bp.route('/nurse/privacy_security')
 def nurse_privacy_security():
-    audit_logs = audit_model.get_recent_logs_for_user(get_db(), session.get("user_id"))
+    """Privacy & Security. The Audit Trail tab is this nurse's own actions only,
+    filtered (severity / text / date range) and paged in SQL."""
+    db, user_id = get_db(), session.get("user_id")
+
+    severity_options = audit_model.list_severities_for_user(db, user_id)
+    severity = request.args.get('severity', '')
+    if severity not in severity_options:
+        severity = ''
+    q = (request.args.get('q') or '').strip()[:100]
+    date_from = _parse_iso_date(request.args.get('date_from'))
+    date_to = _parse_iso_date(request.args.get('date_to'))
+    if date_from and date_to and date_from > date_to:
+        date_from, date_to = date_to, date_from
+    try:
+        per_page = int(request.args.get('per', _AUDIT_PER_PAGE_CHOICES[0]))
+    except ValueError:
+        per_page = _AUDIT_PER_PAGE_CHOICES[0]
+    if per_page not in _AUDIT_PER_PAGE_CHOICES:
+        per_page = _AUDIT_PER_PAGE_CHOICES[0]
+
+    filters = dict(severity=severity or None, q=q or None, date_from=date_from, date_to=date_to)
+    total = audit_model.count_logs_for_user(db, user_id, **filters)
+    total_pages = max(1, -(-total // per_page))
+    try:
+        page = int(request.args.get('page', 1))
+    except ValueError:
+        page = 1
+    page = min(max(page, 1), total_pages)
+    logs = audit_model.get_logs_for_user_page(
+        db, user_id, **filters, limit=per_page, offset=(page - 1) * per_page
+    )
+
+    filters_active = bool(severity or q or date_from or date_to)
+    on_audit_tab = request.args.get('tab') == 'audit' or filters_active or 'page' in request.args
     return render_template(
         'nurse/nurse_privacy_security.html',
-        audit_logs=audit_logs,
+        audit_logs=logs,
+        audit_total=total,
+        audit_page=page,
+        audit_total_pages=total_pages,
+        audit_page_numbers=_page_window(page, total_pages),
+        audit_first_row=(page - 1) * per_page + 1 if total else 0,
+        audit_last_row=(page - 1) * per_page + len(logs),
+        audit_per=per_page,
+        audit_per_choices=_AUDIT_PER_PAGE_CHOICES,
+        audit_severities=severity_options,
+        audit_filters={
+            'severity': severity, 'q': q,
+            'date_from': date_from.isoformat() if date_from else '',
+            'date_to': date_to.isoformat() if date_to else '',
+        },
+        audit_filters_active=filters_active,
+        active_tab='audit' if on_audit_tab else 'security',
         active_page='privacy',
     )
 
@@ -1004,6 +1158,8 @@ def nurse_issue_portal_credentials(patient_id):
     temp_password = patient_auth_controller.issue_patient_credentials(
         patient["id"], staff_id=session.get("user_id")
     )
+    patient_model.set_portal_active(patient["id"], True)
+    patient_model.resolve_account_help_request(patient["id"], staff_id=session.get("user_id"))
     _audit_event(f"Portal credentials issued: {patient_id}", "Warning")
 
     return render_template(
@@ -1022,3 +1178,15 @@ def patient_fbs_set_status(patient_id, entry_id):
     except ValueError:
         return jsonify({"error": "Invalid status"}), 400
     return (jsonify({"status": status}), 200) if ok else (jsonify({"error": "Not found"}), 404)
+
+@nurse_bp.route('/nurse/patient/<patient_id>/reactivate_portal', methods=['POST'])
+@rate_limit(max_calls=10, period_seconds=60)
+def nurse_reactivate_portal(patient_id):
+    patient = patient_model.get_patient_by_code(patient_id)
+    if patient is None:
+        abort(404)
+    patient_model.set_portal_active(patient["id"], True)
+    patient_model.resolve_account_help_request(patient["id"], staff_id=session.get("user_id"))
+    _audit_event(f"Portal reactivated: {patient_id}", "Warning")
+    flash("Portal access reactivated. The patient can sign in again with their current password.", "success")
+    return redirect(url_for('nurse.nurse_patient_file_view', patient_id=patient_id))

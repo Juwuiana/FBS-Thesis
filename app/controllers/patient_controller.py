@@ -3,10 +3,60 @@ from app.models import patient_portal_model, patient_model, visit_model, lookup_
 from app.controllers import patient_auth_controller
 from flask import Response
 from datetime import date as date_cls, datetime
-
+from app.rate_limit import rate_limit
 
 
 patient_bp = Blueprint('patient', __name__)
+
+
+
+try:
+    import geoip2.database
+    _geo = geoip2.database.Reader('instance/GeoLite2-City.mmdb')
+except Exception:          # file missing: the app still runs, locations just show as unavailable
+    _geo = None
+
+
+def lookup_location(ip):
+    if not _geo or not ip:
+        return None
+    try:
+        r = _geo.city(ip)
+        return ', '.join(p for p in [r.city.name, r.subdivisions.most_specific.name, r.country.name] if p) or None
+    except Exception:      # private/local/unknown IPs
+        return None
+
+
+@patient_bp.app_template_filter('mask_ip')
+def mask_ip(ip):
+    p = (ip or '').split('.')
+    return '.'.join(p[:2] + ['x', 'x']) if len(p) == 4 else (ip or '')[:9] + '…'
+
+
+def _with_locations(events):
+    out = []
+    for e in events:
+        e = dict(e)
+        e['location'] = lookup_location(e.get('ip_address'))
+        out.append(e)
+    return out
+
+def _group_login_events(events):
+    """Collapse repeated logins from the same IP + device into one row.
+    Assumes events are newest first, so the first one seen is the latest."""
+    groups = {}
+    for e in events:
+        key = (e.get('ip_address'), e.get('device_label'))
+        g = groups.get(key)
+        if g is None:
+            g = dict(e)
+            g['count'] = 1
+            g['first_seen'] = e.get('created_at')
+            groups[key] = g
+        else:
+            g['count'] += 1
+            g['first_seen'] = e.get('created_at')  
+    return list(groups.values())
 
 
 # Allowed values for the patient "Add New Record" form. Single source of truth:
@@ -44,7 +94,7 @@ PATIENT_RECORD_OPTIONS = {
 def _require_patient_login():
     if current_app.config.get("DEV_NO_AUTH"):
         return
-    if request.endpoint in ("patient.patient_login",):
+    if request.endpoint in ("patient.patient_login", "patient.patient_account_help"):
         return
     if (session.get("patient_id") and
             session.get("security_version") != settings_model.get_security_version("patient")):
@@ -53,6 +103,13 @@ def _require_patient_login():
         return redirect(url_for("patient.patient_login"))
     if not session.get("patient_id"):
         return redirect(url_for('patient.patient_login'))
+
+    state = patient_model.get_session_state(session["patient_id"])
+    if (not state or not state["is_active"]
+            or state["session_version"] != session.get("patient_sv")):
+        session.clear()
+        flash("You've been signed out. Please log in again.", "error")
+        return redirect(url_for("patient.patient_login"))
 
 
 @patient_bp.app_context_processor
@@ -153,6 +210,8 @@ def patient_login():
     session.clear()
     session['patient_id'] = patient['id']
     session['security_version'] = settings_model.get_security_version("patient")
+    state = patient_model.get_session_state(patient['id'])
+    session['patient_sv'] = state['session_version'] if state else 0
     patient_model.record_login_event(
         patient['id'],
         user_agent=request.headers.get('User-Agent'),
@@ -160,11 +219,70 @@ def patient_login():
     )
     return redirect(url_for('patient.patient_dashboard'))
 
+@patient_bp.route('/patient_account_help', methods=['POST'])
+@rate_limit(max_calls=5, period_seconds=300)
+def patient_account_help():
+    """
+    Unauthenticated: a patient who can't log in has no session to work
+    with. Flags their account (if the Patient ID they gave is real) for a
+    nurse to follow up on and reissue credentials in person/by phone --
+    this never sends a password or a reset link itself.
+
+    The flash message is identical whether or not patient_code matched a
+    real account, on purpose: a different response here would let someone
+    enumerate valid Patient IDs. patient_model.request_account_help()
+    already no-ops silently on no match, so there is nothing else to
+    branch on.
+    """
+    raw_code = (request.form.get('patient_code') or '').strip()
+    patient_code = patient_auth_controller.normalize_patient_code(raw_code)
+    reason = (request.form.get('reason') or '').strip()
+    
+    if reason not in ("forgot_password", "lost_id", "locked_out"):
+        reason = "locked_out"
+    if patient_code:
+        patient_model.request_account_help(patient_code, reason)
+
+    flash(
+        "If that Patient ID matches our records, your health worker has "
+        "been notified and will follow up with you.",
+        "success",
+    )
+    return redirect(url_for('patient.patient_login'))
+
+
 @patient_bp.route('/patient_logout', methods=['GET', 'POST'])
 def patient_logout():
     session.pop('patient_id', None)
     return redirect(url_for('patient.patient_login'))
 
+@patient_bp.route('/patient_sign_out_all', methods=['POST'])
+def patient_sign_out_all():
+    patient_id = patient_portal_model.get_current_patient_id()
+    session['patient_sv'] = patient_model.bump_session_version(patient_id)  # current device stays signed in
+    flash("All other devices have been signed out.", "success")
+    return redirect(url_for('patient.patient_settings'))
+
+
+@patient_bp.route('/patient_deactivate', methods=['POST'])
+@rate_limit(max_calls=5, period_seconds=300)
+def patient_deactivate():
+    patient_id = patient_portal_model.get_current_patient_id()
+    patient = patient_model.get_patient_by_id(patient_id)
+    _, error = patient_auth_controller.authenticate_patient(
+        patient['patient_code'], request.form.get('password', ''))
+    if error:
+        flash("Incorrect password. Your account was not deactivated.", "error")
+        return redirect(url_for('patient.patient_settings'))
+
+    patient_model.set_portal_active(patient_id, False)
+    patient_model.request_account_help(
+        patient_auth_controller.normalize_patient_code(patient['patient_code']),
+        "self_deactivated",
+    )
+    session.clear()
+    flash("Your portal account has been deactivated.", "success")
+    return redirect(url_for('patient.patient_login'))
 
 @patient_bp.route('/patient_dashboard')
 def patient_dashboard():
@@ -194,8 +312,9 @@ def patient_health_results():
 def patient_settings():
     patient_id = patient_portal_model.get_current_patient_id()
     patient = patient_model.get_patient_by_id(patient_id)
-    login_events = patient_model.get_recent_login_events(patient_id)
-
+    login_events = _group_login_events(
+        _with_locations(patient_model.get_recent_login_events(patient_id))
+    )
     if request.method == 'GET':
         return render_template(
             'patient/patient_settings.html',
@@ -444,8 +563,8 @@ def patient_update_consent():
 
 @patient_bp.route('/patient_update_demographics', methods=['POST'])
 def patient_update_demographics():
-    """Patient corrects civil status, occupation and/or address. Name, ID,
-    sex, age and assessment date are not accepted here. Each changed field
+    """Patient corrects civil status, occupation, email and/or address. Name,
+    ID, sex, age and assessment date are not accepted here. Each changed field
     flags the nurse through record_patient_profile_edit."""
     patient_id = patient_portal_model.get_current_patient_id()
     patient = patient_model.get_patient_by_id(patient_id)
@@ -454,11 +573,18 @@ def patient_update_demographics():
     allowed_status = {'Single', 'Married', 'Annulled', 'Widow/Widower', 'Separated'}
     civil = (request.form.get('civil_status') or '').strip()
     occupation = (request.form.get('occupation') or '').strip()
+    email_raw = (request.form.get('email') or '').strip()
+    
     if civil not in allowed_status:
         flash("Please choose a valid civil status.", "error")
         return redirect(back)
     if len(occupation) > 100:
         flash("Occupation must be 100 characters or fewer.", "error")
+        return redirect(back)
+    try:
+        email = patient_model._normalize_email(email_raw)
+    except ValueError as e:
+        flash(str(e), "error")
         return redirect(back)
 
     changes, flagged = {}, {}
@@ -468,6 +594,9 @@ def patient_update_demographics():
     if occupation != (patient.get('occupation') or ''):
         changes['occupation'] = occupation or None
         flagged['occupation'] = patient.get('occupation')
+    if email != (patient.get('email') or None):
+        changes['email'] = email
+        flagged['email'] = patient.get('email')
 
     before_loc = patient_model.format_location(patient)
     region_code = (request.form.get('region_code') or '').strip()
@@ -491,7 +620,14 @@ def patient_update_demographics():
         flash("Nothing to update.", "success")
         return redirect(back)
 
-    patient_model.update_patient(patient_id, changes)
+    try:
+        patient_model.update_patient(patient_id, changes)
+    except ValueError as e:
+        # Belt-and-suspenders: update_patient() may re-normalize email (or
+        # anything else) internally and reject it even though our own
+        # check above passed -- surface that as a normal flash, not a 500.
+        flash(str(e), "error")
+        return redirect(back)
 
     after_loc = patient_model.format_location(patient_model.get_patient_by_id(patient_id))
     if after_loc != before_loc:
