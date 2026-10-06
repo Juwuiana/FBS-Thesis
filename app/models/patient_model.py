@@ -1241,6 +1241,9 @@ def import_patients_from_csv(file_stream, staff_id: int | None = None) -> dict:
                     existing = get_patient_by_id(existing_patient_id)
                     if existing and not existing.get("email"):
                         update_patient(existing_patient_id, {"email": email})
+            else:
+                patient_id = create_patient(patient_data, staff_id=staff_id)
+                new_patients += 1
 
             assessment_date_raw = (row.get("assessment_date") or "").strip()
             if assessment_date_raw:
