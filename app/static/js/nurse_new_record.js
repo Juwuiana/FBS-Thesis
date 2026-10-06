@@ -325,6 +325,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
         need("dateAssessment", visit.assessment_date, "Date of Assessment is required.");
 
+        // Email is optional, but if one is typed it has to look like an email
+        // (checked for drafts too).
+        const emailInput = document.getElementById("email");
+        const emailVal = emailInput ? emailInput.value.trim() : "";
+        if (emailVal && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal)) {
+            markFieldError(emailInput, "Enter a valid email address (e.g. name@example.com).");
+            invalids.push(emailInput);
+        }
+
         if (requireClinicalGroups) {
             [
                 { wrapper: document.getElementById("pmhGroup"), selector: ".pmh" },
@@ -355,6 +364,23 @@ document.addEventListener("DOMContentLoaded", () => {
 
         return !revealErrors(invalids);
     }
+
+    // Live email check: flag a malformed address as soon as the nurse leaves the field.
+    (function wireLiveEmailCheck() {
+        const emailField = document.getElementById("email");
+        if (!emailField) return;
+        emailField.addEventListener("blur", () => {
+            const v = emailField.value.trim();
+            if (v && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) {
+                markFieldError(emailField, "Enter a valid email address (e.g. name@example.com).");
+            } else {
+                emailField.classList.remove("field-error");
+                const m = emailField.parentElement.querySelector(".field-error-text");
+                if (m) m.remove();
+            }
+            refreshSectionBadges();
+        });
+    })();
 
     const submitBtn = document.getElementById("submitIntakeBtn");
     const draftBtn = document.getElementById("saveDraftBtn");
@@ -456,6 +482,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 mother_last_name: val("motherLastName"),
                 mother_first_name: val("motherFirstName"),
                 contact_number: val("contactNumber"),
+                email: (val("email") || "").trim().toLowerCase() || null,
                 spouse_last_name: val("spouseLastName"),
                 spouse_first_name: val("spouseFirstName"),
                 birthdate: val("birthdate"),

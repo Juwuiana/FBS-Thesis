@@ -255,7 +255,11 @@ def create_patient():
 
     staff_id = None  # wire up once auth/session (staff table) is in place
 
-    patient_id = patient_model.create_patient(patient_data, staff_id=staff_id)
+    try:
+        patient_id = patient_model.create_patient(patient_data, staff_id=staff_id)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    
     visit_id = visit_model.create_visit(patient_id, "intake", visit_data, staff_id=staff_id)
 
     for category, codes in conditions.items():
@@ -303,7 +307,12 @@ def create_followup_record(patient_id):
         barangay_id = _resolve_barangay(demographic_updates)
         if barangay_id is not None:
             demographic_updates["barangay_id"] = barangay_id
-        patient_model.update_patient(patient["id"], demographic_updates)
+        if not (demographic_updates.get("email") or "").strip():
+            demographic_updates.pop("email", None)
+        try:
+            patient_model.update_patient(patient["id"], demographic_updates)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
 
     visit_id = visit_model.create_visit(patient["id"], "follow_up", visit_data, staff_id=staff_id)
 
@@ -555,6 +564,8 @@ def nurse_patient_file_edit(patient_id, visit_id):
 
         if cvd_answers:
             visit_model.save_cvd_responses(visit_id, cvd_answers)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
     except Exception as e:
         # Surface the real reason instead of a bare 500 -- the frontend
         # shows this in its "Could not save changes" alert, so a data

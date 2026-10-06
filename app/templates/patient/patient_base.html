@@ -197,26 +197,19 @@
     {% block scripts %}{% endblock %}
 
     <script>
-    document.addEventListener('DOMContentLoaded', () => {
-        const modal = document.getElementById('flashModalOverlay');
-        const okBtn = document.getElementById('closeFlashModalBtn');
-
-        if (modal && okBtn) {
-            const dismiss = () => {
-                modal.style.opacity = '0';
-                modal.style.transition = 'opacity 0.2s ease';
-                setTimeout(() => modal.remove(), 200);
-            };
-            okBtn.addEventListener('click', dismiss);
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) dismiss();
-            });
-            document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape') dismiss();
-            });
-            okBtn.focus();
-        }
+(function () {
+    function dismissAll() {
+        document.querySelectorAll('[id="flashModalOverlay"]').forEach(function (m) {
+            m.style.transition = 'opacity 0.2s ease';
+            m.style.opacity = '0';
+            setTimeout(function () { m.remove(); }, 200);
+        });
+    }
+    document.addEventListener('click', function (e) {
+        if (e.target.closest('[id="closeFlashModalBtn"]') || e.target.matches('[id="flashModalOverlay"]')) dismissAll();
     });
-    </script>
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') dismissAll(); });
+})();
+</script>
 </body>
 </html>

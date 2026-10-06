@@ -286,6 +286,7 @@ document.addEventListener('DOMContentLoaded', () => {
             spouse_first_name: strOrNull('spouseFirstName'),
             maiden_name: (sexSelect.value === 'Female') ? strOrNull('maidenName') : null,
             contact_number: strOrNull('contactNumber'),
+            email: (strOrNull('email') || '').toLowerCase() || null,
             birthdate: strOrNull('birthdate'),
             sex: strOrNull('sex'),
             civil_status: strOrNull('civilStatus'),
@@ -574,7 +575,27 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
+        // Email is optional, but if one is typed it has to look like an email --
+        // checked for drafts too, since a bad address would be saved either way.
+        const emailInput = $('email');
+        if (patient.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(patient.email)) {
+            markFieldError(emailInput, 'Enter a valid email address (e.g. name@example.com).');
+            invalids.push(emailInput);
+        }
+
         return revealErrors(invalids);
+    }
+
+    // Live email check: flag a malformed address as soon as the nurse leaves the field,
+    // not only when they press Save.
+    const emailField = $('email');
+    if (emailField) {
+        emailField.addEventListener('blur', () => {
+            const v = emailField.value.trim();
+            if (v && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) markFieldError(emailField, 'Enter a valid email address (e.g. name@example.com).');
+            else clearFieldError(emailField);
+            refreshSectionBadges();
+        });
     }
 
     async function submitIntake(redirectAfter) {

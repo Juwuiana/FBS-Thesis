@@ -151,7 +151,53 @@
         citySel.addEventListener('change', () => fillBarangays(regionSel.value, citySel.value));
     }).catch(err => console.error('Could not load PSGC data', err));
 
+    // Email is optional, but if one is typed it has to look like an email.
+    // Flags the field inline, opens its section if collapsed, and scrolls to it
+    // once the section has finished expanding. Returns true when valid.
+    const emailInput = document.querySelector('[data-field="patient.email"]');
+    const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    function clearEmailError() {
+        if (!emailInput) return;
+        emailInput.classList.remove('field-error');
+        const m = emailInput.parentElement.querySelector('.field-error-text');
+        if (m) m.remove();
+    }
+    if (emailInput) emailInput.addEventListener('input', clearEmailError);
+
+    function validateEmail(reveal = true) {
+        clearEmailError();
+        if (!emailInput) return true;
+        const v = emailInput.value.trim();
+        if (!v || EMAIL_RE.test(v)) return true;
+
+        emailInput.classList.add('field-error');
+        const msg = document.createElement('span');
+        msg.className = 'field-error-text';
+        msg.textContent = 'Enter a valid email address (e.g. name@example.com).';
+        emailInput.insertAdjacentElement('afterend', msg);
+
+        if (!reveal) return false; // live check on blur: just flag it, don't move the page
+
+        const body = emailInput.closest('.card-body');
+        const header = body && body.previousElementSibling;
+        const wasCollapsed = !!(body && body.classList.contains('collapsed'));
+        if (wasCollapsed) {
+            body.classList.remove('collapsed');
+            if (header) header.classList.remove('collapsed');
+        }
+        setTimeout(() => {
+            emailInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            emailInput.focus({ preventScroll: true });
+        }, wasCollapsed ? 350 : 0);
+        return false;
+    }
+
+    // Live check as soon as the nurse leaves the field (only while editing).
+    if (emailInput) emailInput.addEventListener('blur', () => { if (!emailInput.disabled) validateEmail(false); });
+
     saveBtn.addEventListener('click', async () => {
+        if (!validateEmail()) return;
         const payload = { patient: {}, visit: {}, conditions: {}, cvd_responses: {} };
 
         editableFields.forEach(el => {
@@ -167,6 +213,7 @@
                 return;
             }
             if (value === '') value = null;
+            else if (field === 'patient.email') value = value.toLowerCase();
             else if (el.type === 'number' && value !== null) value = Number(value);
             payload[scope][key] = value;
         });

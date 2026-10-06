@@ -358,18 +358,19 @@
                     <div class="dd-item"><span class="dd-key">Sex</span><span class="dd-val">{{ patient.sex }}</span></div>
                     <div class="dd-item"><span class="dd-key">Civil Status</span><span class="dd-val">{{ patient.civil_status or "—" }}</span></div>
                     <div class="dd-item"><span class="dd-key">Occupation</span><span class="dd-val">{{ patient.occupation or "—" }}</span></div>
+                    <div class="dd-item"><span class="dd-key">Email</span><span class="dd-val">{{ patient.email or "—" }}</span></div>
                     {% set addr_parts = [patient.address, patient.barangay, patient.city_name, patient.region_name] | select | list %}
                     <div class="dd-item"><span class="dd-key">Address</span><span class="dd-val">{{ addr_parts | join(', ') or "—" }}</span></div>
                 </div>
 
-                <form method="POST" action="{{ url_for('patient.patient_update_demographics') }}" class="ve-form demo-form" id="veForm-demo-{{ v.visit_id }}" style="display:none;"
+                <form method="POST" action="{{ url_for('patient.patient_update_demographics') }}" class="ve-form demo-form" id="veForm-demo-{{ v.visit_id }}" style="display:none;" novalidate
                       data-options-url="{{ url_for('patient.patient_location_options') }}"
                       data-has-provinces="{{ '1' if location_has_provinces else '0' }}"
                       data-region="{{ patient.region_code or '' }}"
                       data-province="{{ patient.province_code or '' }}"
                       data-city="{{ patient.city_code or '' }}"
                       data-barangay="{{ patient.barangay_code or '' }}">
-                    <p class="ve-note">Name, ID, sex, age and assessment date can only be changed by your health worker. Moved to a new place? Update your address here. Edits are reviewed by your health worker.</p>
+                    <p class="ve-note">Name, ID, sex, age and assessment date can only be changed by your health worker. Moved to a new place or changed your email? Update it here. Edits are reviewed by your health worker.</p>
                     <div class="ve-grid">
                         <div class="ve-field">
                             <label>Civil Status</label>
@@ -382,6 +383,10 @@
                         <div class="ve-field">
                             <label>Occupation</label>
                             <input type="text" name="occupation" maxlength="100" value="{{ patient.occupation or '' }}">
+                        </div>
+                        <div class="ve-field">
+                            <label>Email</label>
+                            <input type="email" name="email" maxlength="254" autocomplete="off" value="{{ patient.email or '' }}" placeholder="name@example.com">
                         </div>
                         <div class="ve-field">
                             <label>Region</label>
@@ -914,6 +919,35 @@
     }
     val.addEventListener('input', sync);
     sync();
+})();
+</script>
+<script>
+(function () {
+    // Email: optional, but if filled it must look like name@domain.tld.
+    var RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    var MSG = 'Enter a valid email address (e.g. name@example.com).';
+    function setError(input, on) {
+        var holder = input.parentElement;
+        var note = holder.querySelector('.email-error-text');
+        input.style.borderColor = on ? '#dc2626' : '';
+        if (on && !note) {
+            note = document.createElement('span');
+            note.className = 'email-error-text';
+            note.style.cssText = 'display:block;color:#b91c1c;font-size:.78rem;margin-top:.3rem;';
+            note.textContent = MSG;
+            input.insertAdjacentElement('afterend', note);
+        } else if (!on && note) {
+            note.remove();
+        }
+    }
+    function bad(input) { var v = input.value.trim(); return v !== '' && !RE.test(v); }
+    document.querySelectorAll('.demo-form input[name="email"]').forEach(function (input) {
+        input.addEventListener('blur', function () { setError(input, bad(input)); });
+        input.addEventListener('input', function () { if (!bad(input)) setError(input, false); });
+        input.form.addEventListener('submit', function (e) {
+            if (bad(input)) { e.preventDefault(); setError(input, true); input.focus(); }
+        });
+    });
 })();
 </script>
 {% endblock %}

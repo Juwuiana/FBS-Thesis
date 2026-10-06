@@ -257,16 +257,17 @@
                     <input type="text" class="field-input editable-field" data-field="patient.maiden_name" value="{{ patient.maiden_name or '' }}" disabled>
                 </div>
             </div>
-            <div class="grid-5">
+            <div class="grid-4">
                 <div class="field-group"><label class="field-label">Father's Last Name</label><input type="text" class="field-input editable-field" data-field="patient.father_last_name" value="{{ patient.father_last_name or '' }}" disabled></div>
                 <div class="field-group"><label class="field-label">Father's First Name</label><input type="text" class="field-input editable-field" data-field="patient.father_first_name" value="{{ patient.father_first_name or '' }}" disabled></div>
                 <div class="field-group"><label class="field-label">Mother's Last Name</label><input type="text" class="field-input editable-field" data-field="patient.mother_last_name" value="{{ patient.mother_last_name or '' }}" disabled></div>
                 <div class="field-group"><label class="field-label">Mother's First Name</label><input type="text" class="field-input editable-field" data-field="patient.mother_first_name" value="{{ patient.mother_first_name or '' }}" disabled></div>
-                <div class="field-group"><label class="field-label">Contact Number</label><input type="text" class="field-input editable-field" data-field="patient.contact_number" value="{{ patient.contact_number or '' }}" disabled></div>
             </div>
-            <div class="grid-2">
+            <div class="grid-4">
                 <div class="field-group"><label class="field-label">Spouse's Last Name</label><input type="text" class="field-input editable-field" data-field="patient.spouse_last_name" value="{{ patient.spouse_last_name or '' }}" disabled></div>
                 <div class="field-group"><label class="field-label">Spouse's First Name</label><input type="text" class="field-input editable-field" data-field="patient.spouse_first_name" value="{{ patient.spouse_first_name or '' }}" disabled></div>
+                <div class="field-group"><label class="field-label">Contact Number</label><input type="text" class="field-input editable-field" data-field="patient.contact_number" value="{{ patient.contact_number or '' }}" disabled></div>
+                <div class="field-group"><label class="field-label">Email</label><input type="email" class="field-input editable-field" data-field="patient.email" value="{{ patient.email or '' }}" autocomplete="off" placeholder="name@example.com" disabled></div>
             </div>
             <div class="grid-5">
                 <div class="field-group"><label class="field-label">Date of Assessment</label><input type="date" class="field-input editable-field" data-field="visit.assessment_date" value="{{ latest_visit.assessment_date[:10] if latest_visit.assessment_date else '' }}" disabled></div>

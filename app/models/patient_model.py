@@ -60,6 +60,25 @@ def generate_next_patient_code(conn=None) -> str:
     return f"{prefix}{next_seq:04d}"
 
 
+_EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
+
+
+def is_valid_email(value) -> bool:
+    """True for blank (email is optional) or something shaped like name@domain.tld."""
+    v = (value or "").strip()
+    return v == "" or (len(v) <= 254 and bool(_EMAIL_RE.match(v)))
+
+
+def _normalize_email(value) -> str | None:
+    """Trim + lowercase; blank becomes NULL so "no email" is never stored as ''.
+    Raises ValueError for a malformed address so a bad value never reaches the DB
+    even if a page skipped its own check."""
+    v = (value or "").strip().lower()
+    if v and not is_valid_email(v):
+        raise ValueError("Enter a valid email address (e.g. name@example.com).")
+    return v or None
+
+
 def _normalize_name_part(s: str | None) -> str:
     """Lowercase and strip everything but letters, so 'Dela Cruz', 'dela  cruz',
     and 'DELACRUZ' all compare equal."""
@@ -116,15 +135,16 @@ def create_patient(data: dict, staff_id: int | None = None) -> int:
                 INSERT INTO patients (
                     patient_code, last_name, first_name, middle_name,
                     father_last_name, father_first_name, mother_last_name, mother_first_name,
-                    spouse_last_name, spouse_first_name, contact_number,
+                    spouse_last_name, spouse_first_name, contact_number, email,
                     birthdate, sex, civil_status, religion, occupation, education,
                     barangay_id, address, phic_membership, phic_type, maiden_name, created_by_staff_id
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 patient_code, data["last_name"], data["first_name"], data.get("middle_name"),
                 data.get("father_last_name"), data.get("father_first_name"),
                 data.get("mother_last_name"), data.get("mother_first_name"),
                 data.get("spouse_last_name"), data.get("spouse_first_name"), data.get("contact_number"),
+                _normalize_email(data.get("email")),
                 data["birthdate"], data["sex"], data.get("civil_status"), data.get("religion"),
                 data.get("occupation"), data.get("education"), data.get("barangay_id"),
                 data.get("address"), data.get("phic_membership"), data.get("phic_type"),
@@ -264,7 +284,7 @@ def update_patient(patient_id: int, data: dict, allow_name_edit: bool = False, a
     allowed = {
         "middle_name", "father_last_name",
         "father_first_name", "mother_last_name", "mother_first_name",
-        "spouse_last_name", "spouse_first_name", "contact_number",
+        "spouse_last_name", "spouse_first_name", "contact_number", "email",
         "birthdate", "sex", "civil_status", "religion", "occupation",
         "education", "barangay_id", "address", "phic_membership", "phic_type",
         "maiden_name",
@@ -279,6 +299,8 @@ def update_patient(patient_id: int, data: dict, allow_name_edit: bool = False, a
         return
     if not data:
         return
+    if "email" in data:
+        data["email"] = _normalize_email(data["email"])
     columns = ", ".join(f"{k} = ?" for k in data.keys())
     values = list(data.values()) + [patient_id]
     conn = get_connection()
@@ -967,7 +989,7 @@ MULTI_VALUE_FIELDS = {
 COLUMNS = [
     "last_name", "first_name", "middle_name", "maiden_name",
     "birthdate", "sex", "civil_status", "religion", "occupation", "education",
-    "region", "city", "barangay", "address", "contact_number",
+    "region", "city", "barangay", "address", "contact_number", "email",
     "phic_membership", "phic_type",
     "assessment_date",
     "smoking_status", "alcohol_intake", "illicit_drug_use", "physical_activity",
@@ -1056,6 +1078,13 @@ def _build_codes_sheet(wb):
         row += 2
     ws.column_dimensions["A"].width = 45
 
+def _add_email_hint(ws):
+    col_letter = _col_letter(ws, "email")
+    ws.cell(row=1, column=COLUMNS.index("email") + 1).comment = Comment(
+        "Optional. Format: name@example.com\nInvalid addresses turn red and are ignored on import.", "System")
+    cell = f"{col_letter}2"
+    formula = f'AND({cell}<>"",OR(ISNUMBER(FIND(" ",{cell})),ISERROR(FIND(".",{cell},FIND("@",{cell})))))'
+    ws.conditional_formatting.add(f"{col_letter}2:{col_letter}{MAX_ROWS}", FormulaRule(formula=[formula], fill=RED_FILL))
 
 def generate_import_template_xlsx() -> bytes:
     wb = openpyxl.Workbook()
@@ -1075,6 +1104,8 @@ def generate_import_template_xlsx() -> bytes:
     for field, choices in MULTI_VALUE_FIELDS.items():
         _add_multi_value_comment(ws, field, choices)
         _add_multi_value_formatting(ws, field, choices)
+
+    _add_email_hint(ws)
 
     _build_codes_sheet(wb)
 
@@ -1173,7 +1204,15 @@ def import_patients_from_csv(file_stream, staff_id: int | None = None) -> dict:
             )
             if barangay_warning:
                 errors.append(f"Row {i}: {barangay_warning}")
-
+            
+            email_raw = (row.get("email") or "").strip()
+            email = None
+            if email_raw:
+                if is_valid_email(email_raw):
+                    email = email_raw.lower()
+                else:
+                    errors.append(f"Row {i}: email {email_raw!r} is not a valid address (name@example.com), ignored.")
+                    
             patient_data = {
                 "last_name": last_name, "first_name": first_name,
                 "middle_name": (row.get("middle_name") or "").strip() or None,
@@ -1186,6 +1225,7 @@ def import_patients_from_csv(file_stream, staff_id: int | None = None) -> dict:
                 "barangay_id": barangay_id,
                 "address": (row.get("address") or "").strip() or None,
                 "contact_number": (row.get("contact_number") or "").strip() or None,
+                "email": email,
                 "phic_membership": (row.get("phic_membership") or "").strip() or None,
                 "phic_type": (row.get("phic_type") or "").strip() or None,
             }
@@ -1197,9 +1237,10 @@ def import_patients_from_csv(file_stream, staff_id: int | None = None) -> dict:
             if existing_patient_id is not None:
                 patient_id = existing_patient_id
                 matched_existing += 1
-            else:
-                patient_id = create_patient(patient_data, staff_id=staff_id)
-                new_patients += 1
+                if email:
+                    existing = get_patient_by_id(existing_patient_id)
+                    if existing and not existing.get("email"):
+                        update_patient(existing_patient_id, {"email": email})
 
             assessment_date_raw = (row.get("assessment_date") or "").strip()
             if assessment_date_raw:

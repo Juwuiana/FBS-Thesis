@@ -562,8 +562,8 @@ def patient_update_consent():
 
 @patient_bp.route('/patient_update_demographics', methods=['POST'])
 def patient_update_demographics():
-    """Patient corrects civil status, occupation and/or address. Name, ID,
-    sex, age and assessment date are not accepted here. Each changed field
+    """Patient corrects civil status, occupation, email and/or address. Name,
+    ID, sex, age and assessment date are not accepted here. Each changed field
     flags the nurse through record_patient_profile_edit."""
     patient_id = patient_portal_model.get_current_patient_id()
     patient = patient_model.get_patient_by_id(patient_id)
@@ -572,11 +572,18 @@ def patient_update_demographics():
     allowed_status = {'Single', 'Married', 'Annulled', 'Widow/Widower', 'Separated'}
     civil = (request.form.get('civil_status') or '').strip()
     occupation = (request.form.get('occupation') or '').strip()
+    email_raw = (request.form.get('email') or '').strip()
+    
     if civil not in allowed_status:
         flash("Please choose a valid civil status.", "error")
         return redirect(back)
     if len(occupation) > 100:
         flash("Occupation must be 100 characters or fewer.", "error")
+        return redirect(back)
+    try:
+        email = patient_model._normalize_email(email_raw)
+    except ValueError as e:
+        flash(str(e), "error")
         return redirect(back)
 
     changes, flagged = {}, {}
@@ -586,6 +593,9 @@ def patient_update_demographics():
     if occupation != (patient.get('occupation') or ''):
         changes['occupation'] = occupation or None
         flagged['occupation'] = patient.get('occupation')
+    if email != (patient.get('email') or None):
+        changes['email'] = email
+        flagged['email'] = patient.get('email')
 
     before_loc = patient_model.format_location(patient)
     region_code = (request.form.get('region_code') or '').strip()
@@ -609,7 +619,14 @@ def patient_update_demographics():
         flash("Nothing to update.", "success")
         return redirect(back)
 
-    patient_model.update_patient(patient_id, changes)
+    try:
+        patient_model.update_patient(patient_id, changes)
+    except ValueError as e:
+        # Belt-and-suspenders: update_patient() may re-normalize email (or
+        # anything else) internally and reject it even though our own
+        # check above passed -- surface that as a normal flash, not a 500.
+        flash(str(e), "error")
+        return redirect(back)
 
     after_loc = patient_model.format_location(patient_model.get_patient_by_id(patient_id))
     if after_loc != before_loc:
