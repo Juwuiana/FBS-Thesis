@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <script src="{{ url_for('static', filename='js/csrf.js') }}"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FBS Diabetes Risk Prediction</title>
@@ -39,6 +41,7 @@
             </div>
             <div class="user-dropdown" id="userDropdown">
                 <form id="avatarUploadForm" method="POST" action="{{ url_for('auth.upload_avatar') }}" enctype="multipart/form-data">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <label class="user-dropdown-item" for="avatarFileInput">
                         Change Photo
                         <input type="file" id="avatarFileInput" name="avatar" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" style="display:none;">

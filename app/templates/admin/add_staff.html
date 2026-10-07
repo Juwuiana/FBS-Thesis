@@ -23,6 +23,7 @@
     {% endif %}
 
     <form method="POST" action="{{ url_for('admin.add_staff') }}" class="row g-3">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="col-md-6 col-12">
         <label class="ps-field-label">First Name</label>
         <input type="text" class="ps-input" name="first_name" value="{{ form_data.first_name or '' }}" pattern="[A-Za-z\s.\-]+" title="Letters, spaces, periods, and hyphens only" required>

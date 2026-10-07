@@ -108,6 +108,7 @@
     </p>
 
     <form method="POST" action="{{ url_for('patient.patient_add_record') }}" class="rec-form" id="addRecordForm" novalidate>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
         <div class="ve-grid" style="margin-bottom:1rem;">
             <div class="ve-field">
@@ -370,6 +371,7 @@
                       data-province="{{ patient.province_code or '' }}"
                       data-city="{{ patient.city_code or '' }}"
                       data-barangay="{{ patient.barangay_code or '' }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <p class="ve-note">Name, ID, sex, age and assessment date can only be changed by your health worker. Moved to a new place or changed your email? Update it here. Edits are reviewed by your health worker.</p>
                     <div class="ve-grid">
                         <div class="ve-field">
@@ -492,6 +494,7 @@
                 </div>
 
                 <form method="POST" action="{{ url_for('patient.patient_edit_visit', visit_id=v.visit_id) }}" class="ve-form" id="veForm-lifestyle-{{ v.visit_id }}" style="display:none;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <p class="ve-note">Edits are reviewed by your health worker before they're final.</p>
                     <div class="ve-grid">
                         <div class="ve-field">
@@ -569,6 +572,7 @@
                 </div>
 
                 <form method="POST" action="{{ url_for('patient.patient_edit_visit', visit_id=v.visit_id) }}" class="ve-form" id="veForm-diabetes-{{ v.visit_id }}" style="display:none;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <p class="ve-note">Edits are reviewed by your health worker before they're final.</p>
                     <div class="ve-grid">
                         <div class="ve-field" style="grid-column:1/-1;">
@@ -616,6 +620,7 @@
                 </div>
 
                 <form method="POST" action="{{ url_for('patient.patient_edit_visit', visit_id=v.visit_id) }}" class="ve-form" id="veForm-surgical-{{ v.visit_id }}" style="display:none;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <p class="ve-note">Edits are reviewed by your health worker before they're final.</p>
                     <div class="ve-grid">
                         <div class="ve-field" style="grid-column:1/-1;">
@@ -654,6 +659,7 @@
                 </div>
 
                 <form method="POST" action="{{ url_for('patient.patient_edit_visit', visit_id=v.visit_id) }}" class="ve-form" id="veForm-repro-{{ v.visit_id }}" style="display:none;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <p class="ve-note">Edits are reviewed by your health worker before they're final.</p>
                     <div class="ve-grid">
                         <div class="ve-field"><label>Age at Menarche</label><input type="number" name="menarche_age" min="5" max="25" value="{{ v.menarche_age if v.menarche_age is not none else '' }}"></div>

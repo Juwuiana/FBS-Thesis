@@ -43,7 +43,8 @@
         </div>
     {% endif %}
 
-    <form method="POST" action="{{ url_for('nurse.nurse_screening_submit', patient_id=patient.patient_code, visit_id=latest_visit.visit_id if latest_visit else None) }}">        
+    <form method="POST" action="{{ url_for('nurse.nurse_screening_submit', patient_id=patient.patient_code, visit_id=latest_visit.visit_id if latest_visit else None) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">        
         <div class="screening-layout">
         <div class="left-col">
 

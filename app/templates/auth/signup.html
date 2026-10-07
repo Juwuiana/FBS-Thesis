@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <script src="{{ url_for('static', filename='js/csrf.js') }}"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Create Account — FBS-Based Diabetes Prediction System</title>
@@ -94,6 +96,7 @@
             {% endwith %}
 
             <form method="POST" action="{{ url_for('auth.signup') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 {{ form.hidden_tag() if form else '' }}
 
                <h3 class="form-section-title">Personal Information</h3>

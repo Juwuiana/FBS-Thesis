@@ -12,6 +12,7 @@
     </div>
 
     <form method="POST" action="{{ url_for('admin.staff_update_details', employee_id=employee.id) }}" class="staff-edit-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="row g-3">
       <div class="col-md-6 col-12">
         <label class="ps-field-label">Employee ID</label>
@@ -124,22 +125,27 @@
         <div class="action-group">
           {% if employee.status == 'Pending' %}
           <form method="POST" action="{{ url_for('admin.approve_staff', employee_id=employee.id) }}" class="action-form">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="filter-btn">Approve Account</button>
           </form>
           <form method="POST" action="{{ url_for('admin.reject_staff', employee_id=employee.id) }}" class="action-form">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="btn-danger-soft">Reject Account</button>
           </form>
           {% endif %}
           {% if employee.is_suspended %}
           <form method="POST" action="{{ url_for('admin.reactivate_staff', employee_id=employee.id) }}" class="action-form">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="filter-btn">Reactivate Account</button>
           </form>
           {% elif employee.is_locked %}
           <form method="POST" action="{{ url_for('admin.unlock_staff', employee_id=employee.id) }}" class="action-form">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="filter-btn">Unlock Account</button>
           </form>
           {% elif employee.status == 'Approved' %}
           <form method="POST" action="{{ url_for('admin.suspend_staff', employee_id=employee.id) }}" class="action-form" onsubmit="return confirm('Suspend this employee account?');">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="export-btn">Suspend Account</button>
           </form>
           {% endif %}
@@ -151,6 +157,7 @@
         </div>
         <div class="action-group action-group-danger">
           <form method="POST" action="{{ url_for('admin.delete_staff', employee_id=employee.id) }}" class="action-form" onsubmit="return confirm('Delete this employee account permanently?');">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="btn-danger-soft"><i class="bi bi-trash me-1"></i> Delete Employee</button>
           </form>
         </div>

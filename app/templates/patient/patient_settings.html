@@ -118,6 +118,7 @@
                 <p class="form-hint" style="color: {{ 'var(--g-accent)' if success else 'var(--danger)' }}; margin-bottom: 0.75rem;">{{ message }}</p>
                 {% endif %}
                 <form method="POST" action="{{ url_for('patient.patient_settings') }}" id="pwChangeForm" class="settings-form-grid" style="max-width: 480px;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="form-group" style="grid-column: 1 / -1;">
                         <label class="form-label">Current Password</label>
                         <div class="pw-field-wrap">
@@ -222,6 +223,7 @@
                             <div class="dz-sub">This will end all active sessions except the current one</div>
                         </div>
                         <form method="POST" action="{{ url_for('patient.patient_sign_out_all') }}" style="margin:0;">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="btn-danger-outline">Sign Out All</button>
                         </form>
                     </div>
@@ -257,6 +259,7 @@
 <div class="modal-overlay" id="deactivateModal" style="display:none;">
     <div class="modal-box">
         <form method="POST" action="{{ url_for('patient.patient_deactivate') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="modal-title">Deactivate Account?</div>
             <div class="modal-body">
                 This will disable your access to the patient portal. Your health records at the LHU will not be deleted. You may re-activate by visiting the Sta. Rosa City Health Office.

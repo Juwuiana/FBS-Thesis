@@ -41,9 +41,11 @@
                         </td>
                         <td>
                             <form method="POST" action="{{ url_for('nurse.nurse_patient_restore', patient_id=p.patient_code) }}" style="display:inline;">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button type="submit" class="btn btn-secondary" style="padding:0.35rem 0.75rem; font-size:0.75rem;">Restore</button>
                             </form>
                             <form method="POST" action="{{ url_for('nurse.nurse_patient_purge', patient_id=p.patient_code) }}" style="display:inline;" onsubmit="return confirm('Permanently delete {{ p.first_name }} {{ p.last_name }} now? This cannot be undone.');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button type="submit" class="btn btn-secondary" style="padding:0.35rem 0.75rem; font-size:0.75rem; color:#b91c1c; border-color:#fca5a5;">Delete Permanently</button>
                             </form>
                         </td>

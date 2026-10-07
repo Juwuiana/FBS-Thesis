@@ -34,6 +34,7 @@
             <div class="settings-section">
                 <div class="section-label">Change Password</div>
                 <form method="POST" action="{{ url_for('nurse.nurse_change_password') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="settings-form-grid" style="max-width: 480px;">
                     <div class="form-group" style="grid-column: 1 / -1;">
                         <label class="form-label">Current Password</label>

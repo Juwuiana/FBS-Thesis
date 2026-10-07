@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <script src="{{ url_for('static', filename='js/csrf.js') }}"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
     <title>Patient Portal – LHU</title>
@@ -47,7 +49,8 @@
         </nav>
 
        <div class="sidebar-footer">
-            <form action="{{ url_for('patient.patient_logout') }}" method="POST" style="margin:0;">                    <button type="submit" class="nav-link sign-out" style="width:100%; text-align:left; background:none; border:0; border-left:3px solid transparent;" title="Sign Out">
+            <form action="{{ url_for('patient.patient_logout') }}" method="POST" style="margin:0;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">                    <button type="submit" class="nav-link sign-out" style="width:100%; text-align:left; background:none; border:0; border-left:3px solid transparent;" title="Sign Out">
                     <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg><span class="sb-label">Sign Out</span>
                 </button>
             </form>

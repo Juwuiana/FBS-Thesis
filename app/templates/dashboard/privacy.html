@@ -11,6 +11,7 @@
 <article class="retention-card">
     <h3 class="section-label retention-card-title">{{ title }}</h3>
     <form id="{{ form_id }}" method="POST" action="{{ form_action }}" class="retention-card-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="form-group retention-card-setting">
             <label class="form-label" for="{{ select_id }}">{{ label }}</label>
             <select class="ps-select retention-card-select" id="{{ select_id }}" name="{{ select_name }}">
@@ -69,6 +70,7 @@
             <div class="settings-section">
                 <div class="section-label">Change Password</div>
                 <form method="POST" action="{{ url_for('admin.change_password') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="settings-form-grid" style="max-width: 480px;">
                         <div class="form-group" style="grid-column: 1 / -1;">
                             <label class="form-label" for="adminPwCurrent">Current Password</label>
@@ -168,6 +170,7 @@
                                 <td style="font-weight:600;font-size:13px">{{ role.label }}</td>
                                 <td>
                                     <form method="POST" action="{{ url_for('admin.role_login_toggle') }}">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                         <input type="hidden" name="role" value="{{ role.key }}">
                                         <label class="toggle-switch">
                                             <input type="checkbox" name="enabled" value="1"
@@ -179,6 +182,7 @@
                                 </td>
                                 <td>
                                     <form method="POST" action="{{ url_for('admin.role_export_toggle') }}">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                         <input type="hidden" name="role" value="{{ role.key }}">
                                         <label class="toggle-switch">
                                             <input type="checkbox" name="enabled" value="1"
@@ -190,6 +194,7 @@
                                 </td>
                                 <td>
                                     <form method="POST" action="{{ url_for('admin.role_force_signout') }}">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                         <input type="hidden" name="role" value="{{ role.key }}">
                                         <button type="submit" class="ps-secondary-btn">Force Sign-Out</button>
                                     </form>
@@ -276,6 +281,7 @@
                     Configure authentication policies and session timeout rules for all LHU system users.
                 </p>
                 <form method="POST" action="{{ url_for('admin.update_session_timeout') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="settings-form-grid" style="margin-bottom: 1rem;">
                         <div class="form-group">
                             <label class="form-label">Session Timeout</label>
@@ -315,6 +321,7 @@
     <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">
         <div class="modal-content">
             <form id="patientRetentionActionForm" method="POST" action="{{ url_for('admin.patient_retention_action') }}" class="retention-modal-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="selection_hash" value="{{ patient_retention_selection_hash }}">
                 <input type="hidden" name="action" id="patientRetentionActionValue" value="anonymize">
                 <div class="modal-header">

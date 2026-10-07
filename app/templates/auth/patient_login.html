@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <script src="{{ url_for('static', filename='js/csrf.js') }}"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Patient Portal — FBS-Based Diabetes Prediction System</title>
@@ -59,6 +61,7 @@
             {% endwith %}
 
             <form method="POST" action="{{ url_for('patient.patient_login') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="field-group">
                     <label class="field-label" for="patient_code">Patient ID</label>
                     <input
@@ -122,6 +125,7 @@
                 </p>
 
                 <form method="POST" action="{{ url_for('patient.patient_account_help') }}" style="text-align:left;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="field-group">
                         <label class="field-label" for="help_patient_code">Patient ID</label>
                         <input

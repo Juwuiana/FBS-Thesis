@@ -142,6 +142,7 @@
                 <form method="POST"
                     action="{{ url_for('nurse.nurse_reactivate_portal', patient_id=patient_id) }}"
                     data-confirm="Reactivate this patient's portal access? They will be able to sign in again with their current password.">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="btn btn-primary" style="padding:0.5rem 1rem; font-size:0.8rem;">Reactivate Portal Access</button>
                 </form>
                 {% endif %}
@@ -149,6 +150,7 @@
                 <form method="POST"
                     action="{{ url_for('nurse.nurse_issue_portal_credentials', patient_id=patient_id) }}"
                     data-confirm="{% if patient.password_hash %}Reset this patient's portal password? Their current password will stop working immediately.{% else %}Generate a portal account for this patient?{% endif %}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="btn btn-secondary" style="padding:0.5rem 1rem; font-size:0.8rem;">
                         {{ 'Reset Portal Password' if patient.password_hash else 'Generate Portal Credentials' }}
                     </button>
