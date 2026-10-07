@@ -9,3 +9,9 @@ openpyxl==3.1.5
 gunicorn==23.0.0
 # zoneinfo needs tz data on hosts without a system tz database
 tzdata==2025.3
+# ML runtime for app/ml/artifacts/model.joblib: same versions as the training env
+joblib==1.5.3
+numpy==2.4.2
+scikit-learn==1.8.0
+scipy==1.17.0
+threadpoolctl==3.6.0
