@@ -54,8 +54,8 @@
     <div class="col-6 col-md col-lg">
       <div class="stat-card">
         <div class="stat-label">Model Accuracy</div>
-        <div class="stat-value">{{ metrics.model_accuracy | default(89.3) }}%</div>
-        <div class="stat-change neutral">Validation Set</div>
+        <div class="stat-value">{{ ("%.1f"|format(metrics.model_accuracy) ~ "%") if metrics.model_accuracy is not none else "n/a" }}</div>
+        <div class="stat-change neutral">{{ model_performance.source or "Latest logged evaluation" }}</div>
       </div>
     </div>
   </div>
@@ -172,8 +172,8 @@
         <div class="chart-card-title">Model Performance (Current Model)</div>
         <canvas id="radarChart" height="200"></canvas>
         <div class="mt-3">
-          {% set perf = model_performance if model_performance is defined else
-            {"accuracy":89.3,"precision":0.87,"recall":0.88,"f1_score":0.87,"roc_auc":0.93} %}
+          {% set perf = model_performance %}
+          {% if perf.source %}<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">{{ perf.source }}</div>{% endif %}
           <div class="perf-row">
             <span class="perf-label">Accuracy</span>
             <span class="perf-value">{{ perf.accuracy }}%</span>

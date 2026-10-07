@@ -234,7 +234,7 @@ def dashboard():
         "at_risk": at_risk_count, "at_risk_pct": at_risk_pct,
         "high_risk": high_risk_count, "high_risk_pct": high_risk_pct,
         "avg_fbs": avg_fbs,
-        "model_accuracy": None,
+        "model_accuracy": 59.7,  # RandomForest test accuracy (WIP)
     }
 
     low_count = sum(1 for r in latest_rows if r["final_risk_level"] == "Low")
@@ -318,9 +318,11 @@ def dashboard():
             "date": date_display,
         })
 
+    # WIP: RandomForest test-set metrics from phase4_summary.json (macro-averaged, n=216).
     model_performance = {
-        "accuracy": 89.3, "precision": 0.87, "recall": 0.88,
-        "f1_score": 0.87, "roc_auc": 0.93,
+        "accuracy": 59.7, "precision": 0.553, "recall": 0.554,
+        "f1_score": 0.548, "roc_auc": 0.737,
+        "source": "RandomForest - held-out test set (n=216) - WIP",
     }
 
     # From feature/model-reliability: once real evaluation results exist in
