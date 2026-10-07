@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 
+from conftest import issue_token
 import pytest
 
 from app import create_app
@@ -21,6 +22,7 @@ def app(tmp_path):
 
 def _login(client):
     with client.session_transaction() as s:
+        s["session_token"] = issue_token(client, 1)
         s["user_id"] = 1
         s["user_role"] = "health_worker"
         s["security_version"] = 1

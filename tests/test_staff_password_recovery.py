@@ -1,6 +1,7 @@
 import os
 import sys
 
+from conftest import issue_token
 import pytest
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -50,6 +51,7 @@ def add_user(app, email, role="health_worker", status="approved", password="OldP
 
 def login_as_admin(client, user_id=1):
     with client.session_transaction() as session:
+        session["session_token"] = issue_token(client, user_id)
         session["user_id"] = user_id
         session["user_role"] = "medical_officer"
         session["user_name"] = "Test Admin"

@@ -1,5 +1,6 @@
 import re
 
+from conftest import issue_token
 import pytest
 from werkzeug.security import generate_password_hash
 
@@ -57,6 +58,7 @@ def _staff_client(app, role):
     user_id = _add_user(app, f"{role}@example.com", role)
     client = app.test_client()
     with client.session_transaction() as session:
+        session["session_token"] = issue_token(client, user_id)
         session.update({
             "user_id": user_id, "user_role": role,
             "user_name": "Test User", "security_version": 1,

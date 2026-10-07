@@ -2,6 +2,7 @@ import os
 import sqlite3
 import sys
 
+from conftest import issue_token
 import pytest
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -38,6 +39,7 @@ def add_user(app, email, role="health_worker", status="approved", password="Pass
 
 def active_session(client, user_id, role="medical_officer"):
     with client.session_transaction() as session:
+        session["session_token"] = issue_token(client, user_id)
         session.update({
             "user_id": user_id,
             "user_role": role,

@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
+from conftest import issue_token
 import pytest
 
 from app.db import get_db
@@ -89,6 +90,7 @@ def _seed_patient(
 def _admin_client(app, role="medical_officer"):
     client = app.test_client()
     with client.session_transaction() as session:
+        session["session_token"] = issue_token(client, 1)
         session.update({
             "user_id": 1,
             "user_role": role,
@@ -165,6 +167,7 @@ def test_export_archive_requires_session_hash_and_valid_selection(app):
         pid = _seed_patient(app, patient_code="RET-ARCHIVE", last_visit_days_ago=500)
         admin = app.test_client()
         with admin.session_transaction() as session:
+            session["session_token"] = issue_token(admin, 1)
             session["user_id"] = 1
             session["user_role"] = "medical_officer"
             session["user_name"] = "Admin"

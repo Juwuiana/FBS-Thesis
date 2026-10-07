@@ -2,6 +2,7 @@ import io
 import os
 import sys
 
+from conftest import issue_token
 import pytest
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -51,6 +52,7 @@ def add_user(app, email, role="medical_officer", password="OldPassword123!"):
 
 def login(client, user_id, role):
     with client.session_transaction() as session:
+        session["session_token"] = issue_token(client, user_id)
         session["user_id"] = user_id
         session["user_role"] = role
         session["user_name"] = "Test User"
@@ -115,6 +117,7 @@ def test_change_password_succeeds_logs_audit_and_invalidates_old_password(app):
 
     assert response.status_code == 302
     with app.app_context():
+        user_model.clear_session(user_id)
         old_user, old_error = authenticate("admin@example.com", "OldPassword123!")
         new_user, new_error = authenticate("admin@example.com", "NewPassword123!")
         assert old_user is None and old_error == "Invalid email or password."

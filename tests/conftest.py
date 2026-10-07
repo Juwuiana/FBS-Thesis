@@ -59,9 +59,16 @@ def add_patient(app, code="PATIENT-2026-0001"):
         return patient_id
 
 
+def issue_token(client, user_id):
+    with client.application.app_context():
+        return user_model.start_session(user_id)
+
+
 def active_session(client, user_id, role="medical_officer"):
+    token = issue_token(client, user_id)
     with client.session_transaction() as session:
         session.update({
+            "session_token": token,
             "user_id": user_id,
             "user_role": role,
             "user_name": "Test User",

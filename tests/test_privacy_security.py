@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 import time
 
+from conftest import issue_token
 import pytest
 from werkzeug.security import generate_password_hash
 
@@ -48,6 +49,7 @@ def add_patient(app, code="PATIENT-2026-0001"):
 
 def active_session(client, user_id, role="medical_officer"):
     with client.session_transaction() as session:
+        session["session_token"] = issue_token(client, user_id)
         session.update({
             "user_id": user_id,
             "user_role": role,

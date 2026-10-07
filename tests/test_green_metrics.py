@@ -2,6 +2,7 @@ import os
 import sys
 from datetime import datetime, timedelta, timezone
 
+from conftest import issue_token
 import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
@@ -77,6 +78,7 @@ def app(tmp_path):
 
 def _login(client, role):
     with client.session_transaction() as s:
+        s["session_token"] = issue_token(client, 1)
         s["user_id"], s["user_role"] = 1, role
         s["security_version"] = 1
         s["last_active"] = datetime.now(timezone.utc).isoformat()
