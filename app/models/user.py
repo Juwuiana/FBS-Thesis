@@ -6,7 +6,9 @@ with user input) run through sqlite3. Parameterization is what keeps raw
 SQL safe from injection -- always pass values via the `?` placeholders,
 never f-strings/.format()/% into the query text.
 """
+import secrets
 import sqlite3
+from datetime import datetime, timezone
 
 from app.db import get_db
 from app.constants import BARANGAYS, ROLE_MAP
@@ -200,10 +202,66 @@ def reset_failed_login_attempts(user_id):
 def update_password(user_id, password_hash):
     db = get_db()
     db.execute(
-        "UPDATE users SET password_hash = ? WHERE id = ?",
+        "UPDATE users SET password_hash = ?, active_session_token = NULL, active_session_last_seen = NULL WHERE id = ?",
         (password_hash, user_id),
     )
     db.commit()
+
+
+def start_session(user_id):
+    """Issue a new single-session token (replacing any previous one)."""
+    token = secrets.token_urlsafe(32)
+    db = get_db()
+    db.execute(
+        "UPDATE users SET active_session_token = ?, active_session_last_seen = ? WHERE id = ?",
+        (token, datetime.now(timezone.utc).isoformat(), user_id),
+    )
+    db.commit()
+    return token
+
+
+def clear_session(user_id):
+    db = get_db()
+    db.execute(
+        "UPDATE users SET active_session_token = NULL, active_session_last_seen = NULL WHERE id = ?",
+        (user_id,),
+    )
+    db.commit()
+
+
+def clear_sessions_for_role(role):
+    db = get_db()
+    db.execute(
+        "UPDATE users SET active_session_token = NULL, active_session_last_seen = NULL WHERE role = ?",
+        (role,),
+    )
+    db.commit()
+
+
+def touch_session(user_id):
+    db = get_db()
+    db.execute(
+        "UPDATE users SET active_session_last_seen = ? WHERE id = ? AND active_session_token IS NOT NULL",
+        (datetime.now(timezone.utc).isoformat(), user_id),
+    )
+    db.commit()
+
+
+def get_active_session_state(user_id):
+    """Return {"token", "last_seen"} (last_seen is an aware datetime or None), or None if no session."""
+    row = get_db().execute(
+        "SELECT active_session_token, active_session_last_seen FROM users WHERE id = ?",
+        (user_id,),
+    ).fetchone()
+    if row is None or not row["active_session_token"]:
+        return None
+    last_seen = None
+    if row["active_session_last_seen"]:
+        try:
+            last_seen = datetime.fromisoformat(row["active_session_last_seen"])
+        except ValueError:
+            last_seen = None
+    return {"token": row["active_session_token"], "last_seen": last_seen}
 
 
 def update_avatar(user_id, filename):
@@ -308,8 +366,11 @@ def update_staff_details(employee_id, facility, phone, barangay_id, role):
         return False
     db = get_db()
     db.execute(
-        "UPDATE users SET role = ?, facility = ?, phone = ?, barangay_id = ? WHERE id = ?",
-        (db_role, facility, phone, barangay_id, user["id"]),
+        "UPDATE users SET role = ?, facility = ?, phone = ?, barangay_id = ?, "
+        "active_session_token = CASE WHEN role != ? THEN NULL ELSE active_session_token END, "
+        "active_session_last_seen = CASE WHEN role != ? THEN NULL ELSE active_session_last_seen END "
+        "WHERE id = ?",
+        (db_role, facility, phone, barangay_id, db_role, db_role, user["id"]),
     )
     db.commit()
     return True
@@ -403,8 +464,11 @@ def set_status(user_id, status):
     """Update an account status."""
     db = get_db()
     db.execute(
-        "UPDATE users SET status = ? WHERE id = ?",
-        (status, user_id),
+        "UPDATE users SET status = ?, "
+        "active_session_token = CASE WHEN ? = 'approved' THEN active_session_token ELSE NULL END, "
+        "active_session_last_seen = CASE WHEN ? = 'approved' THEN active_session_last_seen ELSE NULL END "
+        "WHERE id = ?",
+        (status, status, status, user_id),
     )
     db.commit()
 
@@ -412,7 +476,8 @@ def set_status(user_id, status):
 def reset_password(user_id, password_hash, status="approved"):
     db = get_db()
     db.execute(
-        "UPDATE users SET password_hash = ?, status = ?, failed_login_attempts = 0, is_suspended = 0 WHERE id = ?",
+        "UPDATE users SET password_hash = ?, status = ?, failed_login_attempts = 0, is_suspended = 0, "
+        "active_session_token = NULL, active_session_last_seen = NULL WHERE id = ?",
         (password_hash, status, user_id),
     )
     db.commit()
@@ -430,11 +495,14 @@ def unlock_user(user_id):
 
 def set_suspended(user_id, suspended: bool):
     db = get_db()
+    flag = 1 if suspended else 0
     cursor = db.execute(
         "UPDATE users SET is_suspended = ?, "
-        "failed_login_attempts = CASE WHEN ? = 0 THEN 0 ELSE failed_login_attempts END "
+        "failed_login_attempts = CASE WHEN ? = 0 THEN 0 ELSE failed_login_attempts END, "
+        "active_session_token = CASE WHEN ? = 0 THEN active_session_token ELSE NULL END, "
+        "active_session_last_seen = CASE WHEN ? = 0 THEN active_session_last_seen ELSE NULL END "
         "WHERE id = ?",
-        (1 if suspended else 0, 1 if suspended else 0, user_id),
+        (flag, flag, flag, flag, user_id),
     )
     db.commit()
     return cursor.rowcount > 0
