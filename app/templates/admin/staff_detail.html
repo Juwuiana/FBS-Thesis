@@ -149,6 +149,12 @@
             <button type="submit" class="export-btn">Suspend Account</button>
           </form>
           {% endif %}
+          {% if employee.status == 'Approved' %}
+          <form method="POST" action="{{ url_for('admin.staff_force_signout', employee_id=employee.id) }}" class="action-form" onsubmit="return confirm('Sign this employee out of any active session?');">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="export-btn"><i class="bi bi-box-arrow-right me-1"></i> Force Sign Out</button>
+          </form>
+          {% endif %}
           {% if employee.status == 'Password Recovery' or employee.is_suspended %}
           <button type="button" class="export-btn reset-password-btn" data-reset-url="{{ url_for('admin.reset_staff_password', employee_id=employee.id) }}">
             <i class="bi bi-key me-1"></i> Reset Password

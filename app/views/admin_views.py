@@ -1009,6 +1009,20 @@ def suspend_staff(employee_id):
     return redirect(url_for("admin.staff_detail", employee_id=employee_id))
 
 
+@admin_bp.route("/data-management/<employee_id>/force-signout", methods=["POST"])
+@login_required
+def staff_force_signout(employee_id):
+    from app.models import user as user_model
+
+    employee = user_model.get_user_by_employee_id(employee_id)
+    if employee is None:
+        abort(404)
+    user_model.clear_session(employee["id"])
+    _audit_event(f"Staff session force signed out: {employee_id}", "Warning")
+    flash("Staff member has been signed out of any active session.", "success")
+    return redirect(url_for("admin.staff_detail", employee_id=employee_id))
+
+
 @admin_bp.route("/data-management/<employee_id>/reactivate", methods=["POST"])
 @login_required
 def reactivate_staff(employee_id):
