@@ -523,3 +523,66 @@ def test_successful_multi_record_batch_writes_one_audit_with_original_codes(app)
     assert "cutoff_date=" in action
     assert "RET-AUDIT-ONE" in action
     assert "RET-AUDIT-TWO" in action
+
+
+def _seed_due_patients(app, count):
+    with app.app_context():
+        settings_model.set_patient_retention_days(365)
+    for index in range(count):
+        _seed_patient(
+            app,
+            patient_code=f"RP-{index:03d}",
+            created_days_ago=1000 - index,
+            with_related=False,
+        )
+
+
+def test_retention_review_paginates_due_records(app):
+    _seed_due_patients(app, 30)
+    client = _admin_client(app)
+
+    first = client.get("/admin/privacy-security")
+    assert first.status_code == 200
+    assert b"Showing 1&ndash;25 of 30" in first.data
+    assert b"RP-000" in first.data and b"RP-024" in first.data
+    assert b"RP-025" not in first.data
+    assert b"Page 1 of 2" in first.data
+
+    second = client.get("/admin/privacy-security?page=2")
+    assert b"Showing 26&ndash;30 of 30" in second.data
+    assert b"RP-025" in second.data and b"RP-029" in second.data
+    assert b"RP-024" not in second.data
+    assert b"Page 2 of 2" in second.data
+
+
+def test_retention_review_invalid_pagination_inputs_are_clamped(app):
+    _seed_due_patients(app, 30)
+    client = _admin_client(app)
+
+    bad_size = client.get("/admin/privacy-security?per_page=7")
+    assert b"Showing 1&ndash;25 of 30" in bad_size.data
+    junk = client.get("/admin/privacy-security?page=abc&per_page=xyz")
+    assert b"Showing 1&ndash;25 of 30" in junk.data
+    low = client.get("/admin/privacy-security?page=-4")
+    assert b"Page 1 of 2" in low.data
+    high = client.get("/admin/privacy-security?page=99&per_page=10")
+    assert b"Showing 21&ndash;30 of 30" in high.data
+    assert b"Page 3 of 3" in high.data
+    assert b"RP-029" in high.data and b"RP-019" not in high.data
+
+
+def test_retention_selection_and_archive_work_for_second_page(app):
+    _seed_due_patients(app, 12)
+    client = _admin_client(app)
+    page = client.get("/admin/privacy-security?page=2&per_page=10")
+    assert b"Showing 11&ndash;12 of 12" in page.data
+    with app.app_context():
+        ids = [
+            row["id"]
+            for row in patient_model.list_patients_due_for_retention(limit=10, offset=10)
+        ]
+    assert len(ids) == 2
+
+    response = _download_archive(client, [str(i) for i in ids])
+    assert response.status_code == 200
+    assert response.mimetype == "text/csv"

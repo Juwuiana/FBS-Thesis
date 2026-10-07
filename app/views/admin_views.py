@@ -119,6 +119,26 @@ def _coerce_retention_ids(raw_ids):
     return cleaned
 
 
+RETENTION_PAGE_SIZES = (10, 25, 50, 100)
+RETENTION_DEFAULT_PAGE_SIZE = 25
+
+
+def _retention_page_args(total):
+    try:
+        per_page = int(request.args.get("per_page", RETENTION_DEFAULT_PAGE_SIZE))
+    except (TypeError, ValueError):
+        per_page = RETENTION_DEFAULT_PAGE_SIZE
+    if per_page not in RETENTION_PAGE_SIZES:
+        per_page = RETENTION_DEFAULT_PAGE_SIZE
+    try:
+        page = int(request.args.get("page", 1))
+    except (TypeError, ValueError):
+        page = 1
+    total_pages = max(1, -(-total // per_page))
+    page = min(max(page, 1), total_pages)
+    return page, per_page, total_pages
+
+
 def _retention_session_hash():
     user_id = session.get("user_id") or "guest"
     security_version = session.get("security_version") or 0
@@ -1019,11 +1039,13 @@ def privacy_security():
     recycle_bin_days = settings_model.get_recycle_bin_days()
     recycle_bin_status = patient_model.get_recycle_bin_status()
     patient_retention_days = settings_model.get_patient_retention_days()
-    patient_retention_due = patient_model.list_patients_due_for_retention(limit=10)
     patient_retention_due_count = patient_model.count_patients_due_for_retention()
-    patient_retention_oldest_screening = (
-        patient_retention_due[0]["last_screening_date"] if patient_retention_due else None
+    retention_page, retention_per_page, retention_total_pages = _retention_page_args(patient_retention_due_count)
+    patient_retention_due = patient_model.list_patients_due_for_retention(
+        limit=retention_per_page, offset=(retention_page - 1) * retention_per_page
     )
+    oldest_due = patient_model.list_patients_due_for_retention(limit=1)
+    patient_retention_oldest_screening = oldest_due[0]["last_screening_date"] if oldest_due else None
     patient_retention_cutoff_date = (
         (datetime.now(timezone.utc).date() - timedelta(days=patient_retention_days)).isoformat()
         if patient_retention_days is not None else None
@@ -1055,6 +1077,10 @@ def privacy_security():
         patient_retention_days=patient_retention_days,
         patient_retention_due=patient_retention_due,
         patient_retention_due_count=patient_retention_due_count,
+        retention_page=retention_page,
+        retention_per_page=retention_per_page,
+        retention_total_pages=retention_total_pages,
+        retention_page_sizes=RETENTION_PAGE_SIZES,
         patient_retention_oldest_screening=patient_retention_oldest_screening,
         patient_retention_cutoff_date=patient_retention_cutoff_date,
         patient_retention_selection_hash=session.get("patient_retention_selection_hash"),

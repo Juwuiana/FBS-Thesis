@@ -309,6 +309,8 @@
 
 {% if patient_retention_due %}
 {% set retention_shown = patient_retention_due|length %}
+{% set retention_first = (retention_page - 1) * retention_per_page + 1 %}
+{% set retention_last = retention_first + retention_shown - 1 %}
 <div class="modal fade" id="patient-retention-review" tabindex="-1" aria-labelledby="patientRetentionModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">
         <div class="modal-content">
@@ -324,16 +326,28 @@
                 </div>
                 <div class="modal-body">
                     <div class="retention-summary">
-                        <span><strong id="patientRetentionSelected">0</strong> selected of {{ retention_shown }} shown</span>
-                        {% if patient_retention_due_count > retention_shown %}
-                        <span class="retention-summary-note">Only the first {{ retention_shown }} are listed; the rest appear after processing.</span>
-                        {% endif %}
+                        <span><strong id="patientRetentionSelected">0</strong> selected on this page</span>
+                        <span class="retention-summary-note">Showing {{ retention_first }}&ndash;{{ retention_last }} of {{ patient_retention_due_count }}. Selection applies to this page only.</span>
                     </div>
+                    <nav class="retention-pagination" aria-label="Retention review pages">
+                        {% if retention_page > 1 %}
+                        <a class="export-btn" href="{{ url_for('admin.privacy_security', page=retention_page - 1, per_page=retention_per_page) }}#patient-retention-review">Prev</a>
+                        {% endif %}
+                        <span>Page {{ retention_page }} of {{ retention_total_pages }}</span>
+                        {% if retention_page < retention_total_pages %}
+                        <a class="export-btn" href="{{ url_for('admin.privacy_security', page=retention_page + 1, per_page=retention_per_page) }}#patient-retention-review">Next</a>
+                        {% endif %}
+                        <span class="retention-summary-note">Per page:
+                            {% for size in retention_page_sizes %}
+                            {% if size == retention_per_page %}<strong>{{ size }}</strong>{% else %}<a href="{{ url_for('admin.privacy_security', page=1, per_page=size) }}#patient-retention-review">{{ size }}</a>{% endif %}
+                            {% endfor %}
+                        </span>
+                    </nav>
                     <div class="retention-table-wrap">
                         <table class="table retention-table mb-0">
                             <thead>
                                 <tr>
-                                    <th class="retention-col-check"><input type="checkbox" id="select-all-patient-retention" aria-label="Select all due records"></th>
+                                    <th class="retention-col-check"><input type="checkbox" id="select-all-patient-retention" aria-label="Select all due records on this page"></th>
                                     <th>Patient</th>
                                     <th>Last screening</th>
                                     <th>Days overdue</th>
