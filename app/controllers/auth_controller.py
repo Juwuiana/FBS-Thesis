@@ -5,13 +5,18 @@ request/response to these calls.
 """
 import re
 import secrets
-from datetime import datetime
+from datetime import datetime, timezone
 
-from flask import current_app
+from flask import current_app, session
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.db import get_db
 from app.models import audit_model, lookup_model, settings as settings_model, user as user_model
+
+ACTIVE_SESSION_MESSAGE = (
+    "This account is already signed in on another device. "
+    "Sign out there first, or ask your administrator."
+)
 
 PH_MOBILE_RE = re.compile(r"^9\d{9}$")
 NAME_RE = re.compile(r"^[A-Za-z\s.\-]+$")
@@ -232,6 +237,13 @@ def authenticate(email, password):
     if not settings_model.is_role_login_enabled(user["role"]):
         return None, "Logins for this role have been temporarily disabled by an administrator."
 
+    if current_app.config.get("SINGLE_SESSION_POLICY", "block") == "block":
+        active = user_model.get_active_session_state(user["id"])
+        if active is not None and active["last_seen"] is not None:
+            idle_seconds = (datetime.now(timezone.utc) - active["last_seen"]).total_seconds()
+            if idle_seconds <= settings_model.get_session_timeout_minutes() * 60:
+                return None, ACTIVE_SESSION_MESSAGE
+
     user_model.reset_failed_login_attempts(user["id"])
     user_model.update_last_login(user["id"])
     return user, None
@@ -258,4 +270,6 @@ def change_own_password(user_id, form):
 
     if not errors:
         user_model.update_password(user_id, generate_password_hash(new_password))
+        # Other devices are signed out; this device keeps working with a fresh token.
+        session["session_token"] = user_model.start_session(user_id)
     return errors

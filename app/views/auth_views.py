@@ -1,4 +1,5 @@
 import os
+import secrets
 from functools import wraps
 from pathlib import Path
 from urllib.parse import urlparse
@@ -100,10 +101,16 @@ def login():
 
         user, error = auth_controller.authenticate(email, password)
         if error:
+            if error == auth_controller.ACTIVE_SESSION_MESSAGE:
+                audit_action = f"Login blocked, account already signed in elsewhere ({email})"
+                audit_severity = "Warning"
+            else:
+                audit_action = f"Failed login attempt ({email or 'unknown email'})"
+                audit_severity = "Critical"
             audit_model.log_event(
                 get_db(), user_id=None, user_name=email or "unknown", role="Unknown",
-                action=f"Failed login attempt ({email or 'unknown email'})",
-                ip_address=request.remote_addr, severity="Critical",
+                action=audit_action,
+                ip_address=request.remote_addr, severity=audit_severity,
             )
             flash(error, "error")
             return render_template("auth/login.html"), 401
@@ -112,6 +119,7 @@ def login():
         session.clear()
         session.permanent = True
         session["user_id"] = user["id"]
+        session["session_token"] = user_model.start_session(user["id"])
         session["user_name"] = f"{user['first_name']} {user['last_name']}"
         session["user_role"] = user["role"]
         from app.models import settings as settings_model
@@ -183,6 +191,8 @@ def logout():
             role=session.get("user_role", "Unknown"), action="User logout",
             ip_address=request.remote_addr, severity="Info",
         )
+        # Only release the account if this browser still owns the active session.
+        user_model.release_session(session["user_id"], session.get("session_token"))
     session.clear()
     flash("You have been signed out.", "success")
     return redirect(url_for("auth.login"))

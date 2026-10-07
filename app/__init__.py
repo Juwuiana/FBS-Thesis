@@ -1,4 +1,5 @@
 import os
+import secrets
 
 from flask import Flask
 
@@ -109,23 +110,23 @@ def create_app(config_class=Config):
         timeout configured on the Privacy & Security admin page."""
         from datetime import datetime, timezone
 
-        from flask import flash, redirect, request, session, url_for
+        from flask import flash, jsonify, redirect, request, session, url_for
 
         if request.endpoint == "static" or "user_id" not in session:
             return
 
         from app.models import settings as settings_model
+        from app.models import user as user_model
 
         role = session.get("user_role")
         if role and session.get("security_version") != settings_model.get_security_version(role):
+            user_model.release_session(session["user_id"], session.get("session_token"))
             session.clear()
             flash(
                 "You've been signed out for security reasons. Please log in again.",
                 "error",
             )
             return redirect(url_for("auth.login"))
-
-        from app.models import user as user_model
 
         signed_in_user = user_model.get_user_by_id(session["user_id"])
         if signed_in_user is None or signed_in_user["is_suspended"]:
@@ -144,6 +145,7 @@ def create_app(config_class=Config):
             last_active = datetime.fromisoformat(last_active_raw)
             elapsed_seconds = (now - last_active).total_seconds()
             if elapsed_seconds > timeout_minutes * 60:
+                user_model.release_session(session["user_id"], session.get("session_token"))
                 session.clear()
                 flash(
                     "You were signed out after "
@@ -152,7 +154,26 @@ def create_app(config_class=Config):
                 )
                 return redirect(url_for("auth.login"))
 
+        # Single active session: the cookie's token must match the one stored for the account.
+        db_token = signed_in_user["active_session_token"]
+        cookie_token = session.get("session_token")
+        if not db_token or not cookie_token or not secrets.compare_digest(db_token, cookie_token):
+            session.clear()
+            if request.path.startswith("/api/"):
+                return jsonify(error="authentication required"), 401
+            flash(
+                "You were signed out because this account was signed in on another device.",
+                "error",
+            )
+            return redirect(url_for("auth.login"))
+
         session["last_active"] = now.isoformat()
+
+        # Throttle the DB write so ordinary requests don't each hit SQLite.
+        last_touch_raw = session.get("session_touched_at")
+        if not last_touch_raw or (now - datetime.fromisoformat(last_touch_raw)).total_seconds() > 30:
+            user_model.touch_session(session["user_id"])
+            session["session_touched_at"] = now.isoformat()
 
     _register_cli(app)
 

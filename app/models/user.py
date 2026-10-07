@@ -229,6 +229,13 @@ def clear_session(user_id):
     db.commit()
 
 
+def release_session(user_id, token):
+    """Clear the account's session only if `token` is the one currently active."""
+    state = get_active_session_state(user_id)
+    if state and secrets.compare_digest(state["token"], token or ""):
+        clear_session(user_id)
+
+
 def clear_sessions_for_role(role):
     db = get_db()
     db.execute(

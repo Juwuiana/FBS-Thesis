@@ -25,6 +25,10 @@ class Config:
     SESSION_COOKIE_SAMESITE = "Lax"
     PERMANENT_SESSION_LIFETIME = timedelta(hours=8)
 
+    # One active login per staff account. "block" rejects a second login while the first
+    # is still active; "replace" lets the new login win and signs the older device out.
+    SINGLE_SESSION_POLICY = os.environ.get("FBS_SINGLE_SESSION_POLICY", "block").lower()
+
     # CSRF tokens live as long as the session; idle timeout is enforced separately.
     WTF_CSRF_TIME_LIMIT = None
 

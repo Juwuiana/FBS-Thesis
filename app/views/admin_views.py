@@ -1247,7 +1247,7 @@ def role_export_toggle():
 @admin_bp.route("/privacy-security/role-force-signout", methods=["POST"])
 @login_required
 def role_force_signout():
-    from app.models import settings as settings_model
+    from app.models import settings as settings_model, user as user_model
 
     role = request.form.get("role")
     try:
@@ -1255,8 +1255,10 @@ def role_force_signout():
     except ValueError as error:
         flash(str(error), "error")
         return redirect(url_for("admin.privacy_security"))
+    user_model.clear_sessions_for_role(role)
     if session.get("user_role") == role:
         session["security_version"] = settings_model.get_security_version(role)
+        session["session_token"] = user_model.start_session(session["user_id"])
     _audit_event(f"All {role} sessions signed out", "Critical")
     flash(f"All active {role.replace('_', ' ')} sessions have been signed out.", "success")
     return redirect(url_for("admin.privacy_security"))
