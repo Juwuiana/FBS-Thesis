@@ -2,6 +2,9 @@ import os
 from datetime import timedelta
 
 
+DEV_SECRET_KEY = "dev-insecure-key-change-in-.env"
+
+
 class Config:
     """
     Central app configuration.
@@ -10,7 +13,22 @@ class Config:
     source control. Copy `.env.example` to `.env` and fill it in locally.
     """
 
-    SECRET_KEY = os.environ.get("SECRET_KEY", "dev-insecure-key-change-in-.env")
+    ENV = os.environ.get("FBS_ENV", "development").lower()
+    IS_PRODUCTION = ENV == "production"
+
+    SECRET_KEY = os.environ.get("SECRET_KEY", DEV_SECRET_KEY)
+    if IS_PRODUCTION and SECRET_KEY in ("", DEV_SECRET_KEY):
+        raise RuntimeError(
+            "FBS_ENV=production requires SECRET_KEY to be set to a strong random value "
+            "(python -c \"import secrets; print(secrets.token_hex(32))\")."
+        )
+
+    # Demo accounts all share a published password: never enable outside local demos.
+    SEED_DEMO = os.environ.get("FBS_SEED_DEMO", "0") == "1"
+
+    # Avatars live outside the code tree so they can sit on a persistent disk.
+    # If unset, app/__init__.py falls back to <instance folder>/uploads.
+    UPLOAD_DIR = os.environ.get("FBS_UPLOAD_DIR")
 
     # If DATABASE_PATH isn't set, app/__init__.py falls back to
     # <instance folder>/fbs_thesis.sqlite3 (created automatically).
@@ -23,6 +41,7 @@ class Config:
     # Session / cookie hardening
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Lax"
+    SESSION_COOKIE_SECURE = IS_PRODUCTION
     PERMANENT_SESSION_LIFETIME = timedelta(hours=8)
 
     # One active login per staff account. "block" rejects a second login while the first

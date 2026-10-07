@@ -16,7 +16,7 @@
 
     <div class="staff-profile-avatar-wrap">
       {% if employee.avatar_filename %}
-      <img class="staff-profile-avatar" src="{{ url_for('static', filename='uploads/avatars/' + employee.avatar_filename) }}" alt="{{ employee.name }} profile photo" onerror="this.classList.add('staff-profile-avatar-hidden'); this.nextElementSibling.classList.remove('staff-profile-avatar-fallback-hidden');">
+      <img class="staff-profile-avatar" src="{{ url_for('auth.avatar_file', filename=employee.avatar_filename) }}" alt="{{ employee.name }} profile photo" onerror="this.classList.add('staff-profile-avatar-hidden'); this.nextElementSibling.classList.remove('staff-profile-avatar-fallback-hidden');">
       <div class="staff-profile-avatar staff-profile-avatar-fallback staff-profile-avatar-fallback-hidden" role="img" aria-label="{{ employee.name }} initials">{{ (employee.first_name[:1] ~ employee.last_name[:1]) | upper }}</div>
       {% else %}
       <div class="staff-profile-avatar staff-profile-avatar-fallback" role="img" aria-label="{{ employee.name }} initials">{{ (employee.first_name[:1] ~ employee.last_name[:1]) | upper }}</div>

@@ -91,7 +91,7 @@ def test_staff_view_renders_avatar_and_initials_fallback(app):
     client = app.test_client()
     login(client, avatar_id)
     avatar_response = client.get(f"/admin/data-management/EMP-{avatar_id:05d}/view")
-    assert b"uploads/avatars/staff-photo.png" in avatar_response.data
+    assert b"/profile/avatar/staff-photo.png" in avatar_response.data
     assert b"onerror=" in avatar_response.data
 
     fallback_response = client.get(f"/admin/data-management/EMP-{plain_id:05d}/view")

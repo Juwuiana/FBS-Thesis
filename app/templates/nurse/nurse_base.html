@@ -30,7 +30,7 @@
         <div class="user-menu-wrapper">
             <div class="sidebar-user" id="userMenuToggle" role="button" tabindex="0" title="Account options">
                 <div class="user-avatar-wrap">
-                    <img id="userAvatarPreview" src="{{ url_for('static', filename='uploads/avatars/' + current_user_avatar) if current_user_avatar else '' }}" alt="User avatar" style="{{ 'display:block;' if current_user_avatar else 'display:none;' }} width:34px; height:34px; border-radius:50%; object-fit:cover; border:2px solid #66bb6a;">
+                    <img id="userAvatarPreview" src="{{ url_for('auth.avatar_file', filename=current_user_avatar) if current_user_avatar else '' }}" alt="User avatar" style="{{ 'display:block;' if current_user_avatar else 'display:none;' }} width:34px; height:34px; border-radius:50%; object-fit:cover; border:2px solid #66bb6a;">
                     {% set _n = (signed_in_user_name or 'Nurse').split() %}<div class="user-avatar" id="userAvatarFallback" style="{{ 'display:none;' if current_user_avatar else '' }}">{{ (_n[0][0] ~ (_n[1][0] if _n|length > 1 else ''))|upper }}</div>
                 </div>
                 <div class="sb-label" style="flex:1; min-width:0;">

@@ -36,7 +36,7 @@
     </button>
     <div class="sidebar-footer" id="userMenuToggle" role="button" tabindex="0" title="Account options">
       <div class="user-avatar-wrap">
-        <img id="userAvatarPreview" src="{{ url_for('static', filename='uploads/avatars/' + current_user_avatar) if current_user_avatar else 'data:image/svg+xml;utf8,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 40 40\'%3E%3Crect width=\'40\' height=\'40\' fill=\'%234caf50\'/%3E%3Ctext x=\'20\' y=\'26\' font-size=\'16\' text-anchor=\'middle\' fill=\'white\' font-family=\'sans-serif\'%3EHO%3C/text%3E%3C/svg%3E' }}" alt="User avatar" />
+        <img id="userAvatarPreview" src="{{ url_for('auth.avatar_file', filename=current_user_avatar) if current_user_avatar else 'data:image/svg+xml;utf8,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 40 40\'%3E%3Crect width=\'40\' height=\'40\' fill=\'%234caf50\'/%3E%3Ctext x=\'20\' y=\'26\' font-size=\'16\' text-anchor=\'middle\' fill=\'white\' font-family=\'sans-serif\'%3EHO%3C/text%3E%3C/svg%3E' }}" alt="User avatar" />
       </div>
       <div class="sidebar-footer-text sb-label">
         <div class="sidebar-footer-name">{{ signed_in_user_name or "Health Officer" }}</div>

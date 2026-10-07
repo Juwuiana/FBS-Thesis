@@ -394,6 +394,55 @@ def get_user_by_employee_id(employee_id):
         return None
 
 
+def bootstrap_admin_from_env():
+    """First-deploy admin: if the users table is empty and FBS_ADMIN_EMAIL / FBS_ADMIN_PASSWORD
+    are set, create one approved medical_officer. No-op otherwise; the password is never logged."""
+    import os
+
+    from flask import current_app
+    from werkzeug.security import generate_password_hash
+
+    email = (os.environ.get("FBS_ADMIN_EMAIL") or "").strip().lower()
+    password = os.environ.get("FBS_ADMIN_PASSWORD") or ""
+    if not email or not password:
+        return None
+    if get_db().execute("SELECT COUNT(*) FROM users").fetchone()[0] > 0:
+        return None
+
+    from app.controllers.auth_controller import EMAIL_RE, MIN_PASSWORD_LENGTH
+
+    if not EMAIL_RE.match(email):
+        current_app.logger.error("FBS_ADMIN_EMAIL is not a valid email; admin not created.")
+        return None
+    if len(password) < MIN_PASSWORD_LENGTH:
+        current_app.logger.error(
+            "FBS_ADMIN_PASSWORD must be at least %d characters; admin not created.", MIN_PASSWORD_LENGTH
+        )
+        return None
+
+    barangay_name = (os.environ.get("FBS_ADMIN_BARANGAY") or "Aplaya").strip()
+    barangay_id = lookup_model.get_or_create_barangay_by_name(barangay_name)
+    user_id = create_user(
+        {
+            "first_name": os.environ.get("FBS_ADMIN_FIRST_NAME", "System").strip() or "System",
+            "middle_name": None,
+            "last_name": os.environ.get("FBS_ADMIN_LAST_NAME", "Administrator").strip() or "Administrator",
+            "birthday": "1990-01-01",
+            "sex": "female",
+            "email": email,
+            "phone": "9000000000",
+            "role": "medical_officer",
+            "facility": "lhui",
+            "barangay": barangay_name.lower().replace(" ", "_"),
+            "barangay_id": barangay_id,
+        },
+        generate_password_hash(password),
+        status="approved",
+    )
+    current_app.logger.info("Bootstrap admin created for %s.", email)
+    return user_id
+
+
 def seed_demo_users():
     """Create a few dummy approved users when the database is empty."""
     db = get_db()

@@ -1,3 +1,9 @@
+import os
+
+# Many tests rely on the demo accounts (ids 1-3); production keeps seeding off by default.
+# Must be set before config is imported.
+os.environ.setdefault("FBS_SEED_DEMO", "1")
+
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -7,6 +13,7 @@ from app import create_app
 from app.db import get_connection
 from app.models import user as user_model
 from config import Config
+
 
 
 @pytest.fixture

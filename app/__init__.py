@@ -15,6 +15,21 @@ def create_app(config_class=Config):
     os.makedirs(app.instance_path, exist_ok=True)
     if not app.config.get("DATABASE"):
         app.config["DATABASE"] = os.path.join(app.instance_path, "fbs_thesis.sqlite3")
+    if not app.config.get("UPLOAD_DIR"):
+        app.config["UPLOAD_DIR"] = os.path.join(app.instance_path, "uploads")
+    app.config["AVATAR_DIR"] = os.path.join(app.config["UPLOAD_DIR"], "avatars")
+
+    # Behind Render's proxy: trust one hop so request.remote_addr, scheme and host are the client's.
+    if app.config.get("IS_PRODUCTION"):
+        from werkzeug.middleware.proxy_fix import ProxyFix
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+
+    @app.after_request
+    def _security_headers(response):
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        return response
 
     from app import db
     db.init_app(app)
@@ -188,7 +203,9 @@ def create_app(config_class=Config):
             # Seeding reads the `users` table, so it only makes sense once
             # the schema is known to be current.
             from app.models import user as user_model
-            user_model.seed_demo_users()
+            if app.config.get("SEED_DEMO"):
+                user_model.seed_demo_users()
+            user_model.bootstrap_admin_from_env()
             from app.models import patient_model
             patient_model.run_retention_purge(force=True)
 

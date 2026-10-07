@@ -130,7 +130,7 @@ def test_change_password_succeeds_logs_audit_and_invalidates_old_password(app):
 
 def test_avatar_upload_accepts_image_and_rejects_invalid_or_oversized_files(app, tmp_path):
     user_id = add_user(app, "admin@example.com")
-    app.static_folder = str(tmp_path / "static")
+    app.config["AVATAR_DIR"] = str(tmp_path / "uploads" / "avatars")
     client = app.test_client()
     login(client, user_id, "medical_officer")
 
@@ -142,7 +142,7 @@ def test_avatar_upload_accepts_image_and_rejects_invalid_or_oversized_files(app,
     assert valid.status_code == 302
     with app.app_context():
         assert user_model.get_user_by_id(user_id)["avatar_filename"] == f"user_{user_id}.png"
-    assert (tmp_path / "static" / "uploads" / "avatars" / f"user_{user_id}.png").exists()
+    assert (tmp_path / "uploads" / "avatars" / f"user_{user_id}.png").exists()
 
     wrong_type = client.post(
         "/profile/avatar",

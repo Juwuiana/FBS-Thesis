@@ -198,6 +198,12 @@ def logout():
     return redirect(url_for("auth.login"))
 
 
+@auth_bp.route("/profile/avatar/<path:filename>")
+@login_required
+def avatar_file(filename):
+    return send_from_directory(current_app.config["AVATAR_DIR"], filename, max_age=0)
+
+
 @auth_bp.route("/profile/avatar", methods=["POST"])
 @login_required
 def upload_avatar():
@@ -226,7 +232,7 @@ def upload_avatar():
         return redirect(fallback)
 
     user_id = session["user_id"]
-    avatar_dir = Path(current_app.static_folder) / "uploads" / "avatars"
+    avatar_dir = Path(current_app.config["AVATAR_DIR"])
     avatar_dir.mkdir(parents=True, exist_ok=True)
     filename = f"user_{user_id}.{extension}"
     for old_extension in allowed_extensions:
