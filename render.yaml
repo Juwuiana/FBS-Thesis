@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: fbs-thesis
+    runtime: python
+    plan: starter  # persistent disks need a paid instance type
+    buildCommand: pip install -r requirements-deploy.txt
+    startCommand: gunicorn run:app --workers 1 --threads 4 --bind 0.0.0.0:$PORT
+    healthCheckPath: /health
+    disk:
+      name: fbs-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.5
+      - key: FBS_ENV
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_PATH
+        value: /var/data/fbs_thesis.sqlite3
+      - key: FBS_UPLOAD_DIR
+        value: /var/data/uploads
+      - key: FBS_ADMIN_EMAIL
+        sync: false
+      - key: FBS_ADMIN_PASSWORD
+        sync: false

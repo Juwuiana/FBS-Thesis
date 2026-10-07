@@ -25,3 +25,7 @@ app/static/uploads/avatars/*
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Trained models: decide deliberately before committing one (see DEPLOY.md).
+*.joblib
+*.pkl
