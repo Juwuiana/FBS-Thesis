@@ -25,6 +25,9 @@ class Config:
     SESSION_COOKIE_SAMESITE = "Lax"
     PERMANENT_SESSION_LIFETIME = timedelta(hours=8)
 
+    # CSRF tokens live as long as the session; idle timeout is enforced separately.
+    WTF_CSRF_TIME_LIMIT = None
+
     # ------------------------------------------------------------------
     # Green computing (Android/Termux edge server). See README "Green metrics".
     # ------------------------------------------------------------------

@@ -18,6 +18,18 @@ def create_app(config_class=Config):
     from app import db
     db.init_app(app)
 
+    # CSRF protection for every unsafe-method request on every blueprint (no per-route opt-in).
+    from flask_wtf.csrf import CSRFError, CSRFProtect
+    CSRFProtect(app)
+
+    @app.errorhandler(CSRFError)
+    def _handle_csrf_error(_error):
+        from flask import jsonify, render_template, request
+
+        if request.path.startswith("/api/"):
+            return jsonify({"error": "csrf"}), 400
+        return render_template("errors/csrf.html"), 400
+
     from app.views.auth_views import auth_bp
     from app.views.admin_views import admin_bp
     from app.views.metrics_views import metrics_bp
