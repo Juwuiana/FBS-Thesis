@@ -5,7 +5,9 @@ Labels match lab_screenings.model_predicted_risk_level CHECK: Normal / Pre-Diabe
 """
 import os
 
-LABELS = ("Normal", "Pre-Diabetic", "Diabetic")
+# Index = integer class the model was trained on (sklearn LabelEncoder, alphabetical).
+# Verified against test_holdout.csv: 0=Diabetic, 1=Normal, 2=Pre-Diabetic.
+LABELS = ("Diabetic", "Normal", "Pre-Diabetic")
 
 
 class Predictor:
