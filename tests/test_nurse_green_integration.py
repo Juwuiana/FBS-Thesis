@@ -12,6 +12,7 @@ def app(tmp_path):
     cfg = type("TestConfig", (Config,), {
         "DATABASE": str(tmp_path / "t.sqlite3"),
         "TESTING": True,
+        "WTF_CSRF_ENABLED": False,
         "REQUIRE_ADMIN_APPROVAL": False,
         "BATTERY_SYSFS_DIR": str(tmp_path / "missing-battery"),
     })

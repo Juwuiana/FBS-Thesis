@@ -20,6 +20,7 @@ def app(tmp_path):
         {
             "DATABASE": str(tmp_path / "staff-edit.sqlite3"),
             "TESTING": True,
+            "WTF_CSRF_ENABLED": False,
             "REQUIRE_ADMIN_APPROVAL": True,
         },
     )

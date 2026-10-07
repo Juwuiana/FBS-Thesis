@@ -15,7 +15,7 @@ from config import Config  # noqa: E402
 
 @pytest.fixture
 def app(tmp_path):
-    cfg = type("C", (Config,), {"DATABASE": str(tmp_path / "p.sqlite3"), "TESTING": True,
+    cfg = type("C", (Config,), {"DATABASE": str(tmp_path / "p.sqlite3"), "TESTING": True, "WTF_CSRF_ENABLED": False,
                                 "BATTERY_SYSFS_DIR": str(tmp_path / "nobat"),
                                 "PROBE_TARGETS": "127.0.0.1:1", "PROBE_TIMEOUT_S": 0.5})
     return create_app(cfg)

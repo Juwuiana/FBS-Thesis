@@ -16,6 +16,7 @@ def app(tmp_path):
     cfg = type("C", (Config,), {
         "DATABASE": str(tmp_path / "privacy.sqlite3"),
         "TESTING": True,
+        "WTF_CSRF_ENABLED": False,
         "REQUIRE_ADMIN_APPROVAL": True,
         "BATTERY_SYSFS_DIR": str(tmp_path / "nobattery"),
     })

@@ -23,7 +23,7 @@ def at(seconds):
 
 @pytest.fixture
 def ctx(tmp_path):
-    cfg = type("C", (Config,), {"DATABASE": str(tmp_path / "c.sqlite3"), "TESTING": True,
+    cfg = type("C", (Config,), {"DATABASE": str(tmp_path / "c.sqlite3"), "TESTING": True, "WTF_CSRF_ENABLED": False,
                                 "BATTERY_SYSFS_DIR": str(tmp_path / "nobat")})
     app = create_app(cfg)
     with app.app_context():

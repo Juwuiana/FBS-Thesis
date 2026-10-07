@@ -70,7 +70,7 @@ def test_telemetry_stores_null_power_while_charging(app):
 @pytest.fixture
 def app(tmp_path):
     cfg = type("TestConfig", (Config,), {
-        "DATABASE": str(tmp_path / "t.sqlite3"), "TESTING": True,
+        "DATABASE": str(tmp_path / "t.sqlite3"), "TESTING": True, "WTF_CSRF_ENABLED": False,
         "BATTERY_SYSFS_DIR": str(tmp_path / "nobattery"), "REQUIRE_ADMIN_APPROVAL": False})
     return create_app(cfg)
 
@@ -236,7 +236,7 @@ def test_empty_database_renders(app, admin):
 @pytest.fixture
 def demo_app(tmp_path):
     cfg = type("DemoConfig", (Config,), {
-        "DATABASE": str(tmp_path / "d.sqlite3"), "TESTING": True, "DEMO_MODE": True,
+        "DATABASE": str(tmp_path / "d.sqlite3"), "TESTING": True, "WTF_CSRF_ENABLED": False, "DEMO_MODE": True,
         "BATTERY_SYSFS_DIR": str(tmp_path / "nobattery")})
     return create_app(cfg)
 
