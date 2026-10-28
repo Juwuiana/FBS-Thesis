@@ -11,7 +11,7 @@
 {% block content %}
 <main class="page-content">
   {% if is_placeholder %} <div class="alert alert-warning py-2 px-3 mb-3" style="font-size:12px;"> 
-    ⚠️ Showing placeholder data — real model evaluation results pending. 
+    ⚠️ Work in progress: RandomForest results from the Phase 4 summary (held-out test set, n=216). Items not recorded there show a dash. 
   </div> 
   {% endif %}
 
@@ -88,7 +88,7 @@
         {% endfor %}
 
         {% set cm = best_model.confusion_matrix %}
-        {% set cm_labels = training_set.class_breakdown | map(attribute='label') | list %}
+        {% set cm_labels = class_names if class_names is defined else (training_set.class_breakdown | map(attribute='label') | list) %}
         <div class="confusion-label mt-3">
           Confusion Matrix (TEST SET N = {{ best_model.test_n if best_model.test_n is not none else "—" }})
         </div>
@@ -162,7 +162,7 @@
         </div>
         <div class="detail-row">
           <span class="detail-label">Total Records</span>
-          <span class="detail-value">{{ ts.total_records | number_format }}</span>
+          <span class="detail-value">{{ (ts.total_records | number_format) if ts.total_records else "—" }}</span>
         </div>
 
         {# One row per class -- N classes, not a hardcoded binary pair #}
@@ -246,7 +246,7 @@
         <hr class="rel-divider" />
 
         <div class="rel-card-title mt-3">ROC Curve</div>
-        <canvas id="rocChart" height="160"></canvas>
+        {% if roc_points %}<canvas id="rocChart" height="160"></canvas>{% else %}<div class="text-muted-sm" style="font-size:12px;">ROC curve not available (no ROC points exported for this 3-class model).</div>{% endif %}
         <div style="font-size:11px;color:var(--text-muted);margin-top:6px;text-align:center">
           AUC = {{ "%.3f"|format(best_model.auc) if best_model.auc is not none else "—" }}
         </div>
@@ -272,7 +272,7 @@
     <!-- Cross-Validation Results -->
     <div class="col-lg-6 col-12">
       <div class="rel-card h-100">
-        <div class="rel-card-title">Cross-Validation Results (10-Fold)</div>
+        <div class="rel-card-title">Cross-Validation Results</div>
         {% if cv.fold_scores %}
         <canvas id="cvChart" height="200"></canvas>
         {% else %}

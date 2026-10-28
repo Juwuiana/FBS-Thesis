@@ -1,5 +1,5 @@
 # Runtime dependencies for the Render deployment. Local development uses requirements.txt.
-# No ML libraries: the app runs a flagged stub until a model file exists (see DEPLOY.md).
+# ML runtime: XGBoost model exported as JSON (app/ml/artifacts); no scikit-learn needed.
 Flask==3.1.2
 Flask-WTF==1.3.0
 WTForms==3.2.2
@@ -9,9 +9,8 @@ openpyxl==3.1.5
 gunicorn==23.0.0
 # zoneinfo needs tz data on hosts without a system tz database
 tzdata==2025.3
-# ML runtime for app/ml/artifacts/model.joblib: same versions as the training env
-joblib==1.5.3
+# numpy + scipy are required by xgboost-cpu
 numpy==2.4.2
-scikit-learn==1.8.0
 scipy==1.17.0
-threadpoolctl==3.6.0
+
+xgboost-cpu==3.2.0

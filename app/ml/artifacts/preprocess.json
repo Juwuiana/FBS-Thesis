@@ -1,0 +1,48 @@
+{
+  "numeric_columns": [
+    "age",
+    "bmi",
+    "waist_cm",
+    "systolic_bp",
+    "diastolic_bp"
+  ],
+  "numeric_medians": [
+    43.601642604999995,
+    23.274837364549388,
+    78.333336,
+    118.0,
+    74.666664
+  ],
+  "categorical_columns": [
+    "sex",
+    "smoking_status",
+    "alcohol_status"
+  ],
+  "categorical_fill": [
+    "female",
+    "never",
+    "current"
+  ],
+  "categorical_levels": [
+    [
+      "female",
+      "male"
+    ],
+    [
+      "current",
+      "former",
+      "never"
+    ],
+    [
+      "current",
+      "former",
+      "never"
+    ]
+  ],
+  "class_labels": [
+    "Normal",
+    "Pre-Diabetic",
+    "Diabetic"
+  ],
+  "note": "class index 0=Normal 1=Pre-Diabetic 2=Diabetic. Feature order = numeric cols, then one-hot of each categorical col in level order."
+}

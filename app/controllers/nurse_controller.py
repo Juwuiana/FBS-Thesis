@@ -382,6 +382,17 @@ def nurse_screening_submit(patient_id, visit_id):
     }
 
     lab_screening_id = lab_model.create_lab_screening(visit_id, data)
+
+    visit = visit_model.get_visit_by_id(visit_id)
+    features = {
+        "age": patient.get("age"),
+        "waist_cm": visit.get("waist_cm"),
+        "systolic_bp": visit.get("bp_systolic"),
+        "bmi": visit.get("bmi"),
+        "diastolic_bp": visit.get("bp_diastolic"),
+        "sex_male": 1 if (patient.get("sex") or "").strip().lower() == "male" else 0,
+        "alcohol_status_never": 1 if (visit.get("alcohol_intake") or "").strip() == "Never Consumed" else 0,
+    }
     _audit_event(f"Screening saved: {patient_id} (visit: {visit_id})", "Success")
 
     # ML + GREEN COMPUTING
@@ -395,7 +406,7 @@ def nurse_screening_submit(patient_id, visit_id):
         get_db(),
         current_app.extensions["predictor"],
         current_app.extensions["battery"],
-        {"fbs_mg_dl": data["fbs_mg_dl"]},
+        features,
         lab_screening_id=lab_screening_id,
     )
     lab_model.set_model_prediction(

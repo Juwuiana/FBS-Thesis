@@ -360,63 +360,56 @@ def dashboard():
 # applied but scripts/seed_model_performance.py hasn't been run). Keeps the
 # page usable out of the box instead of 404ing; real data from
 # app.models.model_performance_model always takes priority when present.
+# WIP: RandomForest results from phase4_summary.json (held-out test set n=216,
+# macro-averaged precision/recall/F1, class order 0=Diabetic 1=Normal 2=Pre-Diabetic).
+# None / [] = not recorded in that file; the template renders these as a dash.
+# Real rows in model_performance_logs still take priority over all of this.
+_DEMO_CLASS_NAMES = ["Diabetic", "Normal", "Pre-Diabetic"]
 _DEMO_BENCHMARKS = [
-    {"name": "Random Forest", "accuracy": 0.883, "precision": 0.871,
-     "recall": 0.856, "f1": 0.863, "auc": 0.889, "cv_auc": 0.885,
-     "composite_score": 0.885, "best": True},
-    {"name": "XGBoost", "accuracy": 0.871, "precision": 0.858,
-     "recall": 0.843, "f1": 0.850, "auc": 0.878, "cv_auc": 0.874,
-     "composite_score": 0.874, "best": False},
-    {"name": "LightGBM", "accuracy": 0.865, "precision": 0.851,
-     "recall": 0.837, "f1": 0.844, "auc": 0.872, "cv_auc": 0.869,
-     "composite_score": 0.869, "best": False},
+    {"name": "RandomForest", "accuracy": 0.597, "precision": 0.553,
+     "recall": 0.554, "f1": 0.548, "auc": 0.737, "cv_auc": 0.693,
+     "composite_score": 0.571, "best": True},
+    {"name": "LightGBM", "accuracy": None, "precision": None,
+     "recall": None, "f1": None, "auc": None, "cv_auc": 0.675,
+     "composite_score": 0.562, "best": False},
+    {"name": "XGBoost", "accuracy": None, "precision": None,
+     "recall": None, "f1": None, "auc": None, "cv_auc": 0.669,
+     "composite_score": 0.552, "best": False},
 ]
 _DEMO_BEST_MODEL = {
-    "name": "Random Forest", "accuracy": 0.883, "precision": 0.871,
-    "recall": 0.856, "f1": 0.863, "auc": 0.889, "test_n": 800,
-    "confusion_matrix": [[420, 30, 8], [26, 210, 18], [6, 15, 267]],
+    "name": "RandomForest", "accuracy": 0.597, "precision": 0.553,
+    "recall": 0.554, "f1": 0.548, "auc": 0.737, "test_n": 216,
+    "confusion_matrix": [[32, 11, 10], [11, 80, 13], [14, 28, 17]],
 }
 _DEMO_OPTIMIZATION = {
-    "technique": "Post-Training Quantization",
-    "serialized_size_kb": 182,
-    "inference_time_ms": 0.4,
-    "target_device": "Android edge device (Termux)",
+    "technique": None,
+    "serialized_size_kb": 804,
+    "inference_time_ms": 27.2,
+    "target_device": "Android (Termux)",
 }
 _DEMO_TRAINING_SET = {
-    "source": "1 LHU \u2013 Santa Rosa City (placeholder)",
-    "total_records": 4820,
-    "class_breakdown": [
-        {"label": "Normal", "count": 2456, "pct": 51.0},
-        {"label": "Pre-Diabetic", "count": 1420, "pct": 29.5},
-        {"label": "Diabetic", "count": 944, "pct": 19.5},
-    ],
-    "train_split": 70,
-    "test_split": 30,
-    "primary_feature": "FBS (mg/dL)",
+    "source": None,
+    "total_records": None,
+    "class_breakdown": [],
+    "train_split": None,
+    "test_split": None,
+    "primary_feature": None,
 }
 _DEMO_FEATURE_IMPORTANCE = [
-    {"name": "FBS (mg/dL)", "importance": 0.5821},
-    {"name": "Age", "importance": 0.1342},
-    {"name": "BMI", "importance": 0.0987},
-    {"name": "Systolic BP", "importance": 0.0765},
-    {"name": "Diastolic BP", "importance": 0.0534},
-    {"name": "Sex", "importance": 0.0312},
-    {"name": "Waist Circum.", "importance": 0.0239},
+    {"name": "Age", "importance": 0.2674},
+    {"name": "Waist (cm)", "importance": 0.2304},
+    {"name": "Systolic BP", "importance": 0.1532},
+    {"name": "BMI", "importance": 0.1413},
+    {"name": "Alcohol: never", "importance": 0.1046},
+    {"name": "Diastolic BP", "importance": 0.0929},
+    {"name": "Sex: male", "importance": 0.0103},
 ]
 _DEMO_CV = {
-    "fold_scores": [0.881, 0.893, 0.876, 0.901, 0.885,
-                    0.879, 0.897, 0.868, 0.891, 0.883],
-    "mean_auc": 0.885, "std_auc": 0.009, "min_auc": 0.868, "max_auc": 0.901,
-    "accuracy": 0.878, "precision": 0.865, "recall": 0.851, "f1": 0.858,
+    "fold_scores": [],
+    "mean_auc": 0.693, "std_auc": None, "min_auc": None, "max_auc": None,
+    "accuracy": 0.524, "precision": 0.483, "recall": 0.489, "f1": 0.482,
 }
-_DEMO_ROC_POINTS = [
-    {"fpr": 0.00, "tpr": 0.00}, {"fpr": 0.02, "tpr": 0.32},
-    {"fpr": 0.05, "tpr": 0.55}, {"fpr": 0.10, "tpr": 0.72},
-    {"fpr": 0.15, "tpr": 0.80}, {"fpr": 0.20, "tpr": 0.85},
-    {"fpr": 0.30, "tpr": 0.91}, {"fpr": 0.40, "tpr": 0.94},
-    {"fpr": 0.50, "tpr": 0.96}, {"fpr": 0.70, "tpr": 0.98},
-    {"fpr": 1.00, "tpr": 1.00},
-]
+_DEMO_ROC_POINTS = []
 
 
 @admin_bp.route("/reliability")
@@ -441,6 +434,7 @@ def reliability():
             feature_importance=_DEMO_FEATURE_IMPORTANCE,
             cv=_DEMO_CV,
             roc_points=_DEMO_ROC_POINTS,
+            class_names=_DEMO_CLASS_NAMES,
             is_placeholder=True,
         )
 
