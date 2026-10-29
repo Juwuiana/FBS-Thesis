@@ -263,6 +263,7 @@
         <div class="rel-card-title">Feature Importance</div>
         {% if feature_importance %}
         <canvas id="featureChart" height="200"></canvas>
+        <div class="text-muted-sm" style="font-size:12px;margin-top:8px;">Share of the model's predictive power that each input accounts for. Measured on the held-out test set by shuffling one input at a time and seeing how much the model's AUC drops. Longer bar = the model relies on it more.</div>
         {% else %}
         <div class="text-muted-sm" style="font-size:12px;">Feature importance not available.</div>
         {% endif %}

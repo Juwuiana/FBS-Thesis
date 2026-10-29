@@ -92,7 +92,7 @@
   <div class="main-wrapper">
     <header class="topbar">
       <div class="topbar-title">
-        <i class="bi bi-list" id="sidebarToggle"></i>
+        <i class="bi bi-list d-lg-none" id="sidebarToggle"></i>
         {% block page_title %}Dashboard{% endblock %}
       </div>
       <button class="btn btn-sm btn-outline-secondary border-0">
@@ -158,6 +158,20 @@
           });
       })();
       </script>
+  <script>
+    // Click a flash/welcome banner to dismiss it (it still auto-dismisses after a while).
+    document.addEventListener('DOMContentLoaded', function () {
+      document.querySelectorAll('.app-flash').forEach(function (f) {
+        f.style.cursor = 'pointer';
+        f.style.pointerEvents = 'auto';
+        f.title = 'Click to dismiss';
+      });
+    });
+    document.addEventListener('click', function (e) {
+      var f = e.target.closest('.app-flash');
+      if (f) f.remove();
+    });
+  </script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -66,7 +66,7 @@ PERMUTATION_IMPORTANCE = {
 
 def feature_importance():
     """[{name, importance}] -- the shape reliability.js reads."""
-    return [{"name": DISPLAY_NAMES.get(k, k), "importance": v}
+    return [{"name": DISPLAY_NAMES.get(k, k), "importance": round(v / sum(PERMUTATION_IMPORTANCE.values()), 4)}
             for k, v in sorted(PERMUTATION_IMPORTANCE.items(), key=lambda kv: kv[1], reverse=True)]
 
 

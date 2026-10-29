@@ -66,7 +66,7 @@ function initReliabilityCharts(data) {
         labels: sorted.map(f => f.name),
         datasets: [{
           label: 'Importance',
-          data: sorted.map(f => f.importance),
+          data: sorted.map(f => f.importance * 100),
           backgroundColor: sorted.map((_, i) =>
             i === 0 ? '#4caf50' : 'rgba(76,175,80,.35)'
           ),
@@ -81,6 +81,7 @@ function initReliabilityCharts(data) {
         scales: {
           x: {
             beginAtZero: true,
+            title: { display: true, text: '% of total importance', font: { size: 10 } },
             grid: { color: '#f0f4f0' },
             ticks: { font: { size: 11 } }
           },
@@ -93,7 +94,7 @@ function initReliabilityCharts(data) {
           legend: { display: false },
           tooltip: {
             callbacks: {
-              label: ctx => ` Importance: ${ctx.parsed.x.toFixed(4)}`
+              label: ctx => ` ${ctx.parsed.x.toFixed(1)}% of total importance`
             }
           }
         }
