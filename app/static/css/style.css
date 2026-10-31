@@ -112,6 +112,7 @@ canvas { max-width: 100% !important; }
 .barangay-name { font-size: 12px; font-weight: 500; margin-bottom: 3px; }
 .barangay-bar-track, .score-bar-track { background: #e8f0e8; border-radius: 6px; height: 8px; overflow: hidden; }
 .barangay-bar-fill, .score-bar-fill { background: var(--accent-green-light); border-radius: 6px; height: 100%; }
+.barangay-bar-fill { transition: width .4s ease; }
 .barangay-count { font-size: 11px; color: var(--text-muted); margin-top: 2px; text-align: right; }
 .score-bar-row { margin-bottom: 10px; }
 .score-bar-label { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 3px; }

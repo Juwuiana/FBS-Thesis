@@ -101,23 +101,18 @@
     <div class="col-lg-3 col-md-6 col-12">
       <div class="chart-card h-100">
         <div class="chart-card-title">Barangay List by At-Risk Count</div>
-        {% set barangays = barangay_list if barangay_list is defined else [
-          {"name":"Kanluran","count":58},
-          {"name":"Market Area","count":47},
-          {"name":"Dila","count":41},
-          {"name":"Dita","count":33},
-          {"name":"Malitlit","count":29}
-        ] %}
-        {% for b in barangays %}
+        {% for b in barangay_list %}
         <div class="barangay-item">
           <div class="d-flex justify-content-between">
             <span class="barangay-name">{{ b.name }}</span>
             <span class="barangay-count">{{ b.count }}</span>
           </div>
-          <div class="barangay-bar-track">
-            <div class="barangay-bar-fill" style="width:{{ (b.count / 60 * 100)|int }}%"></div>
+          <div class="barangay-bar-track" title="{{ b.name }}: {{ b.count }}">
+            <div class="barangay-bar-fill" style="width:{{ b.pct }}%"></div>
           </div>
         </div>
+        {% else %}
+        <div style="font-size:12px;color:var(--text-muted)">No screenings recorded yet.</div>
         {% endfor %}
       </div>
     </div>

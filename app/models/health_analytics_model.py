@@ -245,8 +245,8 @@ def get_current_risk_snapshot(cutoff_iso: str | None = None) -> dict:
     conn = get_connection()
     try:
         rows = conn.execute(f"""
-            SELECT risk, fbs FROM (
-                SELECT {_RISK} AS risk, ls.fbs_mg_dl AS fbs,
+            SELECT risk, fbs, barangay FROM (
+                SELECT {_RISK} AS risk, ls.fbs_mg_dl AS fbs, b.name AS barangay,
                        ROW_NUMBER() OVER (
                            PARTITION BY v.patient_id
                            ORDER BY ls.test_datetime DESC, ls.id DESC
@@ -254,6 +254,7 @@ def get_current_risk_snapshot(cutoff_iso: str | None = None) -> dict:
                 FROM lab_screenings ls
                 JOIN visits v ON v.id = ls.visit_id
                 JOIN patients p ON p.id = v.patient_id
+                LEFT JOIN barangays b ON b.id = p.barangay_id
                 WHERE p.deleted_at IS NULL AND p.anonymized_at IS NULL
                   AND ls.fbs_mg_dl IS NOT NULL {cutoff_sql}
             ) WHERE rn = 1
@@ -262,11 +263,15 @@ def get_current_risk_snapshot(cutoff_iso: str | None = None) -> dict:
         conn.close()
 
     counts = {"Low": 0, "Moderate": 0, "High": 0}
+    at_risk_by_barangay: dict[str, int] = {}
     fbs_sum = 0.0
     for r in rows:
         fbs_sum += r["fbs"]
         if r["risk"] in counts:
             counts[r["risk"]] += 1
+        if r["risk"] in ("Moderate", "High"):
+            name = r["barangay"] or "Unknown"
+            at_risk_by_barangay[name] = at_risk_by_barangay.get(name, 0) + 1
     total = len(rows)
     risk_total = sum(counts.values())
     pct = {k: (round(v * 100 / risk_total, 1) if risk_total else 0.0) for k, v in counts.items()}
@@ -279,7 +284,23 @@ def get_current_risk_snapshot(cutoff_iso: str | None = None) -> dict:
         "risk_total": risk_total,
         "risk_pct": pct,
         "unclassified": total - risk_total,
+        "at_risk_by_barangay": at_risk_by_barangay,
     }
+
+
+def barangay_bars(counts: dict[str, int], limit: int = 5) -> list[dict]:
+    """Top `limit` barangays (count DESC, name ASC) with a bar width `pct`
+    relative to the largest count in the list (scaled from zero)."""
+    top = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[:limit]
+    max_count = max((c for _, c in top), default=0)
+    bars = []
+    for name, count in top:
+        if count <= 0 or max_count <= 0:
+            pct = 0.0
+        else:
+            pct = max(3.0, round(count / max_count * 100, 1))
+        bars.append({"name": name, "count": count, "pct": pct})
+    return bars
 
 
 def _summary_as_of(cutoff_iso: str) -> dict:

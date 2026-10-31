@@ -220,20 +220,7 @@ def dashboard():
     }
     unclassified = snap["unclassified"]
 
-    barangay_rows = conn.execute(
-        """
-        SELECT b.name, COUNT(ls.id) AS cnt
-        FROM lab_screenings ls
-        JOIN visits v ON v.id = ls.visit_id
-        JOIN patients p ON p.id = v.patient_id
-        LEFT JOIN barangays b ON b.id = p.barangay_id
-        WHERE p.deleted_at IS NULL AND p.anonymized_at IS NULL
-        GROUP BY b.name
-        ORDER BY cnt DESC
-        LIMIT 5
-        """
-        ).fetchall()
-    barangay_list = [{"name": row[0] or "Unknown", "count": row[1]} for row in barangay_rows]
+    barangay_list = health_analytics_model.barangay_bars(snap["at_risk_by_barangay"], limit=5)
 
     period_rows = conn.execute(
         "SELECT ls.test_datetime, COALESCE(ls.final_risk_level, ls.preliminary_risk_level) AS final_risk_level "
