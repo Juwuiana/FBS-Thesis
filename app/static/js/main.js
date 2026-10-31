@@ -30,7 +30,7 @@ function initDonutChart() {
         tooltip: { callbacks: { label: ctx => ` ${ctx.label} – ${ctx.parsed}% (${riskCounts[ctx.dataIndex] || 0})` } }
       },
       responsive: true,
-      maintainAspectRatio: true
+      maintainAspectRatio: false
     }
   });
 }
@@ -66,7 +66,7 @@ function initLineChart() {
     },
     options: {
       responsive: true,
-      maintainAspectRatio: true,
+      maintainAspectRatio: false,
       scales: {
         x: { grid: { display: false }, ticks: { font: { size: 11 }, maxRotation: 45 } },
         y: { grid: { color: '#f0f4f0' }, ticks: { font: { size: 11 } }, beginAtZero: false }
@@ -97,7 +97,7 @@ function initRadarChart() {
     },
     options: {
       responsive: true,
-      maintainAspectRatio: true,
+      maintainAspectRatio: false,
       scales: {
         r: {
           min: 0.75, max: 1,

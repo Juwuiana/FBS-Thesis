@@ -25,7 +25,46 @@ EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 VALID_SEX = ("male", "female")
 VALID_ROLES = ("health_worker", "medical_officer")
 MIN_PASSWORD_LENGTH = 12
+MAX_PASSWORD_LENGTH = 128
+# keep in sync with PASSWORD_REGEX in app/static/js/signup.js
+PASSWORD_REGEX = re.compile(
+    r"^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[^A-Za-z0-9\s])(?!.*(.)\1\1)\S{12,128}$"
+)
 _PASSWORD_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789"
+
+
+def validate_password_strength(password, *, first_name="", last_name="", email=""):
+    """Return one specific error per failed password rule ([] when the password is acceptable)."""
+    password = password or ""
+    if PASSWORD_REGEX.fullmatch(password):
+        errors = []
+    else:
+        errors = []
+        if len(password) < MIN_PASSWORD_LENGTH:
+            errors.append(f"Password must be at least {MIN_PASSWORD_LENGTH} characters.")
+        if len(password) > MAX_PASSWORD_LENGTH:
+            errors.append(f"Password must be at most {MAX_PASSWORD_LENGTH} characters.")
+        if not re.search(r"[A-Z]", password):
+            errors.append("Password must include an uppercase letter.")
+        if not re.search(r"[a-z]", password):
+            errors.append("Password must include a lowercase letter.")
+        if not re.search(r"[0-9]", password):
+            errors.append("Password must include a number.")
+        if not re.search(r"[^A-Za-z0-9\s]", password):
+            errors.append("Password must include a special character.")
+        if re.search(r"\s", password):
+            errors.append("Password must not contain spaces.")
+        if re.search(r"(.)\1\1", password, re.DOTALL):
+            errors.append("Password must not repeat the same character 3 times in a row.")
+
+    lowered = password.lower()
+    local_part = (email or "").split("@", 1)[0]
+    for part in (first_name, last_name, local_part):
+        part = (part or "").strip().lower()
+        if len(part) >= 3 and part in lowered:
+            errors.append("Password must not contain your name or email.")
+            break
+    return errors
 
 
 def generate_temp_password(length: int = 10) -> str:
@@ -56,7 +95,7 @@ def normalize_import_birthday(birthday):
     return value
 
 
-def validate_profile_fields(form, require_terms=False, normalize_phone_input=False):
+def validate_profile_fields(form, require_terms=False, normalize_phone_input=False, strong_password=False):
     """
     Validate the sign-up form. Returns (errors, cleaned_fields, password).
     `errors` is a list of user-facing strings; empty list means valid.
@@ -135,7 +174,10 @@ def validate_profile_fields(form, require_terms=False, normalize_phone_input=Fal
     if barangay_id is None:
         errors.append("Please select an assigned barangay.")
 
-    if len(password) < MIN_PASSWORD_LENGTH:
+    if strong_password:
+        errors.extend(validate_password_strength(
+            password, first_name=first_name, last_name=last_name, email=email))
+    elif len(password) < MIN_PASSWORD_LENGTH:
         errors.append(f"Password must be at least {MIN_PASSWORD_LENGTH} characters.")
     if password != confirm_password:
         errors.append("Passwords do not match.")
@@ -164,7 +206,7 @@ def validate_profile_fields(form, require_terms=False, normalize_phone_input=Fal
 
 
 def validate_signup(form):
-    return validate_profile_fields(form, require_terms=True)
+    return validate_profile_fields(form, require_terms=True, strong_password=True)
 
 
 def register_user(form):
@@ -261,8 +303,12 @@ def change_own_password(user_id, form):
 
     if not check_password_hash(user["password_hash"], current_password):
         errors.append("Current password is incorrect.")
-    if len(new_password) < MIN_PASSWORD_LENGTH:
-        errors.append(f"Password must be at least {MIN_PASSWORD_LENGTH} characters.")
+    errors.extend(validate_password_strength(
+        new_password,
+        first_name=user["first_name"],
+        last_name=user["last_name"],
+        email=user["email"],
+    ))
     if new_password != confirm_password:
         errors.append("Passwords do not match.")
     if new_password == current_password:

@@ -15,7 +15,7 @@
   </div>
 {% endif %}
 {%- endmacro %}
-<main class="page-content">
+<main class="page-content admin-dash">
 
   <!-- ── ROW 1: STAT CARDS ── -->
   <div class="row g-3 mb-3">
@@ -69,7 +69,7 @@
     <div class="col-lg-3 col-md-6 col-12">
       <div class="chart-card h-100">
         <div class="chart-card-title">Risk Distribution</div>
-        <canvas id="donutChart" height="180"></canvas>
+        <div class="admin-chart-box"><canvas id="donutChart"></canvas></div>
                 <div class="donut-legend mt-3">
           {% set legend_rows = [
             ("Low", "low", "--risk-low"),
@@ -93,7 +93,7 @@
     <div class="col-lg-6 col-md-12 col-12">
       <div class="chart-card h-100">
         <div class="chart-card-title">Screenings Over Time</div>
-        <canvas id="lineChart" height="200"></canvas>
+        <div class="admin-chart-box"><canvas id="lineChart"></canvas></div>
       </div>
     </div>
 
@@ -175,7 +175,7 @@
     <div class="col-lg-4 col-12">
       <div class="chart-card h-100">
         <div class="chart-card-title">Model Performance (Current Model)</div>
-        <canvas id="radarChart" height="200"></canvas>
+        <div class="admin-chart-box"><canvas id="radarChart"></canvas></div>
         <div class="mt-3">
           {% set perf = model_performance %}
           {% if perf.source %}<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">{{ perf.source }}</div>{% endif %}

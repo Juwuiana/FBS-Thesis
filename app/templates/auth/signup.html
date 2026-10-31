@@ -60,6 +60,7 @@
             <div class="form-header">
                 <h2 class="form-title">Create an Account</h2>
                 <p class="form-description">Fill in your information to request access to the system</p>
+                <p class="required-note"><span class="req-star">*</span> Required field</p>
                 <div class="form-divider" style="margin-top: 1.5rem;"></div>
             </div>
 
@@ -103,7 +104,7 @@
 
                     <div class="form-row">
                         <div class="field-group">
-                            <label class="field-label" for="first_name">First Name</label>
+                            <label class="field-label" for="first_name">First Name <span class="req-star" aria-hidden="true">*</span></label>
                             <input class="field-input" type="text" id="first_name" name="first_name" 
                                 pattern="[A-Za-z\s]+" title="Letters only" placeholder="Juan" required>
                         </div>
@@ -115,18 +116,18 @@
                     </div>
 
                     <div class="field-group">
-                        <label class="field-label" for="last_name">Last Name</label>
+                        <label class="field-label" for="last_name">Last Name <span class="req-star" aria-hidden="true">*</span></label>
                         <input class="field-input" type="text" id="last_name" name="last_name" 
                             pattern="[A-Za-z\s]+" title="Letters only" placeholder="Cruz" required>
                     </div>
 
                     <div class="form-row">
                         <div class="field-group">
-                            <label class="field-label" for="birthday">Birthday</label>
+                            <label class="field-label" for="birthday">Birthday <span class="req-star" aria-hidden="true">*</span></label>
                             <input class="field-input" type="date" id="birthday" name="birthday" required>
                         </div>
                         <div class="field-group">
-                            <label class="field-label" for="sex">Sex</label>
+                            <label class="field-label" for="sex">Sex <span class="req-star" aria-hidden="true">*</span></label>
                             <select class="field-input select-input" id="sex" name="sex" required>
                                 <option value="" disabled selected>Select...</option>
                                 <option value="male">Male</option>
@@ -136,11 +137,11 @@
                     </div>
 
                     <div class="field-group">
-                        <label class="field-label" for="email">Email Address</label>
+                        <label class="field-label" for="email">Email Address <span class="req-star" aria-hidden="true">*</span></label>
                         <input class="field-input" type="email" id="email" name="email" placeholder="e.g. health.officer@lhu.gov.ph" required>
                     </div>
                     <div class="field-group">
-                        <label class="field-label" for="phone">Phone Number</label>
+                        <label class="field-label" for="phone">Phone Number <span class="req-star" aria-hidden="true">*</span></label>
                         <div style="display: flex; align-items: center; background: var(--gray-50); border: 1px solid var(--border); border-radius: 8px; padding-left: 0.875rem;">
                             <span style="color: var(--text-muted); font-size: 0.875rem; margin-right: 0.5rem;">+63</span>
                             <input class="field-input" type="tel" id="phone" name="phone" 
@@ -153,7 +154,7 @@
 
                 <h3 class="form-section-title">Role & Facility</h3>
                 <div class="field-group">
-                    <label class="field-label" for="role">Role / Position</label>
+                    <label class="field-label" for="role">Role / Position <span class="req-star" aria-hidden="true">*</span></label>
                     <select class="field-input select-input" id="role" name="role" required>
                         <option value="" disabled selected>Select your role</option>
                         <option value="health_worker">Barangay Health Worker</option>
@@ -162,7 +163,7 @@
                 </div>
                 <div class="form-row">
                     <div class="field-group">
-                        <label class="field-label" for="facility">Health Facility</label>
+                        <label class="field-label" for="facility">Health Facility <span class="req-star" aria-hidden="true">*</span></label>
                         <select class="field-input select-input" id="facility" name="facility" required>
                             <option value="" disabled selected>Select...</option>
                             {% for label, code in stations %}
@@ -174,20 +175,20 @@
 
                 <div class="form-row">
                     <div class="field-group">
-                        <label class="field-label" for="region">Region</label>
+                        <label class="field-label" for="region">Region <span class="req-star" aria-hidden="true">*</span></label>
                         <select class="field-input select-input" id="region" required>
                             <option value="" disabled selected>Select...</option>
                         </select>
                     </div>
                     <div class="field-group">
-                        <label class="field-label" for="city">City / Municipality</label>
+                        <label class="field-label" for="city">City / Municipality <span class="req-star" aria-hidden="true">*</span></label>
                         <select class="field-input select-input" id="city" required disabled>
                             <option value="">Select Region first</option>
                         </select>
                     </div>
                 </div>
                 <div class="field-group">
-                    <label class="field-label" for="barangay_select">Assigned Barangay</label>
+                    <label class="field-label" for="barangay_select">Assigned Barangay <span class="req-star" aria-hidden="true">*</span></label>
                     <select class="field-input select-input" id="barangay_select" required disabled>
                         <option value="">Select City first</option>
                     </select>
@@ -203,7 +204,7 @@
                 <h3 class="form-section-title">Security</h3>
                 <div class="form-row">
                     <div class="field-group">
-                        <label class="field-label" for="password">Password</label>
+                        <label class="field-label" for="password">Password <span class="req-star" aria-hidden="true">*</span></label>
                         
                         <div class="password-wrapper" style="position: relative;">
                             <input class="field-input" type="password" id="password" name="password" placeholder="••••••••" required maxlength="128">
@@ -212,6 +213,12 @@
 
                         <ul class="password-checklist">
                             <li id="rule-length" class="invalid">At least 12 characters</li>
+                            <li id="rule-upper" class="invalid">One uppercase letter</li>
+                            <li id="rule-lower" class="invalid">One lowercase letter</li>
+                            <li id="rule-number" class="invalid">One number</li>
+                            <li id="rule-special" class="invalid">One special character</li>
+                            <li id="rule-repeat" class="invalid">No repeated character 3+ times in a row, no spaces</li>
+                            <li id="rule-name" class="invalid">Does not contain your name or email</li>
                         </ul>
 
                         <div class="password-strength">
@@ -223,7 +230,7 @@
                     </div>
                     
                     <div class="field-group">
-                        <label class="field-label" for="confirm_password">Confirm Password</label>
+                        <label class="field-label" for="confirm_password">Confirm Password <span class="req-star" aria-hidden="true">*</span></label>
                         
                         <div class="password-wrapper" style="position: relative;">
                             <input class="field-input" type="password" id="confirm_password" name="confirm_password" placeholder="••••••••" required maxlength="128">
@@ -237,10 +244,10 @@
 
                 </div> <div class="checkbox-group">
                         <input type="checkbox" id="terms" name="terms" required>
-                        <label for="terms">I agree to the <a href="/terms" target="_blank" class="text-link">Terms of Use</a> and <a href="/privacy" target="_blank" class="text-link">Privacy Policy</a> of the LHU Health System</label>
+                        <label for="terms">I agree to the <a href="/terms" target="_blank" class="text-link">Terms of Use</a> and <a href="/privacy" target="_blank" class="text-link">Privacy Policy</a> of the LHU Health System <span class="req-star" aria-hidden="true">*</span></label>
                 </div>
 
-                <button type="submit" class="btn-signin" style="margin-top: 1rem;">Sign Up</button>
+                <button type="submit" id="signupSubmit" class="btn-signin" style="margin-top: 1rem;" disabled>Sign Up</button>
             </form>
 
             <p class="create-account-row" style="margin-top: 1.5rem;">
