@@ -29,3 +29,4 @@ tzdata==2026.6
 Werkzeug==3.1.8
 WTForms==3.3.1
 xgboost==3.4.1
+reportlab==5.1.0

@@ -8,6 +8,31 @@
     <title>Patient Portal – LHU</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/patient_style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='vendor/fontawesome/all.min.css') }}">
+    <style>
+    /* Range-bar marker: bigger, dark, outlined so it reads on green/amber/red */
+    .range-track { overflow: visible; }
+    .range-marker {
+        top: 100%; bottom: auto; margin-top: 2px; transform: translateX(-50%);
+        font-size: 1.35rem; line-height: 1; color: #1e293b;
+        text-shadow: 0 0 2px #fff, 0 0 2px #fff, 0 0 3px #fff;
+        z-index: 2;
+    }
+    .range-track:has(.range-marker) { margin-bottom: 1.4rem; }
+
+    /* Print / "Download as PDF": output only the report, no controls or navigation */
+    @media print {
+        .sidebar, .mobile-header, .mobile-overlay, .patient-bell-wrap, .scroll-top-btn,
+        .patient-modal-overlay, .flash-messages, .no-print, .sb-pin,
+        .patient-footer .footer-links, .hero-circles,
+        button, .btn, .btn-hero, .btn-view, .btn-outline, .btn-warning-action,
+        .ve-edit-btn, .ve-cancel-btn,
+        .screening-table th:last-child, .screening-table td:last-child { display: none !important; }
+        html, body { background: #fff !important; }
+        .main-content { margin: 0 !important; padding: 0 !important; width: 100% !important; max-width: none !important; }
+        * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .patient-card, .result-card, .detail-section { break-inside: avoid; }
+    }
+    </style>
     <script>try{if(localStorage.getItem('sbPinned:patient')==='1')document.documentElement.classList.add('sb-pinned');}catch(e){}</script>
 </head>
 <body>

@@ -306,7 +306,7 @@
                 </div>
                 <div class="detail-actions">
                     <button class="btn btn-outline btn-sm" data-print-id="visit-{{ v.visit_id }}">Print</button>
-                    <button class="btn btn-outline btn-sm" data-download-id="visit-{{ v.visit_id }}">PDF</button>
+                    <a class="btn btn-outline btn-sm" href="{{ url_for('patient.patient_result_pdf', visit_id=v.visit_id) }}" download>PDF</a>
                 </div>
             </div>
 
@@ -423,7 +423,7 @@
             </details>
 
             <details class="detail-section detail-collapse">
-                <summary><span class="ds-label">1b. Past Medical History</span></summary>
+                <summary><span class="ds-label">2. Past Medical History</span></summary>
                 <div class="collapse-body">
                 <div class="risk-factors-grid">
                     {% for code in v.conditions.pmh %}
@@ -436,7 +436,7 @@
             </details>
 
             <details class="detail-section detail-collapse">
-                <summary><span class="ds-label">2. Family History (1st Degree Relative)</span></summary>
+                <summary><span class="ds-label">3. Family History (1st Degree Relative)</span></summary>
                 <div class="collapse-body">
                 <div class="risk-factors-grid">
                     {% for code in v.conditions.family_history %}
@@ -449,7 +449,7 @@
             </details>
 
             <details class="detail-section detail-collapse">
-                <summary><span class="ds-label">3. CVD Questionnaire</span></summary>
+                <summary><span class="ds-label">4. CVD Questionnaire</span></summary>
                 <div class="collapse-body">
                 <div class="cvd-table">
                     {% set cvd_labels = {
@@ -474,7 +474,7 @@
             </details>
 
             <details class="detail-section detail-collapse">
-                <summary><span class="ds-label">4. Lifestyle Factors</span></summary>
+                <summary><span class="ds-label">5. Lifestyle Factors</span></summary>
                 <div class="collapse-body">
 
                 <div class="ve-bar">
@@ -552,7 +552,7 @@
             </details>
 
             <details class="detail-section detail-collapse">
-                <summary><span class="ds-label">5. Diabetes History</span></summary>
+                <summary><span class="ds-label">6. Diabetes History</span></summary>
                 <div class="collapse-body">
 
                 <div class="ve-bar">
@@ -603,7 +603,7 @@
             </details>
 
             <details class="detail-section detail-collapse">
-                <summary><span class="ds-label">5b. Past Surgical History</span></summary>
+                <summary><span class="ds-label">7. Past Surgical History</span></summary>
                 <div class="collapse-body">
 
                 <div class="ve-bar">
@@ -639,7 +639,7 @@
 
             {% if patient.sex == 'Female' %}
             <details class="detail-section detail-collapse">
-                <summary><span class="ds-label">5c. Menstrual &amp; Pregnancy History</span></summary>
+                <summary><span class="ds-label">8. Menstrual &amp; Pregnancy History</span></summary>
                 <div class="collapse-body">
 
                 <div class="ve-bar">
@@ -678,7 +678,7 @@
             {% endif %}
 
             <details class="detail-section detail-collapse" open>
-                <summary><span class="ds-label">6. Anthropometric Measurements &amp; Vitals</span></summary>
+                <summary><span class="ds-label">{{ 9 if patient.sex == 'Female' else 8 }}. Anthropometric Measurements &amp; Vitals</span></summary>
                 <div class="collapse-body">
 
                 <div class="detail-data-grid">
@@ -709,7 +709,7 @@
 
             <div class="detail-footer">
                 <button class="btn btn-outline" data-print-id="visit-{{ v.visit_id }}">Print This Result</button>
-                <button class="btn btn-outline" data-download-id="visit-{{ v.visit_id }}"> Save as PDF</button>
+                <a class="btn btn-outline" href="{{ url_for('patient.patient_result_pdf', visit_id=v.visit_id) }}" download>Save as PDF</a>
             </div>
         </div>
         {% endfor %}

@@ -42,7 +42,7 @@
         <p class="hero-greeting">Welcome back, {{ patient.first_name }}!</p>
         <h1 class="hero-title">Know Your<br><span class="hero-accent">Diabetes Risk.</span></h1>
         <p class="hero-desc">Your latest FBS screening results are ready.<br>Stay informed and take control of your health.</p>
-        <a href="{{ url_for('patient.patient_health_results') }}" class="btn-hero">View Full Health Report <svg class="arrow-icon" aria-hidden="true"><use href="#icon-arrow"/></svg></a>
+        <a href="{{ url_for('patient.patient_health_results') }}" class="btn-hero no-print">View Full Health Report <svg class="arrow-icon" aria-hidden="true"><use href="#icon-arrow"/></svg></a>
     </div>
 
     <div class="hero-right">
@@ -60,6 +60,9 @@
                     <span class="fbs-number">{{ result.fbs_score if result.fbs_score is not none else "-" }}</span>
                     <span class="fbs-unit">mg/dL</span>
                 </div>
+                {% if result.fbs_band == 'Normal' %}<span class="range-badge normal">Normal range</span>
+                {% elif result.fbs_band == 'Pre-Diabetic' %}<span class="range-badge pre-diabetic">Pre-diabetic range</span>
+                {% elif result.fbs_band == 'Diabetic' %}<span class="range-badge diabetic">Diabetic range</span>{% endif %}
 
                 {% if result.fbs_score is not none %}
                 <div class="range-label">Your position on the FBS range:</div>
@@ -68,8 +71,7 @@
                         <div class="range-normal"></div>
                         <div class="range-pre"></div>
                         <div class="range-diabetic"></div>
-                        {% set marker_pct = ((result.fbs_score - 70) / (180 - 70) * 100) | round(1) %}
-                        <div class="range-marker" style="left: {{ [[marker_pct, 2] | max, 100] | min }}%">▲</div>
+                        <div class="range-marker" style="left: {{ result.range_marker_pct }}%">▲</div>
                     </div>
                     <div class="range-labels">
                         <span class="rl-normal">Normal < 100</span>
@@ -119,7 +121,7 @@
     <div class="patient-card">
         <div class="patient-card-header">
             <span>Recent Screenings</span>
-            <a href="{{ url_for('patient.patient_health_results') }}" class="btn btn-outline btn-sm">View All <svg class="arrow-icon" aria-hidden="true"><use href="#icon-arrow"/></svg></a>
+            <a href="{{ url_for('patient.patient_health_results') }}" class="btn btn-outline btn-sm no-print">View All <svg class="arrow-icon" aria-hidden="true"><use href="#icon-arrow"/></svg></a>
         </div>
         <div class="patient-card-body table-wrap">
             <table class="screening-table">
@@ -154,7 +156,7 @@
         </div>
     </div>
 
-    <div class="patient-card quick-actions-panel">
+    <div class="patient-card quick-actions-panel no-print">
         <div class="patient-card-header">Quick Actions</div>
         <div class="actions-list">
             <a href="{{ url_for('patient.patient_health_results') }}" class="action-item">
@@ -164,13 +166,13 @@
                 </div>
                 <span class="action-arrow"><svg class="arrow-icon" aria-hidden="true"><use href="#icon-arrow"/></svg></span>
             </a>
-            <button class="action-item" id="downloadPdfBtn">
+            <a class="action-item" id="downloadPdfBtn" href="{{ url_for('patient.patient_result_pdf', visit_id='latest') }}" download>
                 <div class="action-text">
                     <span class="action-title">Download Latest Result</span>
                     <span class="action-sub">Save as PDF</span>
                 </div>
                 <span class="action-arrow"><svg class="arrow-icon" aria-hidden="true"><use href="#icon-arrow"/></svg></span>
-            </button>
+            </a>
             <a href="{{ url_for('patient.patient_settings') }}" class="action-item">
                 <div class="action-text">
                     <span class="action-title">Account Settings</span>

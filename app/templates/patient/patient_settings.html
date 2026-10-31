@@ -95,6 +95,21 @@
             </div>
 
             <div class="settings-section">
+                <div class="section-label">Email Address</div>
+                <form method="POST" action="{{ url_for('patient.patient_update_email') }}" id="emailForm" class="settings-form-grid" novalidate>
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="form-group">
+                        <label class="form-label" for="emailInput">Email</label>
+                        <input class="form-input" type="email" id="emailInput" name="email" maxlength="254" autocomplete="email" value="{{ patient.email or '' }}" placeholder="name@example.com">
+                        <span class="form-hint" id="emailHint">Optional. Your health worker will be notified when you change it.</span>
+                    </div>
+                    <div class="form-actions" style="grid-column: 1 / -1;">
+                        <button type="submit" class="btn-save">Save Email</button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="settings-section">
                 <div class="section-label">Home Address</div>
                 <div class="settings-form-grid">
                     <div class="form-group" style="grid-column: 1 / -1;">
@@ -241,6 +256,25 @@
 
     </div><!-- end settings-content-panel -->
 </div><!-- end settings-body -->
+
+<script>
+(function () {
+    var form = document.getElementById('emailForm');
+    if (!form) return;
+    var input = document.getElementById('emailInput'), hint = document.getElementById('emailHint');
+    var RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/, base = hint.textContent;
+    form.addEventListener('submit', function (e) {
+        var v = input.value.trim();
+        if (v !== '' && !RE.test(v)) {
+            e.preventDefault();
+            hint.textContent = 'Enter a valid email address (e.g. name@example.com).';
+            hint.style.color = 'var(--danger)';
+            input.focus();
+        }
+    });
+    input.addEventListener('input', function () { hint.textContent = base; hint.style.color = ''; });
+})();
+</script>
 
 <!-- TOAST NOTIFICATION -->
 <div id="settingsToast" class="settings-toast" aria-live="polite"></div>
