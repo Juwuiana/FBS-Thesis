@@ -17,15 +17,19 @@
         <div class="dm-tool-header" id="dmImportTitle">Import Employee Records</div>
         <div class="dm-tool-body">
           <p class="dm-tool-desc">Upload a CSV file to create approved employee accounts in one operation.</p>
-          <a href="{{ url_for('admin.staff_import_template') }}" class="export-btn dm-tool-btn">
-            <i class="bi bi-download me-1"></i> Download Blank Template
+          <a href="{{ url_for('admin.staff_import_template_xlsx') }}" class="filter-btn dm-tool-btn">
+            <i class="bi bi-file-earmark-excel me-1"></i> Download Excel Template (recommended)
           </a>
+          <a href="{{ url_for('admin.staff_import_template') }}" class="export-btn dm-tool-btn">
+            <i class="bi bi-download me-1"></i> Download Blank CSV Template
+          </a>
+          <p class="dm-tool-desc">The Excel template has dropdowns and checks. Fill it in and upload the .xlsx file here directly (a .csv also works).</p>
           <div class="dm-field">
-            <label class="dm-field-label" for="dmImportFile">Select Source File (.csv)</label>
-            <input type="file" id="dmImportFile" class="dm-field-input" accept=".csv,text/csv">
+            <label class="dm-field-label" for="dmImportFile">Select Source File (.xlsx or .csv)</label>
+            <input type="file" id="dmImportFile" class="dm-field-input" accept=".xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
           </div>
           <div id="dmImportFileError" class="dm-field-error" role="alert" hidden></div>
-          <p class="dm-warning-note">The file contains temporary passwords. Delete it after importing.</p>
+          <p class="dm-warning-note">Leave <code>temporary_password</code> blank and the system generates one for each employee. Generated passwords are shown once after the import, so save the credentials file.</p>
           <button type="button" id="dmImportBtn" class="filter-btn dm-tool-btn" disabled>
             <i class="bi bi-upload me-1"></i> Import Employees
           </button>
@@ -56,7 +60,7 @@
                   <li class="dm-schema-item">role <span>(required)</span></li>
                   <li class="dm-schema-item">station <span>(required)</span></li>
                   <li class="dm-schema-item">barangay <span>(required)</span></li>
-                  <li class="dm-schema-item">temporary_password <span>(required)</span></li>
+                  <li class="dm-schema-item">temporary_password <span>(optional &ndash; generated if blank)</span></li>
                 </ul>
                 <p class="dm-schema-note">All headers must be present; middle_name may be left blank. birthday = YYYY-MM-DD; sex = male/female; phone = 10 digits starting with 9 (leading 0 or +63 accepted); role = Health Officer / LHU Nurse; station = LHU I / LHU II; barangay = name from the signup list.</p>
               </div>
@@ -281,15 +285,33 @@
       result.textContent = '';
       progress.hidden = true;
       if (!file) { importButton.disabled = true; return; }
-      if (!file.name.toLowerCase().endsWith('.csv')) {
+      if (!/\.(csv|xlsx)$/i.test(file.name)) {
         fileInput.value = '';
         importButton.disabled = true;
-        fileError.textContent = 'Only .csv files are accepted.';
+        fileError.textContent = 'Only .xlsx or .csv files are accepted.';
         fileError.hidden = false;
         return;
       }
       importButton.disabled = false;
     });
+
+    function downloadCredentials(creds) {
+      const cell = v => {
+        let t = String(v == null ? '' : v);
+        if (/^[=+\-@\t\r]/.test(t)) t = "'" + t;
+        return '"' + t.replace(/"/g, '""') + '"';
+      };
+      const lines = [['Name', 'Email', 'Temporary Password'].map(cell).join(',')];
+      creds.forEach(c => lines.push([c.name, c.email, c.password].map(cell).join(',')));
+      const blob = new Blob(['\ufeff' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'imported_staff_credentials.csv';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    }
 
     importButton.addEventListener('click', () => {
       const file = fileInput.files[0];
@@ -300,28 +322,46 @@
       progressText.textContent = 'Uploading...';
       setProgress(0);
 
+      let shown = 0, target = 0, raf = null, creep = null;
+      const paint = () => {
+        const gap = target - shown;
+        shown = gap < 0.5 ? target : shown + gap * 0.08 + 0.35;
+        if (shown > target) shown = target;
+        setProgress(Math.round(shown));
+        raf = shown < target ? requestAnimationFrame(paint) : null;
+      };
+      const setTarget = t => {
+        target = Math.max(target, Math.min(100, t));
+        if (!raf) raf = requestAnimationFrame(paint);
+      };
+      const stopCreep = () => { if (creep) clearInterval(creep); creep = null; };
+      const whenFull = cb => {
+        const wait = setInterval(() => { if (shown >= 100) { clearInterval(wait); cb(); } }, 40);
+      };
+      setTarget(3);
+
       const formData = new FormData();
       formData.append('file', file);
       const xhr = new XMLHttpRequest();
       xhr.open('POST', '{{ url_for("admin.staff_import") }}');
       xhr.responseType = 'json';
       xhr.upload.addEventListener('progress', event => {
-        if (event.lengthComputable) setProgress(Math.round((event.loaded / event.total) * 100));
+        if (event.lengthComputable) setTarget(Math.round((event.loaded / event.total) * 50));
       });
       xhr.upload.addEventListener('load', () => {
         progressText.textContent = 'Processing...';
-        bar.classList.add('indeterminate');
-        progressPct.textContent = '';
+        setTarget(50);
+        creep = setInterval(() => setTarget(target + (90 - target) * 0.06), 150);
       });
       const fail = message => {
+        stopCreep();
+        if (raf) cancelAnimationFrame(raf);
         progress.hidden = true;
         showResultError(message);
         importButton.disabled = false;
       };
       xhr.addEventListener('error', () => fail('The import could not be completed.'));
-      xhr.addEventListener('load', () => {
-        const payload = xhr.response;
-        if (!payload) { fail('The import could not be completed.'); return; }
+      const render = payload => {
         progress.hidden = true;
         result.textContent = '';
         if (payload.ok) {
@@ -329,7 +369,29 @@
           ok.className = 'dm-result-ok';
           ok.textContent = `Imported ${payload.imported} employee${payload.imported === 1 ? '' : 's'}.`;
           result.appendChild(ok);
-          setTimeout(() => window.location.reload(), 700);
+          const creds = payload.credentials || [];
+          if (!creds.length) {
+            setTimeout(() => window.location.reload(), 700);
+            return;
+          }
+          // Generated passwords exist only in this response: keep the page open
+          // (no auto-reload) until the admin has saved the credentials file.
+          const warn = document.createElement('div');
+          warn.className = 'dm-warning-note';
+          warn.textContent = `${creds.length} temporary password${creds.length === 1 ? ' was' : 's were'} generated. ` +
+            'They are shown only once \u2014 download the credentials file before leaving this page.';
+          const dl = document.createElement('button');
+          dl.type = 'button';
+          dl.className = 'filter-btn dm-tool-btn';
+          dl.innerHTML = '<i class="bi bi-download me-1"></i> Download Credentials (.csv)';
+          dl.addEventListener('click', () => downloadCredentials(creds));
+          const done = document.createElement('button');
+          done.type = 'button';
+          done.className = 'export-btn dm-tool-btn';
+          done.textContent = 'Done \u2013 refresh list';
+          done.addEventListener('click', () => window.location.reload());
+          result.append(warn, dl, done);
+          downloadCredentials(creds);
           return;
         }
         const list = document.createElement('ul');
@@ -341,6 +403,14 @@
         });
         result.appendChild(list);
         importButton.disabled = false;
+      };
+      xhr.addEventListener('load', () => {
+        stopCreep();
+        const payload = xhr.response;
+        if (!payload) { fail('The import could not be completed.'); return; }
+        progressText.textContent = payload.ok ? 'Complete' : 'Finished with errors';
+        setTarget(100);
+        whenFull(() => setTimeout(() => render(payload), 450));
       });
       xhr.send(formData);
     });

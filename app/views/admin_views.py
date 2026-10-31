@@ -1,5 +1,7 @@
 from flask import Blueprint, jsonify, make_response, render_template, request, redirect, url_for, abort, flash, session
 import hashlib
+import secrets
+import string
 import hmac
 import sqlite3
 import csv
@@ -9,7 +11,7 @@ from app.models.patient_model import _compute_age
 from werkzeug.security import generate_password_hash
 
 from app.controllers import auth_controller, metrics_controller
-from app.constants import CSV_IMPORT_COLUMNS, ROLE_MAP, STATION_MAP
+from app.constants import BARANGAYS, CSV_IMPORT_COLUMNS, CSV_IMPORT_OPTIONAL_COLUMNS, ROLE_MAP, STATION_MAP
 from app.db import get_db
 from app.models import audit_model
 from app.models.model_performance_model import list_models, get_best_model
@@ -27,6 +29,74 @@ MAX_IMPORT_BYTES = 1_048_576
 MAX_IMPORT_ROWS = 500
 _ROLE_BY_LABEL = {label.casefold(): value for label, value in ROLE_MAP.items()}
 _STATION_BY_LABEL = {**{label.casefold(): value for label, value in STATION_MAP.items()}, "rhu i": "lhui", "rhu ii": "lhuii"}
+
+
+
+def _generate_temp_password(length=16):
+    """Random temporary password (OS CSPRNG). Always >= 12 characters, with upper,
+    lower, digit and symbol, so it passes validate_profile_fields' password rules."""
+    length = max(length, 12)
+    symbols = "!@#$%^&*-_"
+    pools = [string.ascii_uppercase, string.ascii_lowercase, string.digits, symbols]
+    pools = ["".join(c for c in p if c not in "O0Il1") for p in pools]  # no look-alikes
+    chars = [secrets.choice(p) for p in pools]
+    allchars = "".join(pools)
+    chars += [secrets.choice(allchars) for _ in range(length - len(chars))]
+    secrets.SystemRandom().shuffle(chars)
+    return "".join(chars)
+
+
+def _xlsx_cell(value):
+    """Excel cell -> the plain string a CSV would have held."""
+    import datetime as _dt
+    if value is None:
+        return ""
+    if isinstance(value, _dt.datetime):
+        return value.date().isoformat()
+    if isinstance(value, _dt.date):
+        return value.isoformat()
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    return str(value).strip()
+
+
+class _SheetRows:
+    """Iterates an .xlsx sheet like csv.reader: lists of strings plus .line_num
+    (the Excel row number), so the import loop treats both formats the same."""
+    MAX_BLANK_RUN = 100  # stop on a long run of empty rows (huge formatted-but-empty ranges)
+
+    def __init__(self, content):
+        import zipfile
+        from openpyxl import load_workbook
+        if not zipfile.is_zipfile(io.BytesIO(content)):
+            raise ValueError("not an xlsx file")
+        wb = load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+        ws = wb["Employees"] if "Employees" in wb.sheetnames else wb.worksheets[0]
+        self._rows = ws.iter_rows(values_only=True)
+        self._wb = wb
+        self.line_num = 0
+        self._blank_run = 0
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        while True:
+            try:
+                row = next(self._rows)
+            except StopIteration:
+                self._wb.close()
+                raise
+            self.line_num += 1
+            values = [_xlsx_cell(v) for v in row]
+            if any(values):
+                self._blank_run = 0
+                return values
+            self._blank_run += 1
+            if self._blank_run >= self.MAX_BLANK_RUN:
+                self._wb.close()
+                raise StopIteration
+            return values  # blank rows are skipped by the import loop
 
 def _csv_value(value): return (value or "").strip()
 def _normalize_csv_header(header): return "_".join((header or "").strip().lower().split())
@@ -523,11 +593,124 @@ def staff_import_template():
         "LHU Nurse",
         "LHU I",
         "Aplaya",
-        "NotARealPassword123",
     ])
     response = make_response(output.getvalue())
     response.headers["Content-Type"] = "text/csv; charset=utf-8"
     response.headers["Content-Disposition"] = "attachment; filename=employee_import_template.csv"
+    return response
+
+
+def _build_import_workbook():
+    """Excel version of the import template: dropdowns and format checks catch
+    typos while encoding; the encoder then saves the sheet as CSV UTF-8."""
+    from openpyxl import Workbook
+    from openpyxl.comments import Comment
+    from openpyxl.styles import Alignment, Font, PatternFill
+    from openpyxl.utils import get_column_letter
+    from openpyxl.worksheet.datavalidation import DataValidation
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Employees"
+    lists = wb.create_sheet("Lists")
+    for i, (_, label) in enumerate(BARANGAYS, start=1):
+        lists.cell(row=i, column=1, value=label)
+    lists.sheet_state = "hidden"
+
+    required = [c for c in CSV_IMPORT_COLUMNS if c != "middle_name"]
+    hints = {
+        "first_name": "Required. Letters, spaces, periods, hyphens.",
+        "middle_name": "Optional - may be left blank.",
+        "last_name": "Required. Letters, spaces, periods, hyphens.",
+        "birthday": "Required. Type as YYYY-MM-DD, e.g. 1990-01-31.",
+        "sex": "Required. Pick male or female from the dropdown.",
+        "email": "Required. Must be unique - no duplicates in the file or in the system.",
+        "phone": "Required. 10 digits starting with 9 (e.g. 9171234567). 09... or +63... also accepted.",
+        "role": "Required. Pick from the dropdown.",
+        "station": "Required. Pick from the dropdown.",
+        "barangay": "Required. Pick from the dropdown.",
+    }
+    head_fill = PatternFill("solid", fgColor="2D5A2D")
+    req_fill = PatternFill("solid", fgColor="B71C1C")
+    for col, name in enumerate(CSV_IMPORT_COLUMNS, start=1):
+        c = ws.cell(row=1, column=col, value=name)   # header text must stay exactly as-is
+        c.font = Font(bold=True, color="FFFFFF")
+        c.fill = req_fill if name in required else head_fill
+        c.alignment = Alignment(horizontal="center")
+        if name in hints:
+            c.comment = Comment(hints[name], "FBS")
+        ws.column_dimensions[get_column_letter(col)].width = 24 if name in ("email", "barangay") else 18
+    ws.freeze_panes = "A2"
+
+    last = MAX_IMPORT_ROWS + 1
+    for col in range(1, len(CSV_IMPORT_COLUMNS) + 1):      # text format: Excel must not reformat dates / drop the leading 0
+        for row in range(2, last + 1):
+            ws.cell(row=row, column=col).number_format = "@"
+
+    idx = {name: get_column_letter(i) for i, name in enumerate(CSV_IMPORT_COLUMNS, start=1)}
+
+    def add(dv, col):
+        dv.showErrorMessage = True
+        ws.add_data_validation(dv)
+        dv.add(f"{idx[col]}2:{idx[col]}{last}")
+
+    add(DataValidation(type="list", formula1='"male,female"', allow_blank=False,
+                       errorTitle="Invalid sex", error="Choose male or female."), "sex")
+    add(DataValidation(type="list", formula1='"' + ",".join(ROLE_MAP) + '"', allow_blank=False,
+                       errorTitle="Invalid role", error="Choose a role from the list."), "role")
+    add(DataValidation(type="list", formula1='"' + ",".join(STATION_MAP) + '"', allow_blank=False,
+                       errorTitle="Invalid station", error="Choose a station from the list."), "station")
+    add(DataValidation(type="list", formula1=f"=Lists!$A$1:$A${len(BARANGAYS)}", allow_blank=False,
+                       errorStyle="warning", errorTitle="Barangay not in list",
+                       error="This barangay is not in the Santa Rosa list. Keep it anyway?"), "barangay")
+    b, p, e = idx["birthday"], idx["phone"], idx["email"]
+    add(DataValidation(type="custom", allow_blank=False, errorTitle="Invalid birthday",
+                       error="Use YYYY-MM-DD, e.g. 1990-01-31.",
+                       formula1=f'=AND(LEN({b}2)=10,MID({b}2,5,1)="-",MID({b}2,8,1)="-",ISNUMBER(--LEFT({b}2,4)),ISNUMBER(--MID({b}2,6,2)),ISNUMBER(--RIGHT({b}2,2)))'), "birthday")
+    add(DataValidation(type="custom", allow_blank=False, errorTitle="Invalid phone",
+                       error="Use 10 digits starting with 9 (e.g. 9171234567).",
+                       formula1=f'=OR(AND(LEN({p}2)=10,LEFT({p}2,1)="9"),AND(LEN({p}2)=11,LEFT({p}2,2)="09"),AND(LEN({p}2)=13,LEFT({p}2,4)="+639"))'), "phone")
+    add(DataValidation(type="custom", allow_blank=False, errorTitle="Invalid email",
+                       error="Enter a valid email address, e.g. name@example.com.",
+                       formula1=f'=AND(ISNUMBER(FIND("@",{e}2)),ISNUMBER(FIND(".",{e}2,FIND("@",{e}2))),ISERROR(FIND(" ",{e}2)))'), "email")
+
+    guide = wb.create_sheet("Instructions", 1)  # Employees stays first so CSV export picks it
+    rows = [
+        ("HOW TO FILL OUT THIS TEMPLATE", ""),
+        ("1", "Stay on the 'Employees' sheet (first tab). Do not rename, move, or delete the header row."),
+        ("2", "Fill one employee per row. Red headers are required; green headers are optional."),
+        ("3", "Use the dropdowns for sex, role, station and barangay. Hover a header for hints."),
+        ("4", "Do not leave blank rows between employees. Maximum " + str(MAX_IMPORT_ROWS) + " rows."),
+        ("5", "Save as: File > Save As > 'CSV UTF-8 (Comma delimited) (*.csv)'. Excel saves only the active sheet, so stay on 'Employees'."),
+        ("6", "Upload the .csv on the Data Management page. Passwords are generated by the system after import."),
+        ("", ""),
+        ("EXAMPLE ROW", ""),
+        ("first_name", "Juan"), ("middle_name", "Santos"), ("last_name", "Dela Cruz"),
+        ("birthday", "1990-01-31"), ("sex", "male"), ("email", "juan.delacruz@example.com"),
+        ("phone", "9171234567"), ("role", "LHU Nurse"), ("station", "LHU I"), ("barangay", "Aplaya"),
+    ]
+    for r, (a, b_) in enumerate(rows, start=1):
+        guide.cell(row=r, column=1, value=a).font = Font(bold=True)
+        guide.cell(row=r, column=2, value=b_)
+    guide.column_dimensions["A"].width = 16
+    guide.column_dimensions["B"].width = 110
+    wb.active = wb.worksheets.index(ws)
+    for sheet in wb.worksheets:
+        sheet.sheet_view.tabSelected = sheet is ws
+    return wb
+
+
+@admin_bp.route("/data-management/import-template.xlsx")
+def staff_import_template_xlsx():
+    try:
+        wb = _build_import_workbook()
+    except ImportError:
+        abort(501, description="openpyxl is not installed (pip install openpyxl).")
+    buf = io.BytesIO()
+    wb.save(buf)
+    response = make_response(buf.getvalue())
+    response.headers["Content-Type"] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    response.headers["Content-Disposition"] = "attachment; filename=employee_import_template.xlsx"
     return response
 
 
@@ -546,18 +729,24 @@ def staff_import():
     uploaded = request.files.get("file")
     if uploaded is None or not uploaded.filename:
         return jsonify({"ok": False, "imported": 0, "errors": [{"row": 1, "message": "Please choose a CSV file."}]}), 400
-    if not uploaded.filename.lower().endswith(".csv"):
-        return jsonify({"ok": False, "imported": 0, "errors": [{"row": 1, "message": "Only .csv files are accepted."}]}), 400
+    is_xlsx = uploaded.filename.lower().endswith(".xlsx")
+    if not (is_xlsx or uploaded.filename.lower().endswith(".csv")):
+        return jsonify({"ok": False, "imported": 0, "errors": [{"row": 1, "message": "Only .xlsx or .csv files are accepted."}]}), 400
 
     content = uploaded.read(MAX_IMPORT_BYTES + 1)
     if len(content) > MAX_IMPORT_BYTES:
-        return jsonify({"ok": False, "imported": 0, "errors": [{"row": 1, "message": "The CSV file must be 1 MB or smaller."}]}), 400
+        return jsonify({"ok": False, "imported": 0, "errors": [{"row": 1, "message": "The file must be 1 MB or smaller."}]}), 400
     try:
-        text = content.decode("utf-8-sig")
-        reader = csv.reader(io.StringIO(text), strict=True)
+        if is_xlsx:
+            reader = _SheetRows(content)
+        else:
+            text = content.decode("utf-8-sig")
+            reader = csv.reader(io.StringIO(text), strict=True)
         headers = next(reader, None)
     except (UnicodeDecodeError, csv.Error, StopIteration):
         return jsonify({"ok": False, "imported": 0, "errors": [{"row": 1, "message": "The CSV file is not valid UTF-8 CSV."}]}), 400
+    except Exception:
+        return jsonify({"ok": False, "imported": 0, "errors": [{"row": 1, "message": "The Excel file could not be read. Use the downloaded template and keep the data on the 'Employees' sheet."}]}), 400
 
     if not headers:
         return jsonify({"ok": False, "imported": 0, "errors": [{"row": 1, "message": "The CSV file must include a header row."}]}), 400
@@ -571,6 +760,7 @@ def staff_import():
         }), 400
 
     rows = []
+    credentials = []
     errors = []
     seen_emails = set()
     try:
@@ -581,13 +771,16 @@ def staff_import():
             row = {
                 header: values[index] if index < len(values) else ""
                 for index, header in enumerate(normalized_headers)
-                if header in CSV_IMPORT_COLUMNS
+                if header in CSV_IMPORT_COLUMNS or header in CSV_IMPORT_OPTIONAL_COLUMNS
             }
             if len(rows) >= MAX_IMPORT_ROWS:
                 _import_error(errors, row_number, "The CSV file cannot contain more than 500 data rows.")
                 break
 
             form = _csv_row_form(row)
+            generated = not form["password"].strip()
+            if generated:
+                form["password"] = form["confirm_password"] = _generate_temp_password()
             email = form["email"].casefold()
             if email in seen_emails:
                 _import_error(errors, row_number, "email already exists in this file")
@@ -604,6 +797,12 @@ def staff_import():
                 cleaned["facility"] = form["facility"]
                 cleaned["password_hash"] = generate_password_hash(password)
                 rows.append(cleaned)
+                if generated:
+                    credentials.append({
+                        "name": " ".join(p for p in (cleaned.get("first_name"), cleaned.get("last_name")) if p),
+                        "email": cleaned["email"],
+                        "password": password,
+                    })
     except csv.Error:
         _import_error(errors, reader.line_num or 1, "The CSV file contains invalid CSV data.")
 
@@ -615,7 +814,10 @@ def staff_import():
     except sqlite3.IntegrityError:
         return jsonify({"ok": False, "imported": 0, "errors": [{"row": 2, "message": "email already exists"}]}), 400
     _audit_event(f"Bulk staff import: {len(rows)} employees", "Warning")
-    return jsonify({"ok": True, "imported": len(rows), "errors": []})
+    # Plaintext passwords leave the server only here, once, for the admin to hand out.
+    resp = jsonify({"ok": True, "imported": len(rows), "errors": [], "credentials": credentials})
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
 
 
 
@@ -626,6 +828,7 @@ def add_staff():
     from app.constants import ROLE_MAP, STATION_MAP
 
     if request.method == "POST":
+        temp_password = _generate_temp_password()
         role_label = request.form.get("role", "").strip()
         station_label = request.form.get("station", "").strip()
 
@@ -645,8 +848,8 @@ def add_staff():
             "city_name": request.form.get("city_name", ""),
             "region_code": request.form.get("region_code", ""),
             "region_name": request.form.get("region_name", ""),
-            "password": request.form.get("password", ""),
-            "confirm_password": request.form.get("confirm_password", ""),
+            "password": temp_password,
+            "confirm_password": temp_password,
         }
 
         # barangay resolution (code-first, PSGC-based) now happens inside
@@ -659,6 +862,21 @@ def add_staff():
             errors.append("Please select a valid role.")
         if station_label not in STATIONS:
             errors.append("Please select a valid station.")
+
+        # Server-side mirror of the red-asterisk fields in add_staff.html, so the
+        # browser's "required" check can't be bypassed.
+        required_fields = {
+            "first_name": "First name", "last_name": "Last name", "birthday": "Birthday",
+            "sex": "Sex", "email": "Email", "contact": "Contact number",
+            "region_code": "Region", "city_code": "City / Municipality",
+        }
+        missing = [label for key, label in required_fields.items()
+                   if not request.form.get(key, "").strip()]
+        if not (request.form.get("barangay_code", "").strip()
+                or request.form.get("barangay_name", "").strip()):
+            missing.append("Assigned barangay")
+        if missing:
+            errors.insert(0, "Please fill in all required fields: " + ", ".join(missing) + ".")
 
         form_data = {
             "first_name": request.form.get("first_name", "").strip(),
@@ -703,8 +921,17 @@ def add_staff():
             raise
 
         _audit_event(f"Employee account created: {cleaned['email']}", "Success")
-        flash("Employee account created successfully.", "success")
-        return redirect(url_for("admin.staff_detail", employee_id=f"EMP-{user_id:05d}"))
+        # Shown exactly once, straight from this response: the plaintext password is
+        # never stored (only its hash is) and never put in the session cookie.
+        resp = make_response(render_template(
+            "admin/staff_credentials.html",
+            full_name=" ".join(p for p in (cleaned.get("first_name"), cleaned.get("last_name")) if p),
+            email=cleaned["email"], temp_password=temp_password,
+            login_url=url_for("auth.login", _external=True),
+            employee_url=url_for("admin.staff_detail", employee_id=f"EMP-{user_id:05d}"),
+        ))
+        resp.headers["Cache-Control"] = "no-store"
+        return resp
 
     return render_template(
         "admin/add_staff.html",
