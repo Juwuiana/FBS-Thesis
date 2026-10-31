@@ -11,7 +11,8 @@ function initDonutChart() {
   const el = document.getElementById('donutChart');
   if (!el) return;
   const d = window.__dashboardData || {};
-  const riskData = d.riskData || [72.1, 17.0, 5.9];
+  const riskData = d.riskData || [0, 0, 0];
+  const riskCounts = d.riskCounts || [0, 0, 0];
   new Chart(el, {
     type: 'doughnut',
     data: {
@@ -26,7 +27,7 @@ function initDonutChart() {
       cutout: '65%',
       plugins: {
         legend: { display: false },
-        tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed}%` } }
+        tooltip: { callbacks: { label: ctx => ` ${ctx.label} – ${ctx.parsed}% (${riskCounts[ctx.dataIndex] || 0})` } }
       },
       responsive: true,
       maintainAspectRatio: true

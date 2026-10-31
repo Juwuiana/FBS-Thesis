@@ -147,29 +147,17 @@ def _resolve_barangay(patient_data):
 
 @nurse_bp.route('/nurse/dashboard')
 def nurse_dashboard():
-    summary = health_analytics_model.get_dashboard_summary()
-    risk_status = health_analytics_model.get_risk_status_distribution()
+    snapshot = health_analytics_model.get_current_risk_snapshot()
+    summary = {k: snapshot[k] for k in ("total_screened", "at_risk", "high_risk", "avg_fbs")}
     timeline = health_analytics_model.get_screening_volume_timeline(level="year")
     top_barangays = health_analytics_model.get_top_barangays()
     recent = health_analytics_model.get_recent_registries()
     summary_changes = health_analytics_model.get_dashboard_changes()
     actual_vs_predicted = health_analytics_model.get_actual_vs_predicted()
 
-    risk_counts = {
-        "Low": risk_status.get("Low", 0),
-        "Moderate": risk_status.get("Moderate", 0),
-        "High": risk_status.get("High", 0),
-    }
-    total = sum(risk_counts.values())
-
-    if total:
-        risk_data = [
-            round(risk_counts["Low"] / total * 100, 1),
-            round(risk_counts["Moderate"] / total * 100, 1),
-            round(risk_counts["High"] / total * 100, 1),
-        ]
-    else:
-        risk_data = [0, 0, 0]
+    risk_counts = snapshot["risk_counts"]
+    total = snapshot["risk_total"]
+    risk_data = [snapshot["risk_pct"][k] for k in ("Low", "Moderate", "High")]
 
     return render_template(
         'nurse/nurse_dashboard.html',
@@ -178,8 +166,9 @@ def nurse_dashboard():
         change_label='vs last week',
         actual_vs_predicted=actual_vs_predicted,
         risk_data=risk_data,
-        risk_counts=risk_counts,  
-        risk_total=total,          
+        risk_counts=risk_counts,
+        risk_total=total,
+        unclassified=snapshot["unclassified"],
         timeline=timeline,
         top_barangays=top_barangays,
         recent=recent,
@@ -883,10 +872,14 @@ def nurse_privacy_security():
     )
 
     filters_active = bool(severity or q or date_from or date_to)
+    recent_logins = audit_model.get_logs_for_user_page(
+        db, user_id, q="User login", limit=5, offset=0
+    )
     on_audit_tab = request.args.get('tab') == 'audit' or filters_active or 'page' in request.args
     return render_template(
         'nurse/nurse_privacy_security.html',
         audit_logs=logs,
+        recent_logins=recent_logins,
         audit_total=total,
         audit_page=page,
         audit_total_pages=total_pages,
@@ -942,6 +935,7 @@ def nurse_recycle_bin():
     return render_template(
         'nurse/nurse_recycle_bin.html',
         deleted_patients=deleted_patients,
+        deleted_count=len(deleted_patients),
         recycle_bin_days=settings_model.get_recycle_bin_days(),
         active_page='data_management',
     )
@@ -962,8 +956,34 @@ def nurse_patient_purge(patient_id):
     patient = patient_model.get_patient_by_code(patient_id)
     if patient is None:
         abort(404)
-    patient_model.purge_patient_permanently(patient["id"])
+    if not patient_model.purge_patient_permanently(patient["id"]):
+        flash("Only patients in the Recycle Bin can be permanently deleted.", "error")
+        return redirect(url_for('nurse.nurse_recycle_bin'))
     _audit_event(f"Patient permanently purged: {patient_id}", "Critical")
+    return redirect(url_for('nurse.nurse_recycle_bin'))
+
+
+@nurse_bp.route('/nurse/recycle_bin/restore_all', methods=['POST'])
+@rate_limit(max_calls=5, period_seconds=60)
+def nurse_recycle_bin_restore_all():
+    restored = patient_model.restore_all_deleted_patients()
+    if restored:
+        _audit_event(f"Recycle Bin: restored all {restored} patient record(s)", "Success")
+        flash(f"Restored {restored} patient record(s).", "success")
+    else:
+        flash("The Recycle Bin is already empty.", "info")
+    return redirect(url_for('nurse.nurse_recycle_bin'))
+
+
+@nurse_bp.route('/nurse/recycle_bin/purge_all', methods=['POST'])
+@rate_limit(max_calls=5, period_seconds=60)
+def nurse_recycle_bin_purge_all():
+    purged = patient_model.purge_all_deleted_patients()
+    if purged:
+        _audit_event(f"Recycle Bin: permanently purged all {purged} patient record(s)", "Critical")
+        flash(f"Permanently deleted {purged} patient record(s).", "success")
+    else:
+        flash("The Recycle Bin is already empty.", "info")
     return redirect(url_for('nurse.nurse_recycle_bin'))
 
 @nurse_bp.route('/nurse/data_management/recalculate_pending', methods=['POST'])

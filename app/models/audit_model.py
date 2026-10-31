@@ -141,6 +141,66 @@ def _user_log_where(user_id, severity=None, q=None, date_from=None, date_to=None
     return " AND ".join(where), params
 
 
+AUDIT_TYPES = ("login", "export", "edit", "delete", "import", "role", "report", "failed")
+AUDIT_ROLES = ("admin", "nurse", "unknown")
+AUDIT_SEVERITIES = ("info", "warning", "critical", "success")
+AUDIT_DATES = {"today": 0, "7d": 6, "30d": 29}   # days back from today (Manila)
+
+
+def _system_log_where(severity=None, q=None, type_=None, role=None, date=None):
+    """(WHERE clause, params) for the system-wide log. Unknown whitelist values are ignored;
+    all user input is bound as parameters."""
+    where, params = [], []
+    if q:
+        q = q.strip()[:_MAX_SEARCH_LEN]
+    if q:
+        escaped = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        where.append(
+            "(LOWER(COALESCE(user_name, '')) LIKE ? ESCAPE '\\' "
+            "OR LOWER(COALESCE(action, '')) LIKE ? ESCAPE '\\' "
+            "OR LOWER(COALESCE(ip_address, '')) LIKE ? ESCAPE '\\')"
+        )
+        params.extend([f"%{escaped.lower()}%"] * 3)
+    if type_ in AUDIT_TYPES:
+        where.append("LOWER(action) LIKE ?")
+        params.append(f"%{type_}%")
+    if role == "admin":
+        where.append("role = 'medical_officer'")
+    elif role == "nurse":
+        where.append("role = 'health_worker'")
+    elif role == "unknown":
+        where.append("(role IS NULL OR role NOT IN ('medical_officer', 'health_worker'))")
+    if severity and severity.lower() in AUDIT_SEVERITIES:
+        where.append("LOWER(severity) = ?")
+        params.append(severity.lower())
+    if date in AUDIT_DATES:
+        today = datetime.now(PH_TZ).date()
+        where.append("created_at >= ?")
+        params.append(_ph_midnight_as_utc(today - timedelta(days=AUDIT_DATES[date])))
+    return (" AND ".join(where) or "1=1"), params
+
+
+def count_logs(db, **filters):
+    where, params = _system_log_where(**filters)
+    return db.execute(f"SELECT COUNT(*) FROM audit_log WHERE {where}", params).fetchone()[0]
+
+
+def get_logs_page(db, *, limit, offset, **filters):
+    """One page of the system-wide log matching the filters, newest first."""
+    where, params = _system_log_where(**filters)
+    rows = db.execute(
+        f"""
+        SELECT id, user_id, user_name, role, action, ip_address, severity, created_at
+        FROM audit_log
+        WHERE {where}
+        ORDER BY created_at DESC, id DESC
+        LIMIT ? OFFSET ?
+        """,
+        (*params, int(limit), int(offset)),
+    ).fetchall()
+    return _format_logs(rows)
+
+
 def list_severities_for_user(db, user_id):
     """Severity values this account actually has, in a sensible order, for the filter dropdown."""
     rows = db.execute(

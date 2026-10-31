@@ -67,38 +67,7 @@
     <div class="settings-content-panel">
 
         <div class="settings-pane active" id="pane-password">
-            <div class="settings-section">
-                <div class="section-label">Change Password</div>
-                <form method="POST" action="{{ url_for('admin.change_password') }}">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <div class="settings-form-grid" style="max-width: 480px;">
-                        <div class="form-group" style="grid-column: 1 / -1;">
-                            <label class="form-label" for="adminPwCurrent">Current Password</label>
-                            <div class="pw-field-wrap">
-                                <input class="form-input" type="password" id="adminPwCurrent" name="current_password" placeholder="••••••••" autocomplete="current-password" required>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label" for="adminPwNew">New Password</label>
-                            <div class="pw-field-wrap">
-                                <input class="form-input" type="password" id="adminPwNew" name="new_password" placeholder="At least 12 characters" autocomplete="new-password" required>
-                            </div>
-                            <div class="pw-strength-bar" id="adminPwStrengthBar"><div class="pw-strength-fill" id="adminPwStrengthFill"></div></div>
-                            <span class="pw-strength-label" id="adminPwStrengthLabel"></span>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label" for="adminPwConfirm">Confirm New Password</label>
-                            <div class="pw-field-wrap">
-                                <input class="form-input" type="password" id="adminPwConfirm" name="confirm_password" placeholder="Re-enter new password" autocomplete="new-password" required>
-                            </div>
-                            <span class="form-hint" id="adminPwMatchHint"></span>
-                        </div>
-                    </div>
-                    <div class="form-actions">
-                        <button type="submit" class="btn-save">Update Password</button>
-                    </div>
-                </form>
-            </div>
+            {% with cp_action=url_for('admin.change_password'), cp_prefix='adminPw' %}{% include 'partials/_change_password_form.html' %}{% endwith %}
         </div>
 
         <div class="settings-pane" id="pane-data">
@@ -156,43 +125,48 @@
                 <div class="section-label">Access Roles &amp; Permissions</div>
                 <div class="table-responsive">
                     <table class="table table-borderless ps-roles-table mb-0">
+                        <colgroup>
+                            <col style="width:25%"><col style="width:25%"><col style="width:25%"><col style="width:25%">
+                        </colgroup>
                         <thead>
                             <tr>
-                                <th>Role</th>
-                                <th>Login Enabled</th>
-                                <th>Export</th>
-                                <th>Force Sign-Out</th>
+                                <th class="ps-col-role">Role</th>
+                                <th class="ps-col-ctl">Login Enabled</th>
+                                <th class="ps-col-ctl">Export</th>
+                                <th class="ps-col-ctl">Force Sign-Out</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for role in roles %}
                             <tr>
-                                <td style="font-weight:600;font-size:13px">{{ role.label }}</td>
-                                <td>
+                                <td class="ps-col-role ps-role-name">{{ role.label }}</td>
+                                <td class="ps-col-ctl">
                                     <form method="POST" action="{{ url_for('admin.role_login_toggle') }}">
                                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                         <input type="hidden" name="role" value="{{ role.key }}">
                                         <label class="toggle-switch">
                                             <input type="checkbox" name="enabled" value="1"
+                                                   aria-label="Login enabled for {{ role.label }}"
                                                    {% if role.login_enabled %}checked{% endif %}
                                                    onchange="this.form.submit()">
                                             <span class="toggle-slider"></span>
                                         </label>
                                     </form>
                                 </td>
-                                <td>
+                                <td class="ps-col-ctl">
                                     <form method="POST" action="{{ url_for('admin.role_export_toggle') }}">
                                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                         <input type="hidden" name="role" value="{{ role.key }}">
                                         <label class="toggle-switch">
                                             <input type="checkbox" name="enabled" value="1"
+                                                   aria-label="Export enabled for {{ role.label }}"
                                                    {% if role.export_enabled %}checked{% endif %}
                                                    onchange="this.form.submit()">
                                             <span class="toggle-slider"></span>
                                         </label>
                                     </form>
                                 </td>
-                                <td>
+                                <td class="ps-col-ctl">
                                     <form method="POST" action="{{ url_for('admin.role_force_signout') }}">
                                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                         <input type="hidden" name="role" value="{{ role.key }}">
@@ -412,6 +386,7 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="{{ url_for('static', filename='js/change_password.js') }}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     const tabs  = document.querySelectorAll('.settings-tab');

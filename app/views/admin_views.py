@@ -196,55 +196,29 @@ def _download_retention_archive(patient_model):
 def dashboard():
     conn = get_db()
 
-    # "Current" stats (Total Screened, At Risk, High Risk, Avg FBS, Risk
-    # Distribution) reflect each PATIENT's most recent screening only, so a
-    # patient tested 5 times counts once, using their latest result. This
-    # matches the nurse dashboard's patient-based count. The Barangay list,
-    # Timeline, and Recent Screenings table intentionally stay as full
-    # event logs -- they're about screening activity, not current status.
-    latest_rows = conn.execute(
-        """
-        WITH latest_ids AS (
-            SELECT ls.id AS screening_id,
-                   ROW_NUMBER() OVER (
-                       PARTITION BY v.patient_id
-                       ORDER BY ls.test_datetime DESC, ls.id DESC
-                   ) AS rn
-            FROM lab_screenings ls
-            JOIN visits v ON v.id = ls.visit_id
-        )
-        SELECT ls.fbs_mg_dl, COALESCE(ls.final_risk_level, ls.preliminary_risk_level) AS final_risk_level
-        FROM lab_screenings ls
-        JOIN latest_ids li ON li.screening_id = ls.id
-        WHERE li.rn = 1
-        """
-    ).fetchall()
-
-    total_screened = len(latest_rows)
-    at_risk_count = sum(1 for r in latest_rows if r["final_risk_level"] in ("Moderate", "High"))
-    high_risk_count = sum(1 for r in latest_rows if r["final_risk_level"] == "High")
-    at_risk_pct = round(100 * at_risk_count / total_screened, 1) if total_screened else 0
-    high_risk_pct = round(100 * high_risk_count / total_screened, 1) if total_screened else 0
-
-    fbs_values = [r["fbs_mg_dl"] for r in latest_rows if r["fbs_mg_dl"] is not None]
-    avg_fbs = round(sum(fbs_values) / len(fbs_values), 1) if fbs_values else 0
+    # All "current" numbers come from the same snapshot the nurse dashboard uses.
+    # Barangay list, Timeline and Recent Screenings stay event-based but skip
+    # Recycle Bin / anonymized patients.
+    from app.models import health_analytics_model
+    snap = health_analytics_model.get_current_risk_snapshot()
+    total_screened = snap["total_screened"]
 
     metrics = {
         "total_screened": total_screened,
-        "at_risk": at_risk_count, "at_risk_pct": at_risk_pct,
-        "high_risk": high_risk_count, "high_risk_pct": high_risk_pct,
-        "avg_fbs": avg_fbs,
+        "at_risk": snap["at_risk"],
+        "at_risk_pct": round(100 * snap["at_risk"] / total_screened, 1) if total_screened else 0,
+        "high_risk": snap["high_risk"],
+        "high_risk_pct": round(100 * snap["high_risk"] / total_screened, 1) if total_screened else 0,
+        "avg_fbs": snap["avg_fbs"],
         "model_accuracy": 59.7,  # RandomForest test accuracy (WIP)
     }
+    changes = health_analytics_model.get_dashboard_changes()
 
-    low_count = sum(1 for r in latest_rows if r["final_risk_level"] == "Low")
-    moderate_count = sum(1 for r in latest_rows if r["final_risk_level"] == "Moderate")
-    high_count = high_risk_count
     risk_distribution = {
-        "low":      {"count": low_count,      "pct": round(100*low_count/total_screened,1) if total_screened else 0},
-        "moderate": {"count": moderate_count, "pct": round(100*moderate_count/total_screened,1) if total_screened else 0},
-        "high":     {"count": high_count,     "pct": round(100*high_count/total_screened,1) if total_screened else 0},
+        key.lower(): {"count": snap["risk_counts"][key], "pct": snap["risk_pct"][key]}
+        for key in ("Low", "Moderate", "High")
     }
+    unclassified = snap["unclassified"]
 
     barangay_rows = conn.execute(
         """
@@ -253,6 +227,7 @@ def dashboard():
         JOIN visits v ON v.id = ls.visit_id
         JOIN patients p ON p.id = v.patient_id
         LEFT JOIN barangays b ON b.id = p.barangay_id
+        WHERE p.deleted_at IS NULL AND p.anonymized_at IS NULL
         GROUP BY b.name
         ORDER BY cnt DESC
         LIMIT 5
@@ -261,8 +236,10 @@ def dashboard():
     barangay_list = [{"name": row[0] or "Unknown", "count": row[1]} for row in barangay_rows]
 
     period_rows = conn.execute(
-        "SELECT test_datetime, COALESCE(final_risk_level, preliminary_risk_level) AS final_risk_level "
-        "FROM lab_screenings WHERE test_datetime IS NOT NULL"
+        "SELECT ls.test_datetime, COALESCE(ls.final_risk_level, ls.preliminary_risk_level) AS final_risk_level "
+        "FROM lab_screenings ls JOIN visits v ON v.id = ls.visit_id "
+        "JOIN patients p ON p.id = v.patient_id "
+        "WHERE ls.test_datetime IS NOT NULL AND p.deleted_at IS NULL AND p.anonymized_at IS NULL"
     ).fetchall()
 
     day_totals, day_at_risk = {}, {}
@@ -294,6 +271,7 @@ def dashboard():
         FROM lab_screenings ls
         JOIN visits v ON v.id = ls.visit_id
         JOIN patients p ON p.id = v.patient_id
+        WHERE p.deleted_at IS NULL AND p.anonymized_at IS NULL
         ORDER BY ls.test_datetime DESC
         LIMIT 10
         """
@@ -347,6 +325,8 @@ def dashboard():
     return render_template(
         "dashboard/index.html",
         metrics=metrics,
+        changes=changes,
+        unclassified=unclassified,
         risk_distribution=risk_distribution,
         barangay_list=barangay_list,
         recent_screenings=recent_screenings,
@@ -1335,22 +1315,49 @@ def green_pending():
     return render_template("metrics/pending_sync.html", **ctx)
 
 
+def _audit_filters():
+    """Validated audit-trail filters from the query string ('' = not set)."""
+    args = request.args
+    q = (args.get("q") or "").strip()[:100]
+    type_ = (args.get("type") or "").strip().lower()
+    role = (args.get("role") or "").strip().lower()
+    severity = (args.get("severity") or "").strip().lower()
+    date = (args.get("date") or "").strip()
+    return {
+        "q": q,
+        "type": type_ if type_ in audit_model.AUDIT_TYPES else "",
+        "role": role if role in audit_model.AUDIT_ROLES else "",
+        "severity": severity if severity in audit_model.AUDIT_SEVERITIES else "",
+        "date": date if date in audit_model.AUDIT_DATES else "",
+    }
+
+
+def _audit_query_kwargs(filters):
+    return {
+        "q": filters["q"], "type_": filters["type"], "role": filters["role"],
+        "severity": filters["severity"], "date": filters["date"],
+    }
+
+
 @admin_bp.route("/audit-trails")
 @login_required
 def audit_trails():
     db = get_db()
     page_size = 12
-    total_count = audit_model.get_logs_count(db)
+    filters = _audit_filters()
+    query = _audit_query_kwargs(filters)
+    total_count = audit_model.count_logs(db, **query)
     total_pages = max(1, (total_count + page_size - 1) // page_size)
     page = max(1, min(request.args.get("page", 1, type=int) or 1, total_pages))
-    logs = audit_model.get_recent_logs(
-        db, limit=page_size, offset=(page - 1) * page_size
+    logs = audit_model.get_logs_page(
+        db, limit=page_size, offset=(page - 1) * page_size, **query
     )
     audit_now = datetime.utcnow()
     audit_date = f"{audit_now.strftime('%B')} {audit_now.day}"
     return render_template(
         "dashboard/audit_trails.html", logs=logs, audit_date=audit_date,
         page=page, total_pages=total_pages, total_count=total_count,
+        filters=filters, filters_active=any(filters.values()),
     )
 
 
@@ -1359,7 +1366,14 @@ def audit_trails():
 def audit_trails_export():
     db = get_db()
     _audit_event("Exported CSV: audit trails", "Warning")
-    logs = audit_model.get_recent_logs(db, limit=audit_model.get_logs_count(db))
+    filters = _audit_filters()
+    if any(filters.values()):
+        query = _audit_query_kwargs(filters)
+        logs = audit_model.get_logs_page(
+            db, limit=audit_model.count_logs(db, **query), offset=0, **query
+        )
+    else:
+        logs = audit_model.get_recent_logs(db, limit=audit_model.get_logs_count(db))
 
     output = io.StringIO(newline="")
     writer = csv.writer(output, lineterminator="\r\n")

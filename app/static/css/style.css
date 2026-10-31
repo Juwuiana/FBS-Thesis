@@ -81,6 +81,8 @@ canvas { max-width: 100% !important; }
 .stat-change.up, .gc-stat-change.up-bad { color: #c62828; }
 .stat-change.down, .gc-stat-change.down, .gc-stat-change.positive { color: #2e7d32; }
 .stat-change.neutral, .gc-stat-change.neutral { color: var(--text-muted); }
+.stat-change.bad { color: #c62828; }
+.stat-change.good { color: #2e7d32; }
 
 .chart-card-title, .gc-card-title, .dm-card-title, .ps-card-title { font-weight: 700; color: var(--text-primary); }
 .chart-card-title { font-size: 13px; margin-bottom: 14px; }

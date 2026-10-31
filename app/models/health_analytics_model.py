@@ -223,54 +223,69 @@ def get_risk_by_age() -> dict:
 
 def get_dashboard_summary() -> dict:
     """Top stat cards: total screened, at-risk, high-risk, avg FBS."""
+    snap = get_current_risk_snapshot()
+    return {k: snap[k] for k in ("total_screened", "at_risk", "high_risk", "avg_fbs")}
+
+
+def get_current_risk_snapshot(cutoff_iso: str | None = None) -> dict:
+    """
+    The single definition behind every dashboard number (admin and nurse).
+
+    Population: patients not in the Recycle Bin and not anonymized.
+    Each patient counts once, with their latest screening that has an FBS value
+    (ORDER BY test_datetime DESC, id DESC). If `cutoff_iso` (YYYY-MM-DD) is
+    given, only screenings on or before that day are considered.
+    Risk = final -> preliminary -> model-predicted; only Low/Moderate/High are
+    classified, anything else is counted in `unclassified`.
+    """
+    cutoff_sql, params = "", []
+    if cutoff_iso:
+        cutoff_sql = "AND DATE(ls.test_datetime) <= DATE(?)"
+        params.append(cutoff_iso)
     conn = get_connection()
-    row = conn.execute(f"""
-        SELECT
-            COUNT(*) AS total_screened,
-            SUM(CASE WHEN COALESCE(ls.final_risk_level, ls.preliminary_risk_level, ls.model_predicted_risk_level) IN ('Moderate','High') THEN 1 ELSE 0 END) AS at_risk,
-            SUM(CASE WHEN COALESCE(ls.final_risk_level, ls.preliminary_risk_level, ls.model_predicted_risk_level) = 'High' THEN 1 ELSE 0 END) AS high_risk,
-            AVG(ls.fbs_mg_dl) AS avg_fbs
-        {_base_query()} AND ls.fbs_mg_dl IS NOT NULL
-    """).fetchone()
-    conn.close()
+    try:
+        rows = conn.execute(f"""
+            SELECT risk, fbs FROM (
+                SELECT {_RISK} AS risk, ls.fbs_mg_dl AS fbs,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY v.patient_id
+                           ORDER BY ls.test_datetime DESC, ls.id DESC
+                       ) AS rn
+                FROM lab_screenings ls
+                JOIN visits v ON v.id = ls.visit_id
+                JOIN patients p ON p.id = v.patient_id
+                WHERE p.deleted_at IS NULL AND p.anonymized_at IS NULL
+                  AND ls.fbs_mg_dl IS NOT NULL {cutoff_sql}
+            ) WHERE rn = 1
+        """, params).fetchall()
+    finally:
+        conn.close()
+
+    counts = {"Low": 0, "Moderate": 0, "High": 0}
+    fbs_sum = 0.0
+    for r in rows:
+        fbs_sum += r["fbs"]
+        if r["risk"] in counts:
+            counts[r["risk"]] += 1
+    total = len(rows)
+    risk_total = sum(counts.values())
+    pct = {k: (round(v * 100 / risk_total, 1) if risk_total else 0.0) for k, v in counts.items()}
     return {
-        "total_screened": row["total_screened"] or 0,
-        "at_risk": row["at_risk"] or 0,
-        "high_risk": row["high_risk"] or 0,
-        "avg_fbs": round(row["avg_fbs"], 1) if row["avg_fbs"] else 0,
+        "total_screened": total,
+        "at_risk": counts["Moderate"] + counts["High"],
+        "high_risk": counts["High"],
+        "avg_fbs": round(fbs_sum / total, 1) if total else 0,
+        "risk_counts": counts,
+        "risk_total": risk_total,
+        "risk_pct": pct,
+        "unclassified": total - risk_total,
     }
 
 
 def _summary_as_of(cutoff_iso: str) -> dict:
-    """
-    Same numbers as get_dashboard_summary(), but each patient's state as it
-    stood on `cutoff_iso` (YYYY-MM-DD): their latest visit whose lab test
-    happened on or before that day. Used to compare "now" against a past date.
-    """
-    conn = get_connection()
-    row = conn.execute(f"""
-        SELECT
-            COUNT(*) AS total_screened,
-            SUM(CASE WHEN {_RISK} IN ('Moderate','High') THEN 1 ELSE 0 END) AS at_risk,
-            SUM(CASE WHEN {_RISK} = 'High' THEN 1 ELSE 0 END) AS high_risk,
-            AVG(ls.fbs_mg_dl) AS avg_fbs
-        FROM patients p
-        LEFT JOIN visits v ON v.id = (
-            SELECT v2.id FROM visits v2
-            JOIN lab_screenings l2 ON l2.visit_id = v2.id
-            WHERE v2.patient_id = p.id AND DATE(l2.test_datetime) <= DATE(?)
-            ORDER BY v2.id DESC LIMIT 1
-        )
-        LEFT JOIN lab_screenings ls ON ls.visit_id = v.id
-        WHERE p.deleted_at IS NULL AND ls.fbs_mg_dl IS NOT NULL
-    """, (cutoff_iso,)).fetchone()
-    conn.close()
-    return {
-        "total_screened": row["total_screened"] or 0,
-        "at_risk": row["at_risk"] or 0,
-        "high_risk": row["high_risk"] or 0,
-        "avg_fbs": round(row["avg_fbs"], 1) if row["avg_fbs"] else 0,
-    }
+    """Same definition as get_current_risk_snapshot(), as of `cutoff_iso`."""
+    snap = get_current_risk_snapshot(cutoff_iso)
+    return {k: snap[k] for k in ("total_screened", "at_risk", "high_risk", "avg_fbs")}
 
 
 def get_dashboard_changes(days: int = 7) -> dict:

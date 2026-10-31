@@ -111,6 +111,7 @@
             <p class="card-note">
                 Based on {{ risk_total }} completed screening{{ 's' if risk_total != 1 else '' }}
                 (Low: {{ risk_counts.Low }}, Moderate: {{ risk_counts.Moderate }}, High: {{ risk_counts.High }})
+                {% if unclassified %}<br>{{ unclassified }} screening{{ 's' if unclassified != 1 else '' }} without a risk level not shown.{% endif %}
             </p>
         </div>
     </div>
@@ -214,6 +215,7 @@
 <script>
     window.__dashboardData = {
         riskData: {{ risk_data | tojson }},
+        riskCounts: {{ [risk_counts.Low, risk_counts.Moderate, risk_counts.High] | tojson }},
         timeline: {{ timeline | tojson }},
         topBarangays: {{ top_barangays | tojson }},
         patientFileUrlTemplate: {{ url_for('nurse.nurse_patient_file_view', patient_id='__PATIENT_ID__') | tojson }},

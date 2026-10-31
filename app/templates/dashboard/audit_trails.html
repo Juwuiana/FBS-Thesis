@@ -20,61 +20,54 @@
   <div class="audit-card">
 
     <!-- Filter Row -->
-    <div class="row g-2 mb-3">
+    <form method="get" action="{{ url_for('admin.audit_trails') }}" id="auditFilterForm" class="row g-2 mb-3">
       <div class="col-12 col-md-4">
         <input type="text" class="audit-search" placeholder="Search events, users, or IP…"
-               id="auditSearch" oninput="filterAudit()" />
+               id="auditSearch" name="q" maxlength="100" value="{{ filters.q }}" autocomplete="off" />
       </div>
       <div class="col-6 col-md">
-        <select class="audit-filter-select" id="filterType" onchange="filterAudit()">
+        <select class="audit-filter-select" id="filterType" name="type">
           <option value="">All Types</option>
-          <option value="login">Login</option>
-          <option value="export">Export</option>
-          <option value="edit">Edit</option>
-          <option value="delete">Delete</option>
-          <option value="import">Import</option>
-          <option value="role">Role Change</option>
-          <option value="report">Report</option>
-          <option value="failed">Failed</option>
+          {% for v, label in [('login','Login'),('export','Export'),('edit','Edit'),('delete','Delete'),('import','Import'),('role','Role Change'),('report','Report'),('failed','Failed')] %}
+          <option value="{{ v }}" {{ 'selected' if filters.type == v }}>{{ label }}</option>
+          {% endfor %}
         </select>
       </div>
       <div class="col-6 col-md">
-        <select class="audit-filter-select" id="filterRole" onchange="filterAudit()">
+        <select class="audit-filter-select" id="filterRole" name="role">
           <option value="">All Users</option>
-          <option value="admin">Admin</option>
-          <option value="nurse">Nurse</option>
-          <option value="unknown">Unknown</option>
+          {% for v, label in [('admin','Admin'),('nurse','Nurse'),('unknown','Unknown')] %}
+          <option value="{{ v }}" {{ 'selected' if filters.role == v }}>{{ label }}</option>
+          {% endfor %}
         </select>
       </div>
       <div class="col-6 col-md">
-        <select class="audit-filter-select" id="filterDate" onchange="filterAudit()">
-          <option>Today</option>
-          <option>Last 7 Days</option>
-          <option>Last 30 Days</option>
+        <select class="audit-filter-select" id="filterDate" name="date">
+          <option value="">All Time</option>
+          {% for v, label in [('today','Today'),('7d','Last 7 Days'),('30d','Last 30 Days')] %}
+          <option value="{{ v }}" {{ 'selected' if filters.date == v }}>{{ label }}</option>
+          {% endfor %}
         </select>
       </div>
       <div class="col-6 col-md">
-        <select class="audit-filter-select" id="filterSeverity" onchange="filterAudit()">
+        <select class="audit-filter-select" id="filterSeverity" name="severity">
           <option value="">All Levels</option>
-          <option value="info">Info</option>
-          <option value="warning">Warning</option>
-          <option value="critical">Critical</option>
-          <option value="success">Success</option>
+          {% for v, label in [('info','Info'),('warning','Warning'),('critical','Critical'),('success','Success')] %}
+          <option value="{{ v }}" {{ 'selected' if filters.severity == v }}>{{ label }}</option>
+          {% endfor %}
         </select>
       </div>
       <div class="col-auto">
-        <button class="reset-btn" title="Reset filters" onclick="resetFilters()">
-          <i class="bi bi-arrow-counterclockwise"></i>
-        </button>
+        <a class="reset-btn" title="Reset filters" href="{{ url_for('admin.audit_trails') }}"><i class="bi bi-arrow-counterclockwise"></i></a>
       </div>
-    </div>
+    </form>
 
     <!-- Log header + export -->
     <div class="audit-log-header">
       <div>
         <div class="audit-log-title">Full Audit Log</div>
         <div class="audit-log-subtitle" id="auditCount">
-          Showing {{ logs | length }} events — {{ audit_date }}
+          {{ total_count }} event{{ '' if total_count == 1 else 's' }}{{ ' (filtered)' if filters_active }} — {{ audit_date }}
         </div>
       </div>
       <div class="d-flex gap-2 flex-wrap">
@@ -85,6 +78,9 @@
 
     <!-- Table -->
     <div class="audit-table-wrap">
+      {% if not logs %}
+      <p class="text-center text-muted py-4 mb-0">No events match these filters.</p>
+      {% else %}
       <table class="table table-borderless audit-table mb-0">
         <thead>
           <tr>
@@ -101,14 +97,11 @@
           <tr
             data-event-id="{{ log.id }}"
             data-timestamp="{{ log.timestamp }}"
-            data-timestamp-iso="{{ log.timestamp_iso }}"
             data-user-id="{{ log.user_id if log.user_id is not none else '' }}"
             data-user="{{ log.user }}"
             data-ip="{{ log.ip }}"
-            data-action="{{ log.action | lower }}"
             data-role="{{ log.role | lower }}"
             data-severity="{{ log.severity | lower }}"
-            data-search="{{ (log.user ~ ' ' ~ log.action ~ ' ' ~ log.ip) | lower }}"
           >
             <td style="white-space:nowrap">
               <div class="audit-time">{{ log.time }}</div>
@@ -148,30 +141,42 @@
           {% endfor %}
         </tbody>
       </table>
+      {% endif %}
     </div>
 
     <!-- Pagination -->
+    {% set qp = {} %}
+    {% for k, v in filters.items() %}{% if v %}{% set _ = qp.update({k: v}) %}{% endif %}{% endfor %}
     <div class="audit-pagination mt-3">
       <div class="audit-pagination-info">
-        {% set start = ((page - 1) * 12 + 1) if total_count else 0 %}
+        {% if total_count %}
+        {% set start = (page - 1) * 12 + 1 %}
         {% set end = [page * 12, total_count] | min %}
-        Showing {{ start }}–{{ end }} of {{ total_count }} events
+        Showing {{ start }}–{{ end }} of {{ total_count }} events{{ ' (filtered)' if filters_active }}
+        {% else %}
+        No events match these filters.
+        {% endif %}
       </div>
       <div class="page-btns">
         {% if page > 1 %}
-          <a class="page-btn page-btn-arrow" href="{{ url_for('admin.audit_trails', page=page - 1) }}" aria-label="Previous page">‹</a>
+          <a class="page-btn page-btn-arrow" href="{{ url_for('admin.audit_trails', **dict(qp, page=page - 1)) }}" aria-label="Previous page">‹</a>
         {% else %}
           <span class="page-btn page-btn-arrow disabled" aria-disabled="true">‹</span>
         {% endif %}
+        {% set ns = namespace(last=0) %}
         {% for page_number in range(1, total_pages + 1) %}
-          {% if page_number == page %}
-            <span class="page-btn active">{{ page_number }}</span>
-          {% else %}
-            <a class="page-btn" href="{{ url_for('admin.audit_trails', page=page_number) }}">{{ page_number }}</a>
+          {% if total_pages < 20 or page_number == 1 or page_number == total_pages or (page_number - page) | abs <= 2 %}
+            {% if ns.last and page_number - ns.last > 1 %}<span class="page-btn disabled">…</span>{% endif %}
+            {% set ns.last = page_number %}
+            {% if page_number == page %}
+              <span class="page-btn active">{{ page_number }}</span>
+            {% else %}
+              <a class="page-btn" href="{{ url_for('admin.audit_trails', **dict(qp, page=page_number)) }}">{{ page_number }}</a>
+            {% endif %}
           {% endif %}
         {% endfor %}
         {% if page < total_pages %}
-          <a class="page-btn page-btn-arrow" href="{{ url_for('admin.audit_trails', page=page + 1) }}" aria-label="Next page">›</a>
+          <a class="page-btn page-btn-arrow" href="{{ url_for('admin.audit_trails', **dict(qp, page=page + 1)) }}" aria-label="Next page">›</a>
         {% else %}
           <span class="page-btn page-btn-arrow disabled" aria-disabled="true">›</span>
         {% endif %}
@@ -205,46 +210,29 @@
 
 {% block scripts %}
 <script>
-  function filterAudit() {
-    const q    = document.getElementById('auditSearch').value.toLowerCase();
-    const type = document.getElementById('filterType').value.toLowerCase();
-    const role = document.getElementById('filterRole').value.toLowerCase();
-    const date = document.getElementById('filterDate').value;
-    const sev  = document.getElementById('filterSeverity').value.toLowerCase();
-    const rows = document.querySelectorAll('#auditTableBody tr');
-    let visible = 0;
-
-    rows.forEach(row => {
-      const matchSearch = !q    || row.dataset.search.includes(q);
-      const matchType   = !type || row.dataset.action.includes(type);
-      const matchRole   = !role || row.dataset.role.includes(role);
-      const eventDate = new Date(row.dataset.timestampIso.replace(' ', 'T') + 'Z');
-      const ageDays = (Date.now() - eventDate.getTime()) / 86400000;
-      const matchDate = !date || (date === 'Today' && ageDays < 1) ||
-        (date === 'Last 7 Days' && ageDays < 7) ||
-        (date === 'Last 30 Days' && ageDays < 30);
-      const matchSev    = !sev  || row.dataset.severity.includes(sev);
-      const show = matchSearch && matchType && matchRole && matchDate && matchSev;
-      row.style.display = show ? '' : 'none';
-      if (show) visible++;
-    });
-
-    document.getElementById('auditCount').textContent =
-      `Showing ${visible} events — {{ audit_date }}`;
-  }
-
-  function resetFilters() {
-    ['auditSearch', 'filterType', 'filterRole', 'filterDate', 'filterSeverity']
-      .forEach(id => {
-        const el = document.getElementById(id);
-        if (el.tagName === 'INPUT') el.value = '';
-        else el.selectedIndex = 0;
-      });
-    filterAudit();
-  }
+  (function () {
+    const form = document.getElementById('auditFilterForm');
+    const search = document.getElementById('auditSearch');
+    let timer;
+    function submitForm() {
+      clearTimeout(timer);
+      if (document.activeElement === search) sessionStorage.setItem('auditSearchFocus', '1');
+      form.submit();
+    }
+    search.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(submitForm, 400); });
+    form.querySelectorAll('select').forEach(el => el.addEventListener('change', submitForm));
+    if (sessionStorage.getItem('auditSearchFocus')) {
+      sessionStorage.removeItem('auditSearchFocus');
+      search.focus();
+      search.setSelectionRange(search.value.length, search.value.length);
+    }
+  })();
 
   function exportAudit() {
-    window.location.href = '{{ url_for("admin.audit_trails_export") }}';
+    const params = new URLSearchParams(window.location.search);
+    params.delete('page');
+    const qs = params.toString();
+    window.location.href = '{{ url_for("admin.audit_trails_export") }}' + (qs ? '?' + qs : '');
   }
 
   function showAuditDetails(button) {

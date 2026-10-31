@@ -121,14 +121,24 @@ document.addEventListener('DOMContentLoaded', async function () {
 
         const ctxDonut = document.getElementById('riskDonutChart');
         if (ctxDonut) {
+            const donutColors = ['#4caf50', '#ff9800', '#f44336'];
+            const riskCounts = (window.__dashboardData && window.__dashboardData.riskCounts) || [0, 0, 0];
+            const donutLabels = ['Low Risk', 'Moderate Risk', 'High Risk'];
             new Chart(ctxDonut, {
                 type: 'doughnut',
                 data: {
-                    labels: ['Low Risk', 'Moderate Risk', 'High Risk'],
-                    datasets: [{ data: riskData, backgroundColor: [green, yellow, red], borderWidth: 2, borderColor: '#ffffff' }]
+                    labels: donutLabels,
+                    datasets: [{ data: riskData, backgroundColor: donutColors, borderWidth: 2, borderColor: '#ffffff', hoverOffset: 4 }]
                 },
-                options: { responsive: true, maintainAspectRatio: false, cutout: '70%',
-                    plugins: { legend: { position: 'right', labels: { usePointStyle: true, boxWidth: 8, font: { size: 11 } } } } }
+                options: { responsive: true, maintainAspectRatio: false, cutout: '65%',
+                    plugins: {
+                        legend: { position: 'right', labels: { usePointStyle: true, boxWidth: 8, font: { size: 11 },
+                            generateLabels: () => donutLabels.map((l, i) => ({
+                                text: `${l} – ${riskData[i]}% (${riskCounts[i] || 0})`,
+                                fillStyle: donutColors[i], strokeStyle: donutColors[i], pointStyle: 'circle', index: i
+                            })) } },
+                        tooltip: { callbacks: { label: ctx => ` ${ctx.label} – ${ctx.parsed}% (${riskCounts[ctx.dataIndex] || 0})` } }
+                    } }
             });
         }
 

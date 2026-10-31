@@ -39,6 +39,18 @@ body { display: flex; min-height: 100vh; background: var(--bg); color: var(--t1)
 .app-flash { pointer-events: auto; padding: 0.7rem 1rem; margin-bottom: 0.5rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; box-shadow: 0 3px 12px rgba(0,0,0,.12); }
 .app-flash-success { background: var(--g-light); color: var(--g-dark); border: 1px solid var(--g-accent); }
 .app-flash-error { background: var(--danger-bg); color: var(--danger); border: 1px solid var(--danger); }
+.app-flash-info { background: var(--white); color: var(--t2); border: 1px solid var(--border); }
+
+/* Recycle Bin header actions */
+.rb-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; justify-content: flex-end; }
+.rb-actions form { margin: 0; }
+.rb-actions .btn { display: inline-flex; align-items: center; gap: 0.4rem; }
+.rb-restore-all { color: var(--g-accent); border-color: var(--g-accent); }
+.rb-restore-all:hover:not(:disabled) { background: var(--g-accent); color: var(--white); }
+.rb-delete-all { color: #b91c1c; border-color: #fca5a5; }
+.rb-delete-all:hover:not(:disabled) { background: #b91c1c; color: var(--white); border-color: #b91c1c; }
+.rb-actions .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+@media (max-width: 767.98px) { .rb-actions { justify-content: flex-start; } }
 
 
 .main-wrapper  { flex: 1; margin-left: var(--sidebar-w); padding: 2rem 2.5rem; min-width: 0; }

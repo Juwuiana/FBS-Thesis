@@ -31,86 +31,24 @@
 
         <div class="settings-pane {{ 'active' if active_tab != 'audit' }}" id="pane-security">
 
-            <div class="settings-section">
-                <div class="section-label">Change Password</div>
-                <form method="POST" action="{{ url_for('nurse.nurse_change_password') }}">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <div class="settings-form-grid" style="max-width: 480px;">
-                    <div class="form-group" style="grid-column: 1 / -1;">
-                        <label class="form-label">Current Password</label>
-                        <div class="pw-field-wrap">
-                            <input class="form-input" type="password" id="pwCurrent" name="current_password" placeholder="••••••••" autocomplete="current-password">
-                            <button type="button" class="pw-toggle" data-pw-toggle="pwCurrent" aria-label="Show password" aria-pressed="false" title="Show password">
-                                <svg class="pw-eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                    <g class="eye-open"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></g>
-                                    <g class="eye-off" style="display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 19c-7 0-11-7-11-7a18.5 18.5 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 5c7 0 11 7 11 7a18.5 18.5 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/></g>
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">New Password</label>
-                        <div class="pw-field-wrap">
-                            <input class="form-input" type="password" id="pwNew" name="new_password" placeholder="At least 12 characters" autocomplete="new-password">
-                            <button type="button" class="pw-toggle" data-pw-toggle="pwNew" aria-label="Show password" aria-pressed="false" title="Show password">
-                                <svg class="pw-eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                    <g class="eye-open"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></g>
-                                    <g class="eye-off" style="display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 19c-7 0-11-7-11-7a18.5 18.5 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 5c7 0 11 7 11 7a18.5 18.5 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/></g>
-                                </svg>
-                            </button>
-                        </div>
-                        <div class="pw-strength-bar" id="pwStrengthBar">
-                            <div class="pw-strength-fill" id="pwStrengthFill"></div>
-                        </div>
-                        <span class="pw-strength-label" id="pwStrengthLabel"></span>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Confirm New Password</label>
-                        <div class="pw-field-wrap">
-                            <input class="form-input" type="password" id="pwConfirm" name="confirm_password" placeholder="Re-enter new password" autocomplete="new-password">
-                            <button type="button" class="pw-toggle" data-pw-toggle="pwConfirm" aria-label="Show password" aria-pressed="false" title="Show password">
-                                <svg class="pw-eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                    <g class="eye-open"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></g>
-                                    <g class="eye-off" style="display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 19c-7 0-11-7-11-7a18.5 18.5 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 5c7 0 11 7 11 7a18.5 18.5 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/></g>
-                                </svg>
-                            </button>
-                        </div>
-                        <span class="form-hint" id="pwMatchHint"></span>
-                    </div>
-                    </div>
-                    <div class="form-actions">
-                        <button type="submit" class="btn-save">Update Password</button>
-                    </div>
-                </form>
-            </div>
+            {% with cp_action=url_for('nurse.nurse_change_password'), cp_prefix='pw' %}{% include 'partials/_change_password_form.html' %}{% endwith %}
 
             <div class="settings-section">
                 <div class="section-label">Recent Login Activity</div>
-                <p class="form-hint" style="margin-bottom: 0.875rem;">
-                    Successful login history and connection verifications on this terminal.
-                </p>
+                <p class="form-hint cp-activity-hint">Your most recent successful sign-ins.</p>
                 <div class="login-activity-list">
-                    <div class="la-item la-current">
+                    {% for item in recent_logins %}
+                    <div class="la-item {{ 'la-current' if loop.first }}">
                         <div class="la-info">
-                            <div class="la-device">Session login verified — <span class="la-badge-current">Current Session</span></div>
-                            <div class="la-meta">Jun 10, 08:12 AM</div>
+                            <div class="la-device">Signed in{% if loop.first %} — <span class="la-badge-current">Latest</span>{% endif %}</div>
+                            <div class="la-meta">{{ item.timestamp }} · IP {{ item.ip }}</div>
                         </div>
                     </div>
-                    <div class="la-item">
-                        <div class="la-info">
-                            <div class="la-device">Session login verified</div>
-                            <div class="la-meta">Jun 9, 07:54 AM</div>
-                        </div>
-                    </div>
-                    <div class="la-item">
-                        <div class="la-info">
-                            <div class="la-device">Session login verified</div>
-                            <div class="la-meta">Jun 8, 08:02 AM</div>
-                        </div>
-                    </div>
+                    {% else %}
+                    <p class="form-hint">No sign-ins recorded yet.</p>
+                    {% endfor %}
                 </div>
             </div>
-
         </div>
 
         <!-- ══ TAB: AUDIT TRAIL ══ -->
@@ -248,6 +186,7 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="{{ url_for('static', filename='js/change_password.js') }}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     const tabs  = document.querySelectorAll('.settings-tab');
@@ -258,22 +197,6 @@ document.addEventListener('DOMContentLoaded', () => {
             panes.forEach(p => p.classList.remove('active'));
             tab.classList.add('active');
             document.getElementById('pane-' + tab.dataset.tab).classList.add('active');
-        });
-    });
-
-    // Show / hide password: one eye button per field, each controls only its own input.
-    document.querySelectorAll('[data-pw-toggle]').forEach(btn => {
-        const input = document.getElementById(btn.dataset.pwToggle);
-        if (!input) return;
-        btn.addEventListener('click', () => {
-            const show = input.type === 'password';
-            input.type = show ? 'text' : 'password';
-            btn.setAttribute('aria-pressed', show ? 'true' : 'false');
-            const label = show ? 'Hide password' : 'Show password';
-            btn.setAttribute('aria-label', label);
-            btn.title = label;
-            btn.querySelector('.eye-open').style.display = show ? 'none' : '';
-            btn.querySelector('.eye-off').style.display = show ? '' : 'none';
         });
     });
 

@@ -464,11 +464,53 @@ def restore_patient(patient_id: int) -> None:
     conn.close()
 
 
-def purge_patient_permanently(patient_id: int) -> None:
+def purge_patient_permanently(patient_id: int) -> int:
+    """Hard-delete one patient, only if they are in the Recycle Bin. Returns rows deleted."""
     conn = get_connection()
-    conn.execute("DELETE FROM patients WHERE id = ?", (patient_id,))
-    conn.commit()
-    conn.close()
+    try:
+        cur = conn.execute(
+            "DELETE FROM patients WHERE id = ? AND deleted_at IS NOT NULL", (patient_id,)
+        )
+        conn.commit()
+        return cur.rowcount
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def restore_all_deleted_patients() -> int:
+    """Restore every Recycle Bin record (same filter as list_deleted_patients)."""
+    conn = get_connection()
+    try:
+        cur = conn.execute(
+            "UPDATE patients SET deleted_at = NULL "
+            "WHERE deleted_at IS NOT NULL AND anonymized_at IS NULL"
+        )
+        conn.commit()
+        return cur.rowcount
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def purge_all_deleted_patients() -> int:
+    """Permanently delete every Recycle Bin record (same filter as list_deleted_patients)."""
+    conn = get_connection()
+    try:
+        cur = conn.execute(
+            "DELETE FROM patients WHERE deleted_at IS NOT NULL AND anonymized_at IS NULL"
+        )
+        conn.commit()
+        return cur.rowcount
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 def purge_expired_deleted_patients() -> int:

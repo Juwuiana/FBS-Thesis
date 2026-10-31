@@ -5,6 +5,16 @@
 {% block page_title %}Dashboard{% endblock %}
 
 {% block content %}
+{# Week-over-week change under a stat; hidden when there is no baseline. #}
+{% macro chg(c, up_is_bad) -%}
+{% if c %}
+  {% set tone = 'neutral' if c.dir == 'flat' else ('bad' if (c.dir == 'up') == up_is_bad else 'good') %}
+  <div class="stat-change {{ tone }}">
+    {% if c.dir == 'up' %}<i class="bi bi-arrow-up-short"></i>{% elif c.dir == 'down' %}<i class="bi bi-arrow-down-short"></i>{% else %}<i class="bi bi-dash"></i>{% endif %}
+    {{ c.diff if c.dir != 'flat' else '' }} vs last week
+  </div>
+{% endif %}
+{%- endmacro %}
 <main class="page-content">
 
   <!-- ── ROW 1: STAT CARDS ── -->
@@ -12,43 +22,35 @@
     <div class="col-6 col-md col-lg">
       <div class="stat-card">
         <div class="stat-label">Total Screened</div>
-        <div class="stat-value">{{ metrics.total_screened | default('1,392') }}</div>
-        <div class="stat-change up">
-          <i class="bi bi-arrow-up-short"></i>{{ metrics.total_screened_change | default('+1.2% vs last week') }}
-        </div>
+        <div class="stat-value">{{ metrics.total_screened }}</div>
+        {{ chg(changes.get('total_screened'), false) }}
       </div>
     </div>
     <div class="col-6 col-md col-lg">
       <div class="stat-card">
-        <div class="stat-label">At Risk (Predicted)</div>
+        <div class="stat-label">At Risk (Moderate + High)</div>
         <div class="stat-value">
-          {{ metrics.at_risk | default(276) }}
-          <span style="font-size:14px;font-weight:500;color:var(--text-muted)">({{ metrics.at_risk_pct | default(19.8) }}%)</span>
+          {{ metrics.at_risk }}
+          <span style="font-size:14px;font-weight:500;color:var(--text-muted)">({{ metrics.at_risk_pct }}%)</span>
         </div>
-        <div class="stat-change up">
-          <i class="bi bi-arrow-up-short"></i>{{ metrics.at_risk_change | default('+8% vs last week') }}
-        </div>
+        {{ chg(changes.get('at_risk'), true) }}
       </div>
     </div>
     <div class="col-6 col-md col-lg">
       <div class="stat-card">
         <div class="stat-label">High Risk</div>
         <div class="stat-value">
-          {{ metrics.high_risk | default(82) }}
-          <span style="font-size:14px;font-weight:500;color:var(--text-muted)">({{ metrics.high_risk_pct | default(5.9) }}%)</span>
+          {{ metrics.high_risk }}
+          <span style="font-size:14px;font-weight:500;color:var(--text-muted)">({{ metrics.high_risk_pct }}%)</span>
         </div>
-        <div class="stat-change up">
-          <i class="bi bi-arrow-up-short"></i>{{ metrics.high_risk_change | default('+3% vs last week') }}
-        </div>
+        {{ chg(changes.get('high_risk'), true) }}
       </div>
     </div>
     <div class="col-6 col-md col-lg">
       <div class="stat-card">
         <div class="stat-label">Average FBS (mg/dL)</div>
-        <div class="stat-value">{{ metrics.avg_fbs | default(111.4) }}</div>
-        <div class="stat-change up">
-          <i class="bi bi-arrow-up-short"></i>{{ metrics.avg_fbs_change | default('+2.6 vs last week') }}
-        </div>
+        <div class="stat-value">{{ metrics.avg_fbs }}</div>
+        {{ chg(changes.get('avg_fbs'), true) }}
       </div>
     </div>
     <div class="col-6 col-md col-lg">
@@ -80,6 +82,9 @@
             <span>{{ label }} Risk – <strong>{{ risk_distribution[key].pct }}%</strong> ({{ risk_distribution[key].count }})</span>
           </div>
           {% endfor %}
+          {% if unclassified %}
+          <div class="donut-legend-item text-muted small">{{ unclassified }} screening{{ 's' if unclassified != 1 else '' }} without a risk level not shown.</div>
+          {% endif %}
         </div>
       </div>
     </div>
@@ -207,6 +212,11 @@
       {{ risk_distribution.low.pct }},
       {{ risk_distribution.moderate.pct }},
       {{ risk_distribution.high.pct }}
+    ],
+    riskCounts: [
+      {{ risk_distribution.low.count }},
+      {{ risk_distribution.moderate.count }},
+      {{ risk_distribution.high.count }}
     ],
     timeline: {{ timeline | tojson }},
     modelPerformance: {
