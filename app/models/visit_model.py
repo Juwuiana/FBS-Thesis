@@ -293,6 +293,56 @@ def _recompute_bmi(height_cm, weight_kg):
     return bmi, obesity_class
 
 
+# Plausible ranges for nurse-entered anthropometrics. 0, negatives or absurd
+# values are typos, not measurements, and must never reach the database.
+VITALS_LIMITS = {
+    "height_cm": (50, 250, "Height", "cm"),
+    "weight_kg": (2, 400, "Weight", "kg"),
+}
+
+
+def normalize_vitals(data: dict, stored: dict | None = None) -> dict:
+    """
+    Validate height/weight and (re)derive bmi + obesity_class IN PLACE.
+
+    - Any client-sent bmi / obesity_class is discarded and recomputed, so BMI
+      can never be stale or forged.
+    - If only one of height/weight is in `data` (a partial edit), the other
+      comes from `stored` (the existing visit row).
+    - Raises ValueError with a nurse-readable message on bad input. Callers
+      should run this BEFORE writing anything, so a rejected save changes nothing.
+    """
+    import math
+    data.pop("bmi", None)
+    data.pop("obesity_class", None)
+    if "height_cm" not in data and "weight_kg" not in data:
+        return data
+    stored = stored or {}
+    values = {}
+    for key, (lo, hi, label, unit) in VITALS_LIMITS.items():
+        raw = data[key] if key in data else stored.get(key)
+        if raw is None or (isinstance(raw, str) and raw.strip() == ""):
+            values[key] = None
+            if key in data:
+                data[key] = None
+            continue
+        try:
+            num = float(raw)
+        except (TypeError, ValueError):
+            raise ValueError(f"{label} must be a number.")
+        if not math.isfinite(num) or not (lo <= num <= hi):
+            raise ValueError(f"{label} must be between {lo} and {hi} {unit}.")
+        num = int(num) if num.is_integer() else num
+        values[key] = num
+        if key in data:
+            data[key] = num
+    bmi, obesity_class = _recompute_bmi(values["height_cm"], values["weight_kg"])
+    if bmi is not None and not (5 <= bmi <= 100):
+        raise ValueError("Height and weight give an implausible BMI. Please re-check both.")
+    data["bmi"], data["obesity_class"] = bmi, obesity_class
+    return data
+
+
 def patient_update_visit_vitals(visit_id: int, patient_id: int, data: dict) -> dict:
     """
     Apply a patient-submitted correction to one of their own past visits.
@@ -537,10 +587,76 @@ def acknowledge_patient_edits_for_patient(patient_id: int, staff_id: int | None 
         conn.close()
 
 
+def get_saved_fbs_for_visit(visit_id: int) -> dict | None:
+    """Raw saved FBS columns for a visit, read straight from lab_screenings.
+    Picks the newest row that actually has a value, so a visit with several
+    screening rows (or an imported one) still shows its FBS."""
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            """SELECT * FROM lab_screenings
+               WHERE visit_id = ? AND fbs_mg_dl IS NOT NULL
+               ORDER BY id DESC LIMIT 1""",
+            (visit_id,),
+        ).fetchone()
+    finally:
+        conn.close()
+    return dict(row) if row else None
+
+
+def get_pending_edit_detail(visit_id: int) -> dict:
+    """Which fields the patient changed on this visit (raw keys) and what they
+    were before, so the nurse's record page can flag each changed field.
+    Empty dict when nothing is pending."""
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            """SELECT edited_by_patient_at, edited_fields, patient_edit_previous_values
+               FROM visits WHERE id = ? AND edited_by_patient_at IS NOT NULL
+                 AND edit_acknowledged_at IS NULL""",
+            (visit_id,),
+        ).fetchone()
+    finally:
+        conn.close()
+    if not row:
+        return {}
+    return {
+        "keys": json.loads(row["edited_fields"] or "[]"),
+        "previous": json.loads(row["patient_edit_previous_values"] or "{}"),
+    }
+
+
+def acknowledge_pending_for_visit(visit_id: int, staff_id: int | None = None) -> int:
+    """Clear the patient-edit flag on one visit, only if one is pending.
+    Used when a nurse saves her own changes to that record."""
+    conn = get_connection()
+    try:
+        cur = conn.execute(
+            """UPDATE visits SET edit_acknowledged_at = datetime('now'),
+                   edit_acknowledged_by_staff_id = ?, patient_edit_previous_values = NULL
+               WHERE id = ? AND edited_by_patient_at IS NOT NULL
+                 AND edit_acknowledged_at IS NULL""",
+            (staff_id, visit_id),
+        )
+        conn.commit()
+        return cur.rowcount
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
 def count_pending_patient_edits() -> int:
     conn = get_connection()
+    # Must use the same filters as list_pending_patient_edits(): otherwise
+    # edits on deleted/anonymized patients are counted in the badge but can
+    # never be listed or cleared, so the bell never reaches 0.
     row = conn.execute(
-        "SELECT COUNT(*) AS n FROM visits WHERE edited_by_patient_at IS NOT NULL AND edit_acknowledged_at IS NULL"
+        """SELECT COUNT(*) AS n FROM visits v
+           JOIN patients p ON p.id = v.patient_id
+           WHERE v.edited_by_patient_at IS NOT NULL AND v.edit_acknowledged_at IS NULL
+             AND p.deleted_at IS NULL AND p.anonymized_at IS NULL"""
     ).fetchone()
     conn.close()
     return row["n"] if row else 0

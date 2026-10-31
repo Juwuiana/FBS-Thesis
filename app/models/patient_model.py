@@ -123,6 +123,34 @@ def find_existing_patient_id(last_name: str, first_name: str, middle_name: str |
 
 
 
+def find_possible_duplicates(last_name: str, first_name: str, birthdate: str, limit: int = 5) -> list[dict]:
+    """
+    Patients with the same normalized first + last name and the same birthdate
+    (middle name ignored, so "Juan Cruz" still matches "Juan Santos Cruz").
+    Used by the nurse intake to ASK "is this the same person?" before a new
+    patient_code is minted. Non-deleted, non-anonymized patients only.
+    """
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            """
+            SELECT patient_code, last_name, first_name, middle_name, birthdate
+            FROM patients
+            WHERE birthdate = ? AND deleted_at IS NULL AND anonymized_at IS NULL
+            """,
+            (birthdate,)
+        ).fetchall()
+    finally:
+        conn.close()
+
+    target = (_normalize_name_part(last_name), _normalize_name_part(first_name))
+    matches = [
+        dict(r) for r in rows
+        if (_normalize_name_part(r["last_name"]), _normalize_name_part(r["first_name"])) == target
+    ]
+    return matches[:limit]
+
+
 def create_patient(data: dict, staff_id: int | None = None) -> int:
     max_attempts = 5
     last_error = None

@@ -238,6 +238,28 @@ def create_patient():
     if missing_visit:
         return jsonify({"error": f"Missing required fields: {', '.join(missing_visit)}"}), 400
 
+    # Validate BEFORE any write so a rejected save leaves nothing behind
+    # (no orphan patient row). Applies to drafts too. BMI/class are derived here.
+    if len(conditions.get("diet") or []) > 1:
+        return jsonify({"error": "Choose only one dietary factor."}), 400
+    try:
+        visit_model.normalize_vitals(visit_data)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    # Same name + birthdate already on file? Ask the nurse (HTTP 409) instead of
+    # silently creating a second record. The client re-sends with
+    # confirmed_different_person=true once the nurse says it is NOT the same person.
+    if not payload.get("confirmed_different_person"):
+        dupes = patient_model.find_possible_duplicates(
+            patient_data["last_name"], patient_data["first_name"], patient_data["birthdate"])
+        if dupes:
+            return jsonify({
+                "error": "possible_duplicate",
+                "message": "A patient with the same name and birthdate already exists.",
+                "matches": dupes,
+            }), 409
+
     barangay_id = _resolve_barangay(patient_data)
     if barangay_id is not None:
         patient_data["barangay_id"] = barangay_id
@@ -289,6 +311,13 @@ def create_followup_record(patient_id):
     missing_visit = _missing_required_visit_fields(visit_data)
     if missing_visit:
         return jsonify({"error": f"Missing required fields: {', '.join(missing_visit)}"}), 400
+
+    if len(conditions.get("diet") or []) > 1:
+        return jsonify({"error": "Choose only one dietary factor."}), 400
+    try:
+        visit_model.normalize_vitals(visit_data)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
 
     staff_id = None
 
@@ -358,7 +387,9 @@ def nurse_screening_submit(patient_id, visit_id):
         "test_method": request.form.get("test_method"),
         "glucometer_id": request.form.get("glucometer_id"),
         "test_datetime": request.form.get("test_datetime"),
-        "final_risk_level": request.form.get("final_risk_level"),
+        # Blank = no override. An empty string would beat the preliminary
+        # result in COALESCE(final, preliminary, ...) and show as no risk.
+        "final_risk_level": (request.form.get("final_risk_level") or "").strip() or None,
         "fasted_ge_8h": request.form.get("fasted_ge_8h"),
         "identity_verified": request.form.get("identity_verified"),
         "glucometer_calibrated": request.form.get("glucometer_calibrated"),
@@ -410,6 +441,21 @@ def nurse_screening_submit(patient_id, visit_id):
     # screening (and risk prediction) is fully done.
     visit_model.update_visit(visit_id, {"status": "submitted"})
 
+    # The nurse has now handled this visit, so clear what the bell was
+    # asking her to look at: the patient's "new record submitted" flag for
+    # this visit, and the patient-reported FBS entries submitted with it.
+    # Never let a bookkeeping failure undo a screening that is already saved.
+    try:
+        visit_model.acknowledge_patient_edit(visit_id, staff_id=session.get("user_id"))
+    except Exception:
+        current_app.logger.exception("Could not acknowledge patient edit for visit %s", visit_id)
+    try:
+        for e in patient_fbs_model.list_entries_for_screening(patient["id"], visit_id, limit=50):
+            if e.get("linked") and e.get("review_status") == "unreviewed":
+                patient_fbs_model.set_review_status(e["id"], patient["id"], "reviewed", session.get("user_id"))
+    except Exception:
+        current_app.logger.exception("Could not mark patient FBS entries reviewed for visit %s", visit_id)
+
     flash("Screening saved.", "success")
     return redirect(url_for('nurse.nurse_data_management', just_saved=1))
 
@@ -439,6 +485,25 @@ def nurse_screening(patient_id, visit_id=None):
         latest_visit["visit_id"] = latest_visit["id"]
         latest_visit["date"] = latest_visit["assessment_date"]
         existing_screening = lab_model.get_lab_screening_for_visit(selected_visit_id)
+        # The lookup can return a screening row whose FBS columns are empty
+        # (older/imported records, or several rows for one visit). Fill any
+        # missing FBS straight from lab_screenings so the form is never blank
+        # when the visit list shows a value.
+        es = dict(existing_screening) if existing_screening else {}
+        if es.get("fbs_mg_dl") in (None, ""):
+            saved = visit_model.get_saved_fbs_for_visit(selected_visit_id)
+            if saved:
+                for k in ("fbs_mg_dl", "fbs_entered_value", "fbs_entered_unit"):
+                    es[k] = saved.get(k)
+                for k, val in saved.items():
+                    es.setdefault(k, val)
+            else:
+                row = next((v for v in visits if v["visit_id"] == selected_visit_id), None)
+                if row and row.get("fbs") is not None:
+                    es.update({"fbs_mg_dl": row["fbs"], "fbs_entered_value": None,
+                               "fbs_entered_unit": "mg_dl"})
+                    es.setdefault("preliminary_risk_level", row.get("risk"))
+        existing_screening = es or None
 
     return render_template(
         'nurse/nurse_screening.html',
@@ -462,12 +527,35 @@ def nurse_patient_file_view(patient_id, visit_id=None):
 
     records = visit_model.list_visits_for_patient(patient["id"])
 
+    # Visits of this patient that carry an unreviewed patient edit (newest first).
+    pending_visits = []
+    try:
+        for e in visit_model.list_pending_patient_edits(limit=500):
+            if e["patient_code"] == patient_id:
+                pending_visits.append(e)
+    except Exception:
+        current_app.logger.exception("Could not load pending patient edits")
+    date_by_visit = {v["visit_id"]: v["date"] for v in records}
+
     if visit_id is not None:
         if not any(v["visit_id"] == visit_id for v in records):
             abort(404)
         selected_visit_id = visit_id
+    elif pending_visits and any(e["visit_id"] == pending_visits[0]["visit_id"] for e in records):
+        # Patient edits are flagged on one specific visit. Open that one by
+        # default so the changed fields are highlighted instead of showing a
+        # banner for changes sitting on a different visit.
+        selected_visit_id = pending_visits[0]["visit_id"]
     else:
         selected_visit_id = records[0]["visit_id"] if records else None
+
+    # Pending edits on visits OTHER than the one on screen -> links in the banner.
+    other_pending_visits = [{
+        "visit_id": e["visit_id"],
+        "date": date_by_visit.get(e["visit_id"], ""),
+        "fields": [visit_model._field_label(f) for f in (e["edited_fields"] or [])],
+        "url": url_for('nurse.nurse_patient_file_view', patient_id=patient_id, visit_id=e["visit_id"]),
+    } for e in pending_visits if e["visit_id"] != selected_visit_id]
 
     latest_visit = None
     conditions = {"pmh": [], "family_history": [], "diet": [], "immunization": [], "dm_symptom": []}
@@ -482,8 +570,24 @@ def nurse_patient_file_view(patient_id, visit_id=None):
         cvd_responses = visit_model.get_cvd_responses_for_visit(selected_visit_id)
         existing_screening = lab_model.get_lab_screening_for_visit(selected_visit_id)
 
+    pending_edit = visit_model.attach_pending_patient_edits(
+        [{"patient_id": patient["id"]}]
+    )[0]["pending_edit"]
+
+    # Patient-submitted FBS readings the nurse hasn't reviewed yet -> bell on
+    # the "View Screening Result" button. Failure here must never break the page.
+    try:
+        pending_fbs_count = patient_fbs_model.count_unreviewed(patient["id"])
+    except Exception:
+        current_app.logger.exception("Could not count unreviewed patient FBS entries")
+        pending_fbs_count = 0
+
     return render_template(
         'nurse/nurse_patient_file_view.html',
+        pending_edit=pending_edit,
+        pending_fbs_count=pending_fbs_count,
+        other_pending_visits=other_pending_visits,
+        edit_detail=visit_model.get_pending_edit_detail(selected_visit_id) if selected_visit_id else {},
         patient_id=patient_id,
         patient=patient,
         records=records,
@@ -536,6 +640,18 @@ def nurse_patient_file_edit(patient_id, visit_id):
     if demographic_updates.get("birthdate") is None:
         demographic_updates.pop("birthdate", None)
 
+    # Validate first, write second: a bad height/weight must not leave the
+    # demographics half-saved. BMI/obesity class are always recomputed from the
+    # merged height/weight (submitted value, else what's already stored), so
+    # editing only the weight still updates BMI.
+    if len(conditions.get("diet") or []) > 1:
+        return jsonify({"error": "Choose only one dietary factor."}), 400
+    try:
+        if visit_data:
+            visit_model.normalize_vitals(visit_data, stored=visit_row)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
     try:
         if demographic_updates:
             # Same PSGC-code-first resolver used by intake and nurse_new_record,
@@ -576,6 +692,10 @@ def nurse_patient_file_edit(patient_id, visit_id):
         # actually diagnosable instead of only ever generic.
         current_app.logger.exception("nurse_patient_file_edit failed for %s/%s", patient_id, visit_id)
         return jsonify({"error": f"Could not save: {e}"}), 400
+
+    # The nurse has looked at and saved this record: clear the patient-edit
+    # flag so the bell and the Data Management badge stop showing it.
+    visit_model.acknowledge_pending_for_visit(visit_id, staff_id=session.get("user_id"))
 
     _audit_event(f"Patient record edited via Data Management: {patient_id} (visit: {visit_id})", "Info")
     return jsonify({"message": "Record updated."}), 200
@@ -753,6 +873,9 @@ def nurse_data_management_acknowledge_edits(patient_id):
             visit_model.acknowledge_patient_edit(e["visit_id"], staff_id=session.get("user_id"))
             cleared += 1
     _audit_event(f"Patient edits marked reviewed: {patient_id} ({cleared} visit(s))", "Info")
+    nxt = request.form.get('next', '')
+    if nxt.startswith('/nurse/') and not nxt.startswith('//'):
+        return redirect(nxt)
     qs = request.form.get('return_qs', '')
     target = url_for('nurse.nurse_data_management')
     return redirect(f"{target}?{qs}" if qs else target)
@@ -1193,10 +1316,14 @@ def nurse_issue_portal_credentials(patient_id):
     patient_model.resolve_account_help_request(patient["id"], staff_id=session.get("user_id"))
     _audit_event(f"Portal credentials issued: {patient_id}", "Warning")
 
-    return render_template(
+    # The account already exists at this point -- the slip's "Done" button is
+    # only navigation. The page shows a plaintext password, so never cache it.
+    resp = Response(render_template(
         'nurse/nurse_patient_credentials_slip.html',
         patient=patient, temp_password=temp_password,
-    )
+    ))
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
 
 @nurse_bp.route('/patient/<patient_id>/fbs_entry/<int:entry_id>/status', methods=['POST'])
 def patient_fbs_set_status(patient_id, entry_id):

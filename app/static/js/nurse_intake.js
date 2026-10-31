@@ -186,10 +186,25 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     birthdateInput.addEventListener('change', calcAge);
 
+    // Same limits as visit_model.VITALS_LIMITS (the server re-checks them).
+    function vitalProblem(input, key) {
+        const raw = input.value.trim();
+        if (raw === '') return null;
+        const [lo, hi, label, unit] = key === 'height' ? [50, 250, 'Height', 'cm'] : [2, 400, 'Weight', 'kg'];
+        const n = Number(raw);
+        if (!isFinite(n) || n < lo || n > hi) return `${label} must be between ${lo} and ${hi} ${unit}.`;
+        return null;
+    }
+
     function calcBmi() {
+        const hProblem = vitalProblem(heightInput, 'height');
+        const wProblem = vitalProblem(weightInput, 'weight');
+        hProblem ? markFieldError(heightInput, hProblem) : clearFieldError(heightInput);
+        wProblem ? markFieldError(weightInput, wProblem) : clearFieldError(weightInput);
+
         const h = parseFloat(heightInput.value);
         const w = parseFloat(weightInput.value);
-        if (!h || !w) {
+        if (hProblem || wProblem || !h || !w) {
             bmiInput.value = '';
             bmiInput.dataset.raw = '';
             obesityInput.value = '';
@@ -575,6 +590,15 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
+        // Height / weight sanity -- drafts too. 0, negative or absurd values are never saved.
+        [[heightInput, 'height'], [weightInput, 'weight']].forEach(([input, key]) => {
+            const problem = vitalProblem(input, key);
+            if (problem) {
+                markFieldError(input, problem);
+                invalids.push(input);
+            }
+        });
+
         // Email is optional, but if one is typed it has to look like an email --
         // checked for drafts too, since a bad address would be saved either way.
         const emailInput = $('email');
@@ -611,11 +635,34 @@ document.addEventListener('DOMContentLoaded', () => {
     draftBtn.disabled = true;
 
     try {
-        const res = await fetch('/api/patients', {
+        const body = { patient, visit, conditions, cvd_responses };
+        const send = () => fetch('/api/patients', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ patient, visit, conditions, cvd_responses }),
+            body: JSON.stringify(body),
         });
+        let res = await send();
+
+        // 409 = same name + birthdate already on file. Ask the nurse instead of
+        // silently creating a second patient.
+        if (res.status === 409) {
+            const dup = await res.clone().json().catch(() => ({}));
+            if (dup.error === 'possible_duplicate' && Array.isArray(dup.matches) && dup.matches.length) {
+                // In-page dialog instead of window.confirm(): the browser's native
+                // box can be auto-dismissed (idle, background tab), which used to
+                // count as "different person" and silently saved a duplicate.
+                // Here only an explicit click saves; closing it cancels the save.
+                const choice = await askSamePerson(dup.matches);
+                if (choice === null) return;          // closed / Esc -> nothing saved
+                const same = choice === 'same';
+                if (same) {
+                    window.location.href = `/nurse/new_record/${encodeURIComponent(dup.matches[0].patient_code)}`;
+                    return;
+                }
+                body.confirmed_different_person = true;
+                res = await send();
+            }
+        }
 
         if (res.status === 401) {
             await nurseAlert('Your session has expired. Please sign in again.');
@@ -686,6 +733,88 @@ $('saveDraftBtn').addEventListener('click', () => submitIntake(false));
     }
 
 });
+
+// ---------------------------------------------------------------------
+// "Is this the same person?" dialog. Resolves 'same' | 'different' | null.
+// null (X, Esc, click outside) means "cancel" -- the caller must NOT save.
+function askSamePerson(matches) {
+    return new Promise((resolve) => {
+        const prevFocus = document.activeElement;
+        const overlay = document.createElement('div');
+        overlay.className = 'nurse-modal-overlay';
+        const modal = document.createElement('div');
+        modal.className = 'nurse-modal';
+        modal.setAttribute('role', 'dialog');
+        modal.setAttribute('aria-modal', 'true');
+        modal.setAttribute('aria-labelledby', 'samePersonTitle');
+
+        const head = document.createElement('div');
+        head.className = 'nurse-dialog-head';
+        const h3 = document.createElement('h3');
+        h3.id = 'samePersonTitle';
+        h3.textContent = 'Is this the same person?';
+        const x = document.createElement('button');
+        x.type = 'button';
+        x.className = 'nurse-dialog-x';
+        x.setAttribute('aria-label', 'Close');
+        x.innerHTML = '&times;';
+        head.append(h3, x);
+
+        const intro = document.createElement('p');
+        intro.textContent = 'A patient with the same name and birthdate is already on file:';
+
+        const ul = document.createElement('ul');
+        ul.style.cssText = 'margin:0.5rem 0 0.75rem; padding-left:1.1rem; font-size:0.85rem;';
+        matches.forEach((m) => {
+            const li = document.createElement('li');
+            const name = [m.first_name, m.middle_name, m.last_name].filter(Boolean).join(' ');
+            li.textContent = `${name} — born ${m.birthdate} (${m.patient_code})`;   // textContent: no HTML injection
+            ul.appendChild(li);
+        });
+
+        const note = document.createElement('p');
+        note.style.cssText = 'font-size:0.8rem; opacity:0.8; margin:0 0 0.5rem;';
+        note.textContent = 'Nothing is saved until you choose. Closing this window cancels the save.';
+
+        const actions = document.createElement('div');
+        actions.className = 'nurse-modal-actions';
+        const diffBtn = document.createElement('button');
+        diffBtn.type = 'button';
+        diffBtn.className = 'btn btn-secondary';
+        diffBtn.textContent = 'No, different person (save as new)';
+        const sameBtn = document.createElement('button');
+        sameBtn.type = 'button';
+        sameBtn.className = 'btn btn-primary';
+        sameBtn.textContent = 'Yes, open their record';
+        actions.append(diffBtn, sameBtn);
+
+        modal.append(head, intro, ul, note, actions);
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+        sameBtn.focus();
+
+        function close(result) {
+            document.removeEventListener('keydown', onKey, true);
+            overlay.remove();
+            if (prevFocus && typeof prevFocus.focus === 'function') prevFocus.focus();
+            resolve(result);
+        }
+        function onKey(ev) {
+            if (ev.key === 'Escape') { ev.preventDefault(); close(null); return; }
+            if (ev.key === 'Tab') {
+                const items = modal.querySelectorAll('button');
+                const first = items[0], last = items[items.length - 1];
+                if (ev.shiftKey && document.activeElement === first) { ev.preventDefault(); last.focus(); }
+                else if (!ev.shiftKey && document.activeElement === last) { ev.preventDefault(); first.focus(); }
+            }
+        }
+        document.addEventListener('keydown', onKey, true);
+        sameBtn.addEventListener('click', () => close('same'));
+        diffBtn.addEventListener('click', () => close('different'));
+        x.addEventListener('click', () => close(null));
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) close(null); });
+    });
+}
 
 // ---------------------------------------------------------------------
 // Shared "what next?" dialog after a draft save. Also used by

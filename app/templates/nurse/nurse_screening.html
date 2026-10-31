@@ -58,11 +58,11 @@
                     <div style="display:flex; gap:0.5rem; align-items:stretch;">
                         <input type="number" step="0.1" name="fbs_mg_dl" id="fbsInput" class="field-input fbs-display" style="flex:1;"
                             placeholder="e.g. 95"
-                            value="{{ existing_screening.fbs_entered_value if existing_screening and existing_screening.fbs_entered_value is not none else (existing_screening.fbs_mg_dl if existing_screening else '') }}"
+                            value="{{ existing_screening.fbs_entered_value if existing_screening and existing_screening.fbs_entered_value not in (none, '') else (existing_screening.fbs_mg_dl if existing_screening and existing_screening.fbs_mg_dl is not none else '') }}"
                             {% if not is_latest %}disabled{% else %}required{% endif %}>
                         <select name="fbs_unit" id="fbsUnit" class="field-input" style="max-width:130px;" {% if not is_latest %}disabled{% endif %}>
-                            <option value="mg_dl" {% if not existing_screening or existing_screening.fbs_entered_unit in (None, "mg_dl") %}selected{% endif %}>mg/dL</option>
-                            <option value="mmol_l" {% if existing_screening and existing_screening.fbs_entered_unit == "mmol_l" %}selected{% endif %}>mmol/L</option>
+                            <option value="mg_dl" {% if not existing_screening or existing_screening.fbs_entered_value in (none, '') or existing_screening.fbs_entered_unit in (none, '', "mg_dl") %}selected{% endif %}>mg/dL</option>
+                            <option value="mmol_l" {% if existing_screening and existing_screening.fbs_entered_value not in (none, '') and existing_screening.fbs_entered_unit == "mmol_l" %}selected{% endif %}>mmol/L</option>
                         </select>
                     </div>
                     <p id="fbsConvertedHint" style="font-size:0.75rem; color:var(--text-muted); margin-top:0.35rem;"></p>
@@ -77,12 +77,12 @@
                             <label class="field-label">Glucometer ID / Lot No.</label>
                             <input type="text" name="glucometer_id" id="glucometerId" class="field-input"
                                    placeholder="e.g. GLC-2025-042"
-                                   value="{{ existing_screening.glucometer_id if existing_screening else '' }}">
+                                   value="{{ (existing_screening.glucometer_id or '') if existing_screening else '' }}">
                         </div>
                         <div class="field-group">
                             <label class="field-label">Test Date & Time<span class="required-mark">*</span></label>
                             <input type="datetime-local" name="test_datetime" id="testDateTime" class="field-input" required
-                                value="{{ existing_screening.test_datetime if existing_screening else '' }}">
+                                value="{{ (existing_screening.test_datetime or '') if existing_screening else '' }}">
                         </div>
                     </div>
                     <div style="margin-top: 1.25rem; display:flex; justify-content:flex-end;">
@@ -121,11 +121,11 @@
                             <div class="field-label" style="display:flex; justify-content:space-between; align-items:center;">
                                 <span>Follow-up Date<span class="required-mark" id="followUpRequiredMark">*</span></span>
                                 <label style="display:flex; align-items:center; gap:0.35rem; font-weight:normal; font-size:0.75rem; color:var(--text-muted); cursor:pointer;">
-                                    <input type="checkbox" id="noFollowUpCheck"> No follow-up needed
+                                    <input type="checkbox" id="noFollowUpCheck" {% if not is_latest and existing_screening and not existing_screening.follow_up_date %}checked{% endif %}> No follow-up needed
                                 </label>
                             </div>
                             <input type="date" name="follow_up_date" id="followUpDate" class="field-input" required
-                                   value="{{ existing_screening.follow_up_date or '' }}">
+                                   value="{{ (existing_screening.follow_up_date or '') if existing_screening else '' }}">
                         </div>
                         <div class="field-group">
                             <label class="field-label">Referred To (Facility)</label>
@@ -176,7 +176,7 @@
                         <div class="result-circle-wrapper">
                             <div class="result-circle" id="resultCircle">
                                 <span id="resultCircleLabel" style="font-size:0.8rem; color:var(--text-secondary);">
-                                    {{ existing_screening.preliminary_risk_level if existing_screening else "—" }}
+                                    {{ (existing_screening.preliminary_risk_level or "—") if existing_screening else "—" }}
                                 </span>
                                 <span id="resultCircleText">RISK</span>
                             </div>
@@ -186,11 +186,11 @@
                             <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:0.25rem;">
                                 <span style="color:var(--text-muted);">Prediction Score</span>
                                 <span id="predictionScoreText" style="font-weight:700; color:var(--warning);">
-                                    {{ existing_screening.preliminary_score if existing_screening else "—" }} / 100
+                                    {{ (existing_screening.preliminary_score if existing_screening.preliminary_score is not none else "—") if existing_screening else "—" }} / 100
                                 </span>
                             </div>
                             <div style="width:100%; height:8px; background:var(--bg-light); border-radius:4px; overflow:hidden;">
-                                <div id="predictionScoreBar" style="width:{{ existing_screening.preliminary_score if existing_screening else 0 }}%; height:100%; background:var(--warning);"></div>
+                                <div id="predictionScoreBar" style="width:{{ (existing_screening.preliminary_score or 0) if existing_screening else 0 }}%; height:100%; background:var(--warning);"></div>
                             </div>
                         </div>
 
@@ -209,7 +209,7 @@
                                 </div>
                             </div>
                             <input type="hidden" name="final_risk_level" id="finalRiskLevelInput"
-                                   value="{{ existing_screening.final_risk_level if existing_screening else '' }}">
+                                   value="{{ (existing_screening.final_risk_level or '') if existing_screening else '' }}">
                         </div>
                     </div>
                 </div>
@@ -241,7 +241,8 @@
                             <td style="padding: 1rem;">{{ (v.fbs ~ " mg/dL") if v.fbs else "—" }}</td>
                             <td style="padding: 1rem;">
                                 {% if v.risk %}
-                                <span style="background:var(--warning-light); color:#b45309; padding:0.25rem 0.5rem; border-radius:4px; font-size:0.7rem;">{{ v.risk }}</span>
+                                {% set _rc = {'High': ('#fee2e2', '#991b1b'), 'Moderate': ('#fef3c7', '#b45309'), 'Low': ('#dcfce7', '#166534')}.get((v.risk | string).strip().title(), ('#fef3c7', '#b45309')) %}
+                                <span style="background:{{ _rc[0] }}; color:{{ _rc[1] }}; padding:0.25rem 0.5rem; border-radius:4px; font-size:0.7rem; font-weight:600;">{{ v.risk }}</span>
                                 {% else %}
                                 <span style="color:var(--text-muted);">Pending</span>
                                 {% endif %}
@@ -273,8 +274,20 @@
            <button type="button" class="btn btn-secondary" onclick="window.print()">Print / Export PDF</button>
         </div>
 
+        {% set already_screened = existing_screening and existing_screening.fbs_mg_dl is not none %}
         {% if is_latest %}
-            <button type="submit" class="btn btn-primary">✓ Save & Submit Screening</button>
+            {# A screening that is already saved opens read-only; Save & Submit only
+               appears once the nurse chooses to edit it. A visit with no saved
+               screening yet still shows Save & Submit straight away. #}
+            {% if already_screened %}
+                <button type="button" class="btn btn-primary" id="editScreeningBtn">✎ Edit Screening</button>
+                <div id="editScreeningActions" style="display:none; gap:0.75rem;">
+                    <button type="button" class="btn btn-secondary" id="cancelEditScreeningBtn">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="saveSubmitScreeningBtn">✓ Save & Submit Screening</button>
+                </div>
+            {% else %}
+                <button type="submit" class="btn btn-primary">✓ Save & Submit Screening</button>
+            {% endif %}
         {% else %}
             <span style="color:var(--text-muted); font-size:0.85rem; padding:0.6rem 1rem;">Read-only — this is a past record</span>
         {% endif %}
@@ -346,6 +359,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const resultCircle = document.getElementById('resultCircle');
     const resultCircleLabel = document.getElementById('resultCircleLabel');
+    const resultCircleText = document.getElementById('resultCircleText');
     const scoreText = document.getElementById('predictionScoreText');
     const scoreBar = document.getElementById('predictionScoreBar');
     const recommendationText = document.getElementById('recommendationText');
@@ -363,6 +377,41 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         return { level: 'HIGH', score: 90, color: 'var(--danger, #dc2626)',
                   recommendation: 'FBS in the diabetic range. Refer to physician promptly for confirmatory testing and management.' };
+    }
+
+    // Result circle / score / recommendation are painted from ONE place so the
+    // colour always matches the level shown, and a nurse override (if any) wins
+    // over the automatic result -- on first load, after Calculate, and on override.
+    const LEVEL_STYLE = {
+        LOW:      { color: 'var(--green-accent, #16a34a)', bg: 'var(--green-light, #dcfce7)',   text: '#166534', score: 20,
+                    rec: 'FBS within normal range. Continue routine annual screening and healthy lifestyle counseling.' },
+        MODERATE: { color: 'var(--warning, #d97706)',      bg: 'var(--warning-light, #fef3c7)', text: '#b45309', score: 60,
+                    rec: 'FBS in the prediabetic range. Refer for confirmatory OGTT test. Schedule follow-up within 2 weeks. Advise lifestyle changes.' },
+        HIGH:     { color: 'var(--danger, #dc2626)',       bg: 'var(--danger-light, #fee2e2)',  text: '#991b1b', score: 90,
+                    rec: 'FBS in the diabetic range. Refer to physician promptly for confirmatory testing and management.' },
+    };
+    let autoLevel = {{ ((existing_screening.preliminary_risk_level or '') if existing_screening else '') | string | upper | tojson }};
+    let autoScore = {{ (existing_screening.preliminary_score if existing_screening and existing_screening.preliminary_score is not none else none) | tojson }};
+
+    function repaintResult() {
+        const override = (finalRiskLevelInput.value || '').trim().toUpperCase();
+        const key = LEVEL_STYLE[override] ? override : autoLevel;
+        const s = LEVEL_STYLE[key];
+        if (!s) return;
+        const overridden = key === override;
+        const score = overridden ? s.score : (autoScore != null ? autoScore : s.score);
+        resultCircleLabel.textContent = overridden ? key + ' (override)' : key;
+        resultCircleLabel.style.color = s.text;
+        if (resultCircleText) resultCircleText.style.color = s.color;
+        resultCircle.style.borderColor = s.color;
+        scoreText.textContent = score + ' / 100';
+        scoreText.style.color = s.color;
+        scoreBar.style.width = score + '%';
+        scoreBar.style.background = s.color;
+        recommendationText.textContent = s.rec;
+        recommendationText.style.background = s.bg;
+        recommendationText.style.color = s.text;
+        recommendationText.style.borderLeftColor = s.color;
     }
 
     const fbsUnit = document.getElementById('fbsUnit');
@@ -399,14 +448,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const result = classifyFbs(fbsValue);
 
-        resultCircleLabel.textContent = result.level;
-        resultCircle.style.borderColor = result.color;
-        scoreText.textContent = `${result.score} / 100`;
-        scoreText.style.color = result.color;
-        scoreBar.style.width = result.score + '%';
-        scoreBar.style.background = result.color;
-        recommendationText.textContent = result.recommendation;
-        recommendationText.style.borderLeftColor = result.color;
+        autoLevel = result.level;
+        autoScore = result.score;
+        repaintResult();
 
         resultSection.style.display = '';
         openCardFor(resultCircle);
@@ -445,6 +489,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // was no way back to "no override, use the preliminary result".
                 finalRiskLevelInput.value = '';
                 refreshOverrideLabel();
+                repaintResult();
                 return;
             }
 
@@ -452,6 +497,7 @@ document.addEventListener('DOMContentLoaded', () => {
             btn.style.fontWeight = 'bold';
             finalRiskLevelInput.value = btn.dataset.level;
             refreshOverrideLabel();
+            repaintResult();
             if (btn.dataset.level === 'Low') {
                 btn.style.borderColor = 'var(--green-accent, #16a34a)';
                 btn.style.color = 'var(--green-accent, #16a34a)';
@@ -474,6 +520,49 @@ document.addEventListener('DOMContentLoaded', () => {
             btn.click();
         }
     });
+
+    // Paint a saved result (and any saved override) right away.
+    repaintResult();
+
+    {% set already_screened = existing_screening and existing_screening.fbs_mg_dl is not none %}
+    {% if is_latest and already_screened %}
+    // Saved screening = view mode. Controls are locked until "Edit Screening"
+    // is clicked, and Save & Submit only shows while editing.
+    const editBtn = document.getElementById('editScreeningBtn');
+    const editActions = document.getElementById('editScreeningActions');
+    const cancelEditBtn = document.getElementById('cancelEditScreeningBtn');
+    const lockables = () => screeningForm.querySelectorAll('input:not([type=hidden]), select, textarea');
+
+    function setScreeningEditing(on) {
+        lockables().forEach(el => { el.disabled = !on; });
+        document.querySelectorAll('.override-btn').forEach(b => { b.disabled = !on; });
+        calculateBtn.disabled = !on;
+        calculateBtn.style.opacity = on ? '' : '0.5';
+        calculateBtn.style.cursor = on ? '' : 'not-allowed';
+        // Re-apply "No follow-up needed" so the date field's state is right again.
+        if (on && noFollowUpCheck) noFollowUpCheck.dispatchEvent(new Event('change'));
+        editBtn.style.display = on ? 'none' : '';
+        editActions.style.display = on ? 'flex' : 'none';
+    }
+    editBtn.addEventListener('click', () => setScreeningEditing(true));
+    cancelEditBtn.addEventListener('click', () => window.location.reload());
+    setScreeningEditing(false);
+    {% endif %}
+
+    {% if not is_latest %}
+    // Past record = read-only view. Nothing here may demand input: drop
+    // "required", disable every control, show the saved referral/follow-up.
+    document.querySelectorAll('.required-mark').forEach(m => { m.style.display = 'none'; });
+    screeningForm.querySelectorAll('input:not([type=hidden]), select, textarea').forEach(el => {
+        el.required = false;
+        el.disabled = true;
+    });
+    document.querySelectorAll('.override-btn').forEach(b => { b.disabled = true; });
+    document.querySelectorAll('.card-header.section-toggle.collapsed').forEach(h => {
+        h.classList.remove('collapsed');
+        if (h.nextElementSibling) h.nextElementSibling.classList.remove('collapsed');
+    });
+    {% endif %}
 });
 </script>
 {% endblock %}
