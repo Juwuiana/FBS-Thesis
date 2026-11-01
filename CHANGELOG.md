@@ -1,3 +1,16 @@
+# UI fix + bug fixes merge
+
+- **Base:** `deploy-ui-fix` kept as the base for everything. The `fix-bugs` zip was older than it in the nurse, patient and staff-account code, so only its genuine fixes were applied. Full file-by-file record: `docs/MERGE_UI_FIX_AND_BUG_FIXES.md`.
+- **Added (security):** strong password policy for public signup and for staff/admin Change Password (12-128 characters, upper/lower/number/special, no spaces, no 3-in-a-row repeats, no name or email). Signup shows required-field stars and a live checklist and keeps Sign Up disabled until valid.
+- **Fixed:** admin dashboard "Barangay List by At-Risk Count" now counts at-risk patients from the same latest-screening-per-patient snapshot as the stat cards (it used to count every screening, so it did not add up to the At Risk card).
+- **Fixed:** `signup.js` read an element id that no longer exists in the template.
+- **Changed (UI):** compact admin dashboard and Green Computing page with fixed-height chart boxes (`maintainAspectRatio: false`), matching the nurse dashboard's density.
+- **Fixed:** the Change Password checklist only checked length; it now shows and checks every rule the server enforces (name/email rule stays server-side).
+- **Fixed (deployment):** `requirements-deploy.txt` was missing `reportlab`, so patient PDF download failed on Render. Added `reportlab==5.1.0`. `geoip2==5.3.0` added to `requirements.txt`.
+- **Tests:** four new test files from the bug branch; three stale tests that assumed the placeholder predictor now pin it explicitly; added a test that the shipped model loads and predicts.
+- **Not taken from the bug branch:** older nurse/patient/staff-credential code, its stale `requirements.txt`, and four empty placeholder files.
+- **Not changed:** the patient portal keeps its 8-character minimum password.
+
 # Patient-record branch merged onto fourth merge
 
 - **Base:** fourth-merge (record retention, anonymization, staff recovery, admin privacy controls) kept intact.

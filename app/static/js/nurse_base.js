@@ -125,9 +125,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!bellList) return;
         try {
             const [editsRes, helpRes] = await Promise.all([
-                fetch('/nurse/patient-edits'),
+                fetch('/nurse/patient-edits', { cache: 'no-store' }),
                 // If this one fails it must not hide the edits list, so it falls back to "none".
-                fetch('/nurse/account-help-requests').catch(() => null),
+                fetch('/nurse/account-help-requests', { cache: 'no-store' }).catch(() => null),
             ]);
             if (!editsRes.ok) throw new Error('bad status');
             const editsData = await editsRes.json();
@@ -177,6 +177,44 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         // refresh periodically so the badge doesn't go stale on a page left open
         setInterval(() => { if (bellPanel.hidden) loadBell(); }, 60000);
+    }
+
+    // Coming back to a page with the Back button restores a cached copy whose
+    // bell badge is stale (e.g. after the nurse approved edits). Refetch it.
+    window.addEventListener('pageshow', (e) => { if (e.persisted) { bellLoaded = false; loadBell(); } });
+    window.refreshNurseBell = () => { bellLoaded = false; loadBell(); };
+
+    // ---- Section numbers follow what is actually visible ------------------
+    // Headers are written "1. ...", "9. Menstrual ...", "10. Anthropometric ...".
+    // The female-only section is hidden for male patients, which left a gap
+    // (8 -> 10). Renumber the visible headers in order instead.
+    function renumberSections() {
+        let n = 0;
+        document.querySelectorAll('.card-header.section-toggle[data-section]').forEach((h) => {
+            if (h.getClientRects().length === 0) return;   // hidden (display:none ancestor)
+            n += 1;
+            const walker = document.createTreeWalker(h, NodeFilter.SHOW_TEXT);
+            let node;
+            while ((node = walker.nextNode())) {
+                if (/^\s*\d+\.\s/.test(node.nodeValue)) {
+                    node.nodeValue = node.nodeValue.replace(/^(\s*)\d+\.\s/, '$1' + n + '. ');
+                    break;
+                }
+                if (node.nodeValue.trim()) break;
+            }
+        });
+    }
+    if (document.querySelector('.card-header.section-toggle[data-section]')) {
+        let queued = false;
+        const schedule = () => {
+            if (queued) return;
+            queued = true;
+            requestAnimationFrame(() => { queued = false; renumberSections(); });
+        };
+        new MutationObserver(schedule).observe(document.body, {
+            attributes: true, subtree: true, attributeFilter: ['style', 'class', 'hidden'],
+        });
+        renumberSections();
     }
 
     const menuToggle = document.getElementById('menuToggle');

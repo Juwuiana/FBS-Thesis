@@ -1,20 +1,38 @@
 """
 eto yung nakikita ng patients
 """
-import bisect
 import json
 from datetime import date, datetime
 from app.models import visit_model, lab_model, patient_fbs_model
 
 _RISK_LABEL_MAP = {"Low": "Low Risk", "Moderate": "Moderate Risk", "High": "High Risk"}
 
-_FBS_BAND_UPPER_BOUNDS = [99, 125]
-_FBS_BAND_LABELS = ["Normal", "Pre-Diabetic", "Diabetic"]
-
-
 def classify_fbs_band(fbs_score: float) -> str:
-    idx = bisect.bisect_right(_FBS_BAND_UPPER_BOUNDS, fbs_score)
-    return _FBS_BAND_LABELS[idx]
+    # <100 Normal, 100-125.x Pre-Diabetic, >=126 Diabetic. Compared against the
+    # real cut-offs (not 99/125) so readings like 99.5 or 125.5 are not misfiled.
+    if fbs_score < 100:
+        return "Normal"
+    if fbs_score < 126:
+        return "Pre-Diabetic"
+    return "Diabetic"
+
+
+def range_marker_pct(fbs_score):
+    """
+    Marker position (%) on the 3-colour range bar. The bar is split 3:2:2
+    (Normal : Pre-diabetic : Diabetic), so the position is mapped piecewise per
+    zone; a straight linear scale put pre-diabetic readings inside the green part.
+    """
+    if fbs_score is None:
+        return None
+    n_end, p_end = 3 / 7 * 100, 5 / 7 * 100
+    if fbs_score < 100:
+        pct = (max(fbs_score, 70) - 70) / 30 * n_end
+    elif fbs_score < 126:
+        pct = n_end + (fbs_score - 100) / 26 * (p_end - n_end)
+    else:
+        pct = p_end + (min(fbs_score, 180) - 126) / 54 * (100 - p_end)
+    return max(2.0, min(98.0, round(pct, 1)))
 
 
 def _parse_date(value):
@@ -87,6 +105,7 @@ def get_patient_dashboard_data(patient_id: int) -> dict:
         "risk_level": risk_level,
         "fbs_score": latest["fbs"],
         "fbs_band": classify_fbs_band(latest["fbs"]),
+        "range_marker_pct": range_marker_pct(latest["fbs"]),
         "total_screenings": len(visits),
         "latest_visit_date": latest["date"],
         "bmi": latest_visit_detail.get("bmi"),
@@ -123,7 +142,7 @@ def get_full_screening_history(patient_id: int, sex: str | None = None) -> list[
             "date": v["date"],
             "fbs_score": fbs,
             "fbs_band": classify_fbs_band(fbs) if fbs is not None else None,
-            "range_marker_pct": max(2, min(100, round((fbs - 70) / (180 - 70) * 100, 1))) if fbs else None,
+            "range_marker_pct": range_marker_pct(fbs),
             "risk_level": _RISK_LABEL_MAP.get(v["risk"], "Pending"),
             "bmi": visit_detail.get("bmi"),
             "obesity_class": visit_detail.get("obesity_class"),

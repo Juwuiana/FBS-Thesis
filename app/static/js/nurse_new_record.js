@@ -129,7 +129,7 @@ document.addEventListener("DOMContentLoaded", () => {
         setField("alcohol", v.alcohol_intake);
         setField("illicitDrugs", v.illicit_drug_use);
         setField("physicalActivity", v.physical_activity);
-        setChecks("diet", c.diet);
+        setChecks("diet", (c.diet || []).slice(0, 1)); // single-select now
 
         // Section 7: diabetes history
         setField("diabetesDiagnosis", v.diabetes_diagnosis);
@@ -334,6 +334,16 @@ document.addEventListener("DOMContentLoaded", () => {
             invalids.push(emailInput);
         }
 
+        // Height / weight sanity -- drafts too. 0, negative or absurd values are never saved.
+        [["height", "height"], ["weight", "weight"]].forEach(([id, key]) => {
+            const input = document.getElementById(id);
+            const problem = input ? vitalProblem(input, key) : null;
+            if (problem) {
+                markFieldError(input, problem);
+                invalids.push(input);
+            }
+        });
+
         if (requireClinicalGroups) {
             [
                 { wrapper: document.getElementById("pmhGroup"), selector: ".pmh" },
@@ -435,30 +445,53 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    function calculateBMI() {
-    const heightCm = parseFloat(document.getElementById("height").value);
-    const weightKg = parseFloat(document.getElementById("weight").value);
-    const bmiField = document.getElementById("bmi");
-    const obesityField = document.getElementById("obesityClass");
-
-    if (!heightCm || !weightKg || heightCm <= 0) {
-        bmiField.value = "";
-        obesityField.value = "";
-        return;
+    // Same limits as visit_model.VITALS_LIMITS (the server re-checks them).
+    function vitalProblem(input, key) {
+        const raw = input.value.trim();
+        if (raw === "") return null;
+        const [lo, hi, label, unit] = key === "height" ? [50, 250, "Height", "cm"] : [2, 400, "Weight", "kg"];
+        const n = Number(raw);
+        if (!isFinite(n) || n < lo || n > hi) return `${label} must be between ${lo} and ${hi} ${unit}.`;
+        return null;
     }
 
-    const heightM = heightCm / 100;
-    const bmi = weightKg / (heightM * heightM);
-    bmiField.value = bmi.toFixed(1);
-    obesityField.value = classifyBMI(bmi);
-}
+    function setVitalError(input, message) {
+        input.classList.remove("field-error");
+        const m = input.parentElement.querySelector(".field-error-text");
+        if (m) m.remove();
+        if (message) markFieldError(input, message);
+    }
 
+    function calculateBMI() {
+        const heightEl = document.getElementById("height");
+        const weightEl = document.getElementById("weight");
+        const bmiField = document.getElementById("bmi");
+        const obesityField = document.getElementById("obesityClass");
+
+        const hProblem = vitalProblem(heightEl, "height");
+        const wProblem = vitalProblem(weightEl, "weight");
+        setVitalError(heightEl, hProblem);
+        setVitalError(weightEl, wProblem);
+
+        const heightCm = parseFloat(heightEl.value);
+        const weightKg = parseFloat(weightEl.value);
+        if (hProblem || wProblem || !heightCm || !weightKg) {
+            bmiField.value = "";
+            obesityField.value = "";
+            return;
+        }
+        const bmi = weightKg / ((heightCm / 100) ** 2);
+        bmiField.value = bmi.toFixed(1);
+        obesityField.value = classifyBMI(bmi);
+    }
+
+    // Labels match visit_model._recompute_bmi (the server overwrites BMI anyway).
     function classifyBMI(bmi) {
         if (bmi < 18.5) return "Underweight";
         if (bmi < 23) return "Normal";
-        if (bmi < 25) return "Overweight (At Risk)";
-        if (bmi < 30) return "Obese I";
-        return "Obese II";
+        if (bmi < 25) return "Overweight";
+        if (bmi < 30) return "Obese Class I";
+        return "Obese Class II";
     }
 
     document.getElementById("height").addEventListener("input", calculateBMI);

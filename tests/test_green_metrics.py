@@ -72,7 +72,10 @@ def test_telemetry_stores_null_power_while_charging(app):
 def app(tmp_path):
     cfg = type("TestConfig", (Config,), {
         "DATABASE": str(tmp_path / "t.sqlite3"), "TESTING": True, "WTF_CSRF_ENABLED": False,
-        "BATTERY_SYSFS_DIR": str(tmp_path / "nobattery"), "REQUIRE_ADMIN_APPROVAL": False})
+        "BATTERY_SYSFS_DIR": str(tmp_path / "nobattery"), "REQUIRE_ADMIN_APPROVAL": False,
+        # An empty folder has no booster/preprocess files, so these tests always exercise the
+        # documented stub predictor, whether or not a trained model ships in app/ml/artifacts.
+        "MODEL_PATH": str(tmp_path / "no-model" / "model.joblib")})
     return create_app(cfg)
 
 
@@ -145,6 +148,23 @@ def test_predict_writes_log_and_dashboard_reads_it(app, admin):
     assert admin.get("/api/v1/green/stats/today").json["inferences"] == 1
     page = admin.get("/admin/green-computing")
     assert page.status_code == 200 and b"gc-stat-card" in page.data
+
+
+def test_shipped_model_loads_and_predicts(tmp_path):
+    """The model that ships in app/ml/artifacts must load (this is what Render serves) and
+    return a valid label, a probability and a green-log row. Uses the default MODEL_PATH."""
+    cfg = type("RealModelConfig", (Config,), {
+        "DATABASE": str(tmp_path / "real.sqlite3"), "TESTING": True, "WTF_CSRF_ENABLED": False,
+        "BATTERY_SYSFS_DIR": str(tmp_path / "nobattery"), "REQUIRE_ADMIN_APPROVAL": False,
+        "MODEL_PATH": None})
+    real_app = create_app(cfg)
+    client = real_app.test_client()
+    _login(client, "medical_officer")
+    assert client.get("/health").json["model_loaded"] is True
+    r = client.post("/api/v1/predict", json={"features": {"fbs_mg_dl": 131}})
+    assert r.status_code == 200 and r.json["is_stub_model"] is False
+    assert r.json["model_predicted_risk_level"] in ("Normal", "Pre-Diabetic", "Diabetic")
+    assert 0.0 <= r.json["model_confidence"] <= 1.0 and r.json["green_log_id"]
 
 
 def test_pending_queue_and_soft_delete(app, admin):

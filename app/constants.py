@@ -42,5 +42,9 @@ CSV_IMPORT_COLUMNS = [
     "role",
     "station",
     "barangay",
+]
+
+# Accepted in an import file but not required: rows that leave it blank get a system-generated password
+CSV_IMPORT_OPTIONAL_COLUMNS = [
     "temporary_password",
 ]

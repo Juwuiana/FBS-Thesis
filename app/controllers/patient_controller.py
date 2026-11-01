@@ -330,6 +330,25 @@ def patient_settings():
     return render_template('patient/patient_settings.html', patient=patient,
                             login_events=login_events, message="Password updated.", success=True)
 
+@patient_bp.route('/patient_result_pdf/<visit_id>')
+def patient_result_pdf(visit_id):
+    """Direct PDF download of one screening result ('latest' = newest screening).
+    Only visits belonging to the logged-in patient can be reached."""
+    from app.models import patient_pdf
+    patient_id = patient_portal_model.get_current_patient_id()
+    patient = patient_model.get_patient_by_id(patient_id)
+    history = patient_portal_model.get_full_screening_history(patient_id, patient.get("sex"))
+    if visit_id == "latest":
+        entry = history[0] if history else None
+    else:
+        entry = next((h for h in history if str(h["visit_id"]) == visit_id), None)
+    if entry is None:
+        abort(404)
+    pdf = patient_pdf.build_result_pdf(patient, entry)
+    return Response(pdf, mimetype='application/pdf', headers={
+        'Content-Disposition': f'attachment; filename={patient["patient_code"]}_result_{entry["date"]}.pdf'})
+
+
 @patient_bp.route('/patient_download_data')
 def patient_download_data():
     if not settings_model.is_role_export_enabled("patient"):
@@ -560,6 +579,34 @@ def patient_update_consent():
     consent = request.json.get('consent', False)
     patient_model.update_patient_consent(patient_id, consent)
     return {"ok": True}
+
+@patient_bp.route('/patient_update_email', methods=['POST'])
+def patient_update_email():
+    """Settings > Contact Details: patient adds/changes/clears their email.
+    A real change flags the nurse via record_patient_profile_edit."""
+    patient_id = patient_portal_model.get_current_patient_id()
+    patient = patient_model.get_patient_by_id(patient_id)
+    back = url_for('patient.patient_settings', tab='contact')
+    try:
+        email = patient_model._normalize_email(request.form.get('email'))
+    except ValueError as e:
+        flash(str(e), "error")
+        return redirect(back)
+
+    previous = patient.get('email')
+    if email == (previous or None):
+        flash("Your email is already up to date.", "success")
+        return redirect(back)
+
+    try:
+        patient_model.update_patient(patient_id, {"email": email})
+    except ValueError as e:
+        flash(str(e), "error")
+        return redirect(back)
+    visit_model.record_patient_profile_edit(patient_id, 'email', previous)
+    flash("Your email was updated. Your health worker will be notified.", "success")
+    return redirect(back)
+
 
 @patient_bp.route('/patient_update_demographics', methods=['POST'])
 def patient_update_demographics():

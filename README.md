@@ -1,5 +1,17 @@
 
 
+## Latest merge: UI fix + bug fixes
+
+`deploy-ui-fix` is the base; the `fix-bugs` branch was applied on top where it held real fixes.
+
+- **Password policy** for public signup and staff/admin Change Password (see "Password policy" below).
+- **Admin dashboard:** compact layout; the barangay list now shows at-risk patients per barangay and adds up to the "At Risk" card.
+- **Green Computing page:** compact layout.
+- **Deployment:** `requirements-deploy.txt` now includes `reportlab` (patient PDF download on Render).
+- **Tests:** the suite passes in a clean environment built only from `requirements-deploy.txt` (one scikit-learn-only benchmark test is skipped there).
+
+Full details, what was taken from each branch and why, and how it was verified: `docs/MERGE_UI_FIX_AND_BUG_FIXES.md`. Change history: `CHANGELOG.md`.
+
 ## Recent Work
 
 The following account-management features were implemented:
@@ -63,7 +75,7 @@ the short version:
 - Python 3
 - The project virtual environment in `venv/`
 
-Dependencies are listed in `requirements.txt`.
+Dependencies are listed in `requirements.txt` (full local freeze). The hosted (Render) build installs `requirements-deploy.txt`, which is deliberately smaller; anything the web app imports at runtime must be in it (for example `reportlab`, used by the patient PDF download).
 
 ## Setup
 
@@ -116,7 +128,13 @@ http://127.0.0.1:5000
 
 ### Add Employee
 
-Admin-created employee accounts are stored as `approved` immediately. The form requires a temporary password, which is stored as a Werkzeug password hash rather than plain text.
+Admin-created employee accounts are stored as `approved` immediately. The system generates a temporary password and shows it to the admin once on a credentials page; it is stored only as a Werkzeug password hash. The CSV import has an optional `temporary_password` column; rows that leave it blank get a generated one.
+
+### Password policy
+
+Applies to public signup and to Change Password for admin and nurse accounts. A new password must be 12-128 characters, include an uppercase letter, a lowercase letter, a number and a special character, contain no spaces, not repeat the same character three times in a row, and not contain the user's first name, last name or the part of their email before `@`. The server enforces it; the signup and Change Password forms show a live checklist.
+
+System-generated temporary passwords are not checked against the policy (the password that replaces them is). The patient portal keeps its own 8-character minimum.
 
 Supported roles:
 
@@ -371,7 +389,7 @@ does not write to the app's database (see the controlled-test-run protocol in
 
 ### Documentation
 `docs/TERMUX_TEST.md` (phone test guide), `docs/NURSE_BRANCH_INTEGRATION.md` (what the nurse branch must
-call), `docs/CONVERSATION_SUMMARY.md` (decisions and open items), `CHANGELOG.md`.
+call), `docs/CONVERSATION_SUMMARY.md` (decisions and open items), `docs/MERGE_UI_FIX_AND_BUG_FIXES.md` (UI-fix + bug-fix merge record), `CHANGELOG.md`.
 
 ### Testing on a phone
 See `docs/TERMUX_TEST.md` (Termux install, battery check, demo run, idle baseline, test protocol).

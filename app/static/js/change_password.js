@@ -1,4 +1,6 @@
-/* Shared Change Password behaviour (admin + nurse). Guidance only: the server enforces the rules. */
+/* Shared Change Password behaviour (admin + nurse). Guidance only: the server enforces the rules.
+   Keep the rule checks below in sync with PASSWORD_REGEX in app/controllers/auth_controller.py.
+   ("must not contain your name or email" is checked on the server only.) */
 (function () {
     function init(form) {
         var minLen = parseInt(form.dataset.cpMin, 10) || 12;
@@ -48,9 +50,20 @@
             }
 
             var okLen = pw.length >= minLen;
+            var okUpper = /[A-Z]/.test(pw);
+            var okLower = /[a-z]/.test(pw);
+            var okNumber = /[0-9]/.test(pw);
+            var okSpecial = /[^A-Za-z0-9\s]/.test(pw);
+            var okRepeat = pw.length > 0 && !/\s/.test(pw) && !/(.)\1\1/s.test(pw);
+            var okPolicy = okLen && okUpper && okLower && okNumber && okSpecial && okRepeat;
             var okMatch = pw.length > 0 && pw === cf;
             var okDiff = pw.length > 0 && cu.length > 0 && pw !== cu;
             setRule('length', okLen);
+            setRule('upper', okUpper);
+            setRule('lower', okLower);
+            setRule('number', okNumber);
+            setRule('special', okSpecial);
+            setRule('repeat', okRepeat);
             setRule('match', okMatch);
             setRule('different', okDiff);
 
@@ -61,7 +74,7 @@
             } else {
                 match.textContent = '\u2717 Passwords do not match'; match.className = 'form-hint cp-match cp-bad';
             }
-            submit.disabled = !(okLen && okMatch && okDiff) || form.dataset.submitting === '1';
+            submit.disabled = !(okPolicy && okMatch && okDiff) || form.dataset.submitting === '1';
         }
 
         [cur, nw, conf].forEach(function (el) { el.addEventListener('input', update); });

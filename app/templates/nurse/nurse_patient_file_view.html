@@ -50,6 +50,91 @@
         }
     </style>
 
+    {% if pending_edit %}
+    <div id="patientEditBanner" style="position:sticky; top:0.5rem; z-index:850; box-shadow:0 4px 14px rgba(146,64,14,0.25); padding-right:4rem !important; display:flex; align-items:center; gap:0.85rem; flex-wrap:wrap; background:#fef3c7; border:1px solid #f59e0b; border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; color:#92400e;">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <div style="flex:1; min-width:220px; font-size:0.85rem;">
+            <strong>The patient updated this record</strong> ({{ pending_edit.at[:10] }}): {{ pending_edit.fields | join(', ') }}.
+            Review the changes, then mark them as reviewed.
+            {% if other_pending_visits %}
+            <div style="margin-top:0.35rem; font-size:0.8rem;">
+                Changes on other visits:
+                {% for ov in other_pending_visits %}
+                    <a href="{{ ov.url }}" style="color:inherit; font-weight:700; text-decoration:underline;">{{ ov.date }}</a> ({{ ov.fields | join(', ') }}){{ ', ' if not loop.last }}
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        <form method="POST" action="{{ url_for('nurse.nurse_data_management_acknowledge_edits', patient_id=patient.patient_code) }}" style="margin:0;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="next" value="{{ request.path }}">
+            <button type="submit" class="btn btn-primary" style="padding:0.4rem 0.9rem; font-size:0.8rem;">Mark reviewed</button>
+        </form>
+    </div>
+    {% endif %}
+
+    {% if edit_detail and edit_detail.keys %}
+    <style>
+        .fv-edited { border-color:#f59e0b !important; background:#fffbeb !important; box-shadow:0 0 0 2px rgba(245,158,11,0.25); }
+        .fv-edit-flag { display:inline-flex; align-items:center; gap:0.2rem; margin-left:0.4rem; color:#d97706; font-weight:600; font-size:0.7rem; vertical-align:middle; cursor:help; text-transform:none; letter-spacing:0; }
+        .fv-edit-flag svg { width:14px; height:14px; }
+    </style>
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var detail = {{ edit_detail | tojson }};
+        var BELL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>';
+        var MAP = {
+            location: ['[data-field="patient.address"]', '#fv_region', '#fv_city', '#fv_barangay'],
+            address: ['[data-field="patient.address"]'],
+            barangay_id: ['#fv_barangay'],
+            civil_status: ['#fv_civilStatus'],
+            bmi: ['#bmiField'],
+            obesity_class: ['#obesityField']
+        };
+        function targets(key) {
+            var sels = MAP[key] || ['[data-field="visit.' + key + '"]', '[data-field="patient.' + key + '"]'];
+            var out = [];
+            sels.forEach(function (s) { document.querySelectorAll(s).forEach(function (el) { out.push(el); }); });
+            return out;
+        }
+        var flaggedCards = new Set();
+        (detail.keys || []).forEach(function (key) {
+            var prev = detail.previous ? detail.previous[key] : undefined;
+            var tip = 'Updated by the patient' + (prev !== undefined && prev !== null && prev !== '' ? ' (was: ' + prev + ')' : '');
+            targets(key).forEach(function (el) {
+                el.classList.add('fv-edited');
+                el.title = tip;
+                var group = el.closest('.field-group');
+                var label = group && group.querySelector('.field-label');
+                if (label && !label.querySelector('.fv-edit-flag')) {
+                    var f = document.createElement('span');
+                    f.className = 'fv-edit-flag';
+                    f.title = tip;
+                    f.innerHTML = BELL + 'Updated';
+                    label.appendChild(f);
+                }
+                var card = el.closest('.form-card');
+                if (card) flaggedCards.add(card);
+            });
+        });
+        // Open (and mark) every section that contains a changed field.
+        flaggedCards.forEach(function (card) {
+            var head = card.querySelector('.card-header.section-toggle');
+            if (!head) return;
+            head.classList.remove('collapsed');
+            if (head.nextElementSibling) head.nextElementSibling.classList.remove('collapsed');
+            if (!head.querySelector('.fv-edit-flag')) {
+                var f = document.createElement('span');
+                f.className = 'fv-edit-flag';
+                f.innerHTML = BELL + 'Patient update';
+                var icon = head.querySelector('.section-toggle-icon');
+                head.insertBefore(f, icon || null);
+            }
+        });
+    });
+    </script>
+    {% endif %}
+
     <header class="topbar">
         <div>
             <h1 class="page-title">Patient Record</h1>
@@ -454,7 +539,7 @@
             <label class="field-label" style="margin-top:1rem;">Dietary Factors</label>
             <div class="radio-card-wrapper">
                 {% for code, label in diet_options %}
-                <div class="radio-card"><input type="checkbox" class="editable-field cond-diet" value="{{ code }}" {% if code in conditions.diet %}checked{% endif %} disabled><label>{{ label }}</label></div>
+                <div class="radio-card"><input type="radio" name="diet" class="editable-field cond-diet" value="{{ code }}" {% if code in conditions.diet %}checked{% endif %} disabled><label>{{ label }}</label></div>
                 {% endfor %}
             </div>
         </div>
@@ -520,13 +605,13 @@
             </div>
             <div class="grid-3">
                 <div class="field-group"><label class="field-label">Respiratory Rate (cpm)</label><input type="text" class="field-input editable-field" data-field="visit.respiratory_rate" value="{{ latest_visit.respiratory_rate if latest_visit.respiratory_rate is not none else '' }}" disabled></div>
-                <div class="field-group"><label class="field-label">Height (cm)</label><input type="number" class="field-input editable-field" data-field="visit.height_cm" value="{{ latest_visit.height_cm if latest_visit.height_cm is not none else '' }}" disabled></div>
-                <div class="field-group"><label class="field-label">Weight (kg)</label><input type="number" class="field-input editable-field" data-field="visit.weight_kg" value="{{ latest_visit.weight_kg if latest_visit.weight_kg is not none else '' }}" disabled></div>
+                <div class="field-group"><label class="field-label">Height (cm)</label><input type="number" class="field-input editable-field" min="50" max="250" step="0.1" data-field="visit.height_cm" value="{{ latest_visit.height_cm if latest_visit.height_cm is not none else '' }}" disabled></div>
+                <div class="field-group"><label class="field-label">Weight (kg)</label><input type="number" class="field-input editable-field" min="2" max="400" step="0.1" data-field="visit.weight_kg" value="{{ latest_visit.weight_kg if latest_visit.weight_kg is not none else '' }}" disabled></div>
             </div>
             <div class="grid-3">
                 <div class="field-group"><label class="field-label">Waist Circ. (cm)</label><input type="number" class="field-input editable-field" data-field="visit.waist_cm" value="{{ latest_visit.waist_cm if latest_visit.waist_cm is not none else '' }}" disabled></div>
-                <div class="field-group"><label class="field-label">BMI</label><input type="text" class="field-input" value="{{ (latest_visit.bmi ~ ' kg/m\u00b2') if latest_visit.bmi else '—' }}" disabled title="Auto-calculated at intake from height/weight."></div>
-                <div class="field-group"><label class="field-label">Obesity Classification</label><input type="text" class="field-input" value="{{ latest_visit.obesity_class or '—' }}" disabled></div>
+                <div class="field-group"><label class="field-label">BMI</label><input type="text" id="bmiField" class="field-input" value="{{ (latest_visit.bmi ~ ' kg/m\u00b2') if latest_visit.bmi else '—' }}" disabled title="Recalculated automatically from height and weight."></div>
+                <div class="field-group"><label class="field-label">Obesity Classification</label><input type="text" id="obesityField" class="field-input" value="{{ latest_visit.obesity_class or '—' }}" disabled></div>
             </div>
             <label class="field-label" style="margin-top:1rem;">Pertinent PE Findings</label>
             <div class="grid-3">
@@ -547,15 +632,34 @@
             {% endif %}
         </div>
     </div>
+    <div id="floatEditBar" class="float-edit-bar" hidden>
+        <button type="button" class="btn btn-secondary" id="floatDiscardBtn">Discard</button>
+        <button type="button" class="btn btn-primary" id="floatSaveBtn"> Save Changes</button>
+    </div>
     </form>
 
-    <div class="action-bar" style="justify-content:flex-start; flex-wrap:nowrap; overflow-x:auto; gap:0.5rem; padding-bottom:0.35rem;">
-        <a href="{{ back_url }}" class="btn btn-secondary" style="text-decoration:none; display:inline-flex; text-align:center; padding:0.625rem 1rem; flex-shrink:0;">← Back to Data Management</a>
-        <button type="button" class="btn btn-secondary" style="padding:0.625rem 1rem; flex-shrink:0;" onclick="window.print()">Print / Save as PDF</button>
-        <a href="{{ url_for('nurse.nurse_patient_export_all', patient_id=patient_id) }}" class="btn btn-secondary" style="text-decoration:none; display:inline-flex; text-align:center; padding:0.625rem 1rem; flex-shrink:0;">Export Full History (CSV)</a>
-        <a href="{{ url_for('nurse.nurse_patient_export_visit', patient_id=patient_id, visit_id=latest_visit.visit_id) }}" class="btn btn-secondary" style="text-decoration:none; display:inline-flex; text-align:center; padding:0.625rem 1rem; flex-shrink:0;">Export This Visit (CSV)</a>
-        <a href="{{ url_for('nurse.nurse_new_record', patient_id=patient_id) }}" class="btn btn-secondary" style="text-decoration:none; display:inline-flex; text-align:center; padding:0.625rem 1rem; flex-shrink:0;">+ Add New Record</a>
-        <a href="{{ url_for('nurse.nurse_screening', patient_id=patient_id, visit_id=latest_visit.visit_id) }}" class="btn btn-primary" style="text-decoration:none; display:inline-flex; text-align:center; padding:0.625rem 1rem; flex-shrink:0;">View Screening Result →</a>
+    <style>
+        .fv-actions { display:flex; flex-wrap:wrap; align-items:center; gap:0.5rem; margin-top:1rem; }
+        .fv-actions .btn { display:inline-flex; align-items:center; justify-content:center; height:40px; padding:0 1rem; margin:0; text-decoration:none; white-space:nowrap; box-sizing:border-box; font-size:0.8rem; }
+        .fv-actions .fv-spacer { flex:1 1 auto; }
+        @media print { .fv-actions { display:none; } #patientEditBanner { display:none !important; } }
+        .fv-result-btn { position:relative; gap:.45rem; }
+        .fv-bell { position:relative; display:inline-flex; width:18px; height:18px; animation:fvBellRing 1.6s ease-in-out infinite; transform-origin:50% 0; }
+        .fv-bell svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+        .fv-bell-badge { position:absolute; top:-8px; right:-10px; min-width:16px; height:16px; padding:0 4px; border-radius:999px; background:#ef4444; color:#fff; font-size:.65rem; font-weight:700; line-height:16px; text-align:center; box-sizing:border-box; }
+        @keyframes fvBellRing { 0%,60%,100%{transform:rotate(0)} 10%{transform:rotate(14deg)} 20%{transform:rotate(-12deg)} 30%{transform:rotate(8deg)} 40%{transform:rotate(-6deg)} }
+        @media (prefers-reduced-motion: reduce) { .fv-bell { animation:none; } }
+    </style>
+    <div class="fv-actions">
+        <a href="{{ back_url }}" class="btn btn-secondary">&larr; Back to Data Management</a>
+        <button type="button" class="btn btn-secondary" onclick="window.print()">Print / Save as PDF</button>
+        <a href="{{ url_for('nurse.nurse_patient_export_all', patient_id=patient_id) }}" class="btn btn-secondary">Export Full History (CSV)</a>
+        <a href="{{ url_for('nurse.nurse_patient_export_visit', patient_id=patient_id, visit_id=latest_visit.visit_id) }}" class="btn btn-secondary">Export This Visit (CSV)</a>
+        <a href="{{ url_for('nurse.nurse_new_record', patient_id=patient_id) }}" class="btn btn-secondary">+ Add New Record</a>
+        <span class="fv-spacer"></span>
+        <a href="{{ url_for('nurse.nurse_screening', patient_id=patient_id, visit_id=latest_visit.visit_id) }}" class="btn btn-primary fv-result-btn"{% if pending_fbs_count %} title="{{ pending_fbs_count }} new FBS reading{{ 's' if pending_fbs_count != 1 }} from the patient to review"{% endif %}>
+            {% if pending_fbs_count %}<span class="fv-bell" aria-label="New FBS from patient"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><span class="fv-bell-badge">{{ pending_fbs_count }}</span></span>{% endif %}
+            View Screening Result &rarr;</a>
     </div>
     {% endif %}
 {% endblock %}
@@ -567,6 +671,9 @@
     <script src="{{ url_for('static', filename='js/nurse_dialog.js') }}"></script>
     <script src="{{ url_for('static', filename='js/nurse_patient_file_view.js') }}"></script>
     <style>
+        .float-edit-bar { position: fixed; left: 50%; bottom: 1.25rem; transform: translateX(-50%); display: flex; gap: .75rem; padding: .6rem .9rem; background: #fff; border: 1px solid var(--border); border-radius: 999px; box-shadow: 0 8px 24px rgba(0,0,0,.2); z-index: 900; }
+        .float-edit-bar[hidden] { display: none; }
+        @media print { .float-edit-bar { display: none !important; } }
         .portal-flag { margin-left: 0.6rem; background: #fef3c7; color: #92400e; border: 1px solid #f59e0b; border-radius: 999px; padding: 0.1rem 0.6rem; font-size: 0.7rem; font-weight: 700; letter-spacing: 0; text-transform: none; }
         .portal-flag-off { background: #fee2e2; color: #b91c1c; border-color: #f87171; }
         .portal-help-banner.is-deactivated { background: #fef2f2; border-color: #f87171; border-left-color: #dc2626; color: #991b1b; }

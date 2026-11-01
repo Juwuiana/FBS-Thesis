@@ -8,6 +8,9 @@
     const saveBtn = document.getElementById('saveRecordBtn');
     const cancelBtn = document.getElementById('cancelEditBtn');
     const subtitle = document.getElementById('pageSubtitle');
+    const floatBar = document.getElementById('floatEditBar');
+    const floatSaveBtn = document.getElementById('floatSaveBtn');
+    const floatDiscardBtn = document.getElementById('floatDiscardBtn');
 
     // Section dropdowns: each header toggles only itself. Bound before the
     // early return below so Portal Access / Past Records still open and close
@@ -60,12 +63,33 @@
     const editUrl = form.dataset.editUrl;
     const editableFields = document.querySelectorAll('.editable-field');
 
+    // Set by the redirect that follows a successful save (?saved=1).
+    const justSaved = new URLSearchParams(window.location.search).get('saved') === '1';
+
+    // Small confirmation toast so the nurse knows the save went through.
+    function showToast(message, ok = true) {
+        const t = document.createElement('div');
+        t.setAttribute('role', 'status');
+        t.textContent = (ok ? '✓ ' : '✕ ') + message;
+        t.style.cssText = 'position:fixed; top:1.25rem; left:50%; transform:translateX(-50%); z-index:2000; ' +
+            'padding:.7rem 1.2rem; border-radius:8px; font-size:.85rem; font-weight:600; color:#fff; ' +
+            'box-shadow:0 8px 24px rgba(0,0,0,.25); transition:opacity .4s ease; ' +
+            'background:' + (ok ? '#2e7d32' : '#c62828') + ';';
+        document.body.appendChild(t);
+        setTimeout(() => { t.style.opacity = '0'; }, 3200);
+        setTimeout(() => t.remove(), 3700);
+    }
+
     function setEditing(on) {
         editingNow = on;
         editableFields.forEach(el => { el.disabled = !on; });
         editBtn.style.display = on ? 'none' : '';
         saveBtn.style.display = on ? '' : 'none';
         cancelBtn.style.display = on ? '' : 'none';
+        if (floatBar) {
+            floatBar.hidden = !on;                       // floating Save / Discard while editing
+            document.body.style.paddingBottom = on ? '5.5rem' : '';
+        }
         subtitle.textContent = on
             ? "Editing this visit's record — test results are not editable here."
             : "Read-only view of the patient's assessment record";
@@ -74,6 +98,78 @@
 
     editBtn.addEventListener('click', () => setEditing(true));
     cancelBtn.addEventListener('click', () => window.location.reload());
+    if (floatSaveBtn) floatSaveBtn.addEventListener('click', () => saveBtn.click());
+    if (floatDiscardBtn) floatDiscardBtn.addEventListener('click', () => cancelBtn.click());
+    function syncFloatSaving(on) {
+        if (!floatSaveBtn) return;
+        floatSaveBtn.disabled = on;
+        floatSaveBtn.textContent = on ? 'Saving…' : '💾 Save Changes';
+    }
+
+    // --- Live BMI / obesity class + height/weight validation ---------------
+    // BMI and classification are derived, so they follow Height and Weight
+    // as the nurse types (they used to stay frozen at the stored value).
+    // The server recomputes them on save; this is only the live preview.
+    const heightEl = document.querySelector('[data-field="visit.height_cm"]');
+    const weightEl = document.querySelector('[data-field="visit.weight_kg"]');
+    const bmiEl = document.getElementById('bmiField');
+    const obesityEl = document.getElementById('obesityField');
+
+    function vitalProblem(input, key) {
+        const raw = input.value.trim();
+        if (raw === '') return null;
+        const [lo, hi, label, unit] = key === 'height' ? [50, 250, 'Height', 'cm'] : [2, 400, 'Weight', 'kg'];
+        const n = Number(raw);
+        if (!isFinite(n) || n < lo || n > hi) return `${label} must be between ${lo} and ${hi} ${unit}.`;
+        return null;
+    }
+
+    function flagField(input, message) {
+        input.classList.remove('field-error');
+        const old = input.parentElement.querySelector('.field-error-text');
+        if (old) old.remove();
+        if (!message) return;
+        input.classList.add('field-error');
+        const span = document.createElement('span');
+        span.className = 'field-error-text';
+        span.textContent = message;
+        input.insertAdjacentElement('afterend', span);
+    }
+
+    function recalcBmi() {
+        const hp = vitalProblem(heightEl, 'height');
+        const wp = vitalProblem(weightEl, 'weight');
+        flagField(heightEl, hp);
+        flagField(weightEl, wp);
+        const h = parseFloat(heightEl.value), w = parseFloat(weightEl.value);
+        if (hp || wp || !h || !w) { bmiEl.value = '—'; obesityEl.value = '—'; return; }
+        const bmi = w / ((h / 100) ** 2);
+        bmiEl.value = bmi.toFixed(1) + ' kg/m²';
+        obesityEl.value = bmi < 18.5 ? 'Underweight' : bmi < 23 ? 'Normal' : bmi < 25 ? 'Overweight'
+                        : bmi < 30 ? 'Obese Class I' : 'Obese Class II';
+    }
+    if (heightEl && weightEl && bmiEl && obesityEl) {
+        heightEl.addEventListener('input', recalcBmi);
+        weightEl.addEventListener('input', recalcBmi);
+    }
+
+    // Returns true when height/weight are acceptable; otherwise flags the field,
+    // opens its (collapsed) section and scrolls to it.
+    function validateVitals() {
+        if (!heightEl || !weightEl) return true;
+        const bad = [[heightEl, vitalProblem(heightEl, 'height')], [weightEl, vitalProblem(weightEl, 'weight')]]
+            .filter(([, p]) => p);
+        flagField(heightEl, vitalProblem(heightEl, 'height'));
+        flagField(weightEl, vitalProblem(weightEl, 'weight'));
+        if (!bad.length) return true;
+        const el = bad[0][0];
+        const body = el.closest('.card-body');
+        const header = body && body.previousElementSibling;
+        const wasCollapsed = !!(body && body.classList.contains('collapsed'));
+        if (wasCollapsed) { body.classList.remove('collapsed'); if (header) header.classList.remove('collapsed'); }
+        setTimeout(() => { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.focus({ preventScroll: true }); }, wasCollapsed ? 350 : 0);
+        return false;
+    }
 
     // Maiden Last Name only makes sense for a married female patient --
     // reactive so it appears/disappears immediately if the nurse changes
@@ -101,12 +197,22 @@
     // A draft hasn't been finalized yet, so open it straight into edit mode
     // (same layout as nurse_intake: all sections still start collapsed --
     // the user clicks a section header to expand it, just like intake).
-    if (isDraft) {
+    // Not right after a save, though: a draft that was just saved must come
+    // back read-only, otherwise Save/Cancel never go away.
+    if (isDraft && !justSaved) {
         setEditing(true);
     }
 
+    if (justSaved) {
+        showToast('Changes saved successfully.');
+        // Drop ?saved=1 so a later refresh doesn't repeat the toast.
+        const u = new URL(window.location.href);
+        u.searchParams.delete('saved');
+        history.replaceState(null, '', u.pathname + u.search + u.hash);
+    }
+
     // Draft "continue" link from Data Management drops straight into edit mode.
-    if (new URLSearchParams(window.location.search).get('edit') === '1') {
+    if (!justSaved && new URLSearchParams(window.location.search).get('edit') === '1') {
         setEditing(true);
     }
 
@@ -198,6 +304,7 @@
 
     saveBtn.addEventListener('click', async () => {
         if (!validateEmail()) return;
+        if (!validateVitals()) return;
         const payload = { patient: {}, visit: {}, conditions: {}, cvd_responses: {} };
 
         editableFields.forEach(el => {
@@ -259,6 +366,7 @@
 
         saveBtn.disabled = true;
         saveBtn.textContent = 'Saving…';
+        syncFloatSaving(true);
         try {
             const res = await fetch(editUrl, {
                 method: 'POST',
@@ -269,17 +377,25 @@
                 const data = await res.json().catch(() => ({}));
                 throw new Error(data.error || 'Save failed');
             }
-            // Preserve return_qs (Data Management's filters/page) through
-            // the reload -- window.location.search would also work, but
-            // this stays correct even if other one-off params like ?edit=1
-            // were on the URL and shouldn't survive the reload.
-            const returnQs = form.dataset.returnQs;
-            window.location.href = window.location.pathname + (returnQs ? '?return_qs=' + encodeURIComponent(returnQs) : '');
-        } catch (err) {
-            console.error(err);
-            alert(err.message && err.message !== 'Save failed' ? err.message : 'Could not save changes. Please try again.');
+        
+            // Saved: leave edit mode right away (Save/Cancel/Discard disappear),
+            // confirm it, then reload so derived values (BMI, age...) are fresh.
+            setEditing(false);
             saveBtn.disabled = false;
             saveBtn.textContent = '💾 Save Changes';
+            syncFloatSaving(false);
+            showToast('Changes saved successfully.');
+
+            const returnQs = form.dataset.returnQs;
+            const qs = new URLSearchParams({ saved: '1' });
+            if (returnQs) qs.set('return_qs', returnQs);
+            setTimeout(() => { window.location.href = window.location.pathname + '?' + qs.toString(); }, 900);
+        } catch (err) {
+            console.error(err);
+            showToast(err.message && err.message !== 'Save failed' ? err.message : 'Could not save changes. Please try again.', false);
+            saveBtn.disabled = false;
+            saveBtn.textContent = '💾 Save Changes';
+            syncFloatSaving(false);
         }
     });
 })();

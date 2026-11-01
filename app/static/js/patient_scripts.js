@@ -170,10 +170,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     /*  4. DASHBOARD: Download PDF button */
-    const downloadPdfBtn = document.getElementById('downloadPdfBtn');
-    if (downloadPdfBtn) {
-        downloadPdfBtn.addEventListener('click', () => window.print());
-    }
+    // (Download is now a plain link to /patient_result_pdf/latest -- no JS needed.)
 
 
     /*  5. RESULTS PAGE: showDetail + print/download */
@@ -187,15 +184,10 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('[data-print-id]').forEach(btn => {
         btn.addEventListener('click', () => printDetail(btn.dataset.printId));
     });
-    document.querySelectorAll('[data-download-id]').forEach(btn => {
-        btn.addEventListener('click', () => printDetail(btn.dataset.downloadId));
-    });
 
     // Print All / Download All buttons
     const printAllBtn    = document.getElementById('printAllBtn');
-    const downloadAllBtn = document.getElementById('downloadAllBtn');
     if (printAllBtn)    printAllBtn.addEventListener('click',    () => window.print());
-    if (downloadAllBtn) downloadAllBtn.addEventListener('click', () => window.print());
 
     const params = new URLSearchParams(window.location.search);
     const visitParam = params.get('visit');
@@ -377,6 +369,8 @@ function printDetail(id) {
     // Clone so collapsed <details> sections are expanded in the printed report
     const clone = el.cloneNode(true);
     clone.querySelectorAll('details').forEach(d => d.setAttribute('open', ''));
+    // Strip edit controls/forms so they never appear in the printed report
+    clone.querySelectorAll('.ve-bar, .ve-edit-btn, .ve-cancel-btn, .ve-note, form, button, .detail-actions').forEach(n => n.remove());
     const content = clone.innerHTML;
     const win = window.open('', '_blank');
     win.document.write(`<!DOCTYPE html><html lang="en"><head>
@@ -385,7 +379,9 @@ function printDetail(id) {
         <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&display=swap" rel="stylesheet">
         <style>
             body { font-family:'DM Sans',sans-serif; padding:2rem; color:#1e293b; font-size:13px; }
-            .detail-actions,.detail-footer,.back-btn { display:none !important; }
+            .detail-actions,.detail-footer,.back-btn,.ve-bar,.ve-edit-btn,button,form { display:none !important; }
+            .range-track { margin-bottom:1.3rem; }
+            .range-marker { top:100%; bottom:auto; font-size:1.2rem; color:#1e293b; }
             .detail-date { font-size:1.3rem; font-weight:700; }
             .detail-id   { color:#94a3b8; font-size:0.85rem; margin-bottom:1.25rem; }
             .detail-cards-row { display:flex; gap:1rem; margin-bottom:1.25rem; }

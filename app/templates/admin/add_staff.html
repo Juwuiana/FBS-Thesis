@@ -14,6 +14,8 @@
       </a>
     </div>
 
+    <p class="req-note"><span class="req-star">*</span> Required field</p>
+
     {% if errors %}
     <div class="alert alert-danger" role="alert">
       <ul class="mb-0" style="padding-left:1.2rem;">
@@ -25,7 +27,7 @@
     <form method="POST" action="{{ url_for('admin.add_staff') }}" class="row g-3">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="col-md-6 col-12">
-        <label class="ps-field-label">First Name</label>
+        <label class="ps-field-label required">First Name</label>
         <input type="text" class="ps-input" name="first_name" value="{{ form_data.first_name or '' }}" pattern="[A-Za-z\s.\-]+" title="Letters, spaces, periods, and hyphens only" required>
       </div>
       <div class="col-md-6 col-12">
@@ -33,15 +35,15 @@
         <input type="text" class="ps-input" name="middle_name" value="{{ form_data.middle_name or '' }}" pattern="[A-Za-z\s.\-]*" title="Letters, spaces, periods, and hyphens only">
       </div>
       <div class="col-md-6 col-12">
-        <label class="ps-field-label">Last Name</label>
+        <label class="ps-field-label required">Last Name</label>
         <input type="text" class="ps-input" name="last_name" value="{{ form_data.last_name or '' }}" pattern="[A-Za-z\s.\-]+" title="Letters, spaces, periods, and hyphens only" required>
       </div>
       <div class="col-md-6 col-12">
-        <label class="ps-field-label">Birthday</label>
+        <label class="ps-field-label required">Birthday</label>
         <input type="date" class="ps-input" name="birthday" value="{{ form_data.birthday or '' }}" max="{{ today }}" required>
       </div>
       <div class="col-md-6 col-12">
-        <label class="ps-field-label">Sex</label>
+        <label class="ps-field-label required">Sex</label>
         <select class="ps-select" name="sex" required>
           <option value="">Select Sex</option>
           <option value="male" {{ 'selected' if form_data.sex == 'male' }}>Male</option>
@@ -49,15 +51,15 @@
         </select>
       </div>
       <div class="col-md-6 col-12">
-        <label class="ps-field-label">Email</label>
+        <label class="ps-field-label required">Email</label>
         <input type="email" class="ps-input" name="email" value="{{ form_data.email or '' }}" required>
       </div>
       <div class="col-md-6 col-12">
-        <label class="ps-field-label">Contact Number</label>
+        <label class="ps-field-label required">Contact Number</label>
         <input type="text" class="ps-input" name="contact" value="{{ form_data.contact or '' }}" placeholder="09171234567" required>
       </div>
       <div class="col-md-6 col-12">
-        <label class="ps-field-label">Role</label>
+        <label class="ps-field-label required">Role</label>
         <select class="ps-select" name="role" required>
           <option value="">Select Role</option>
           {% for r in roles %}
@@ -66,7 +68,7 @@
         </select>
       </div>
       <div class="col-md-6 col-12">
-        <label class="ps-field-label">Station / LHU</label>
+        <label class="ps-field-label required">Station / LHU</label>
         <select class="ps-select" name="station" required>
           <option value="">Select Station</option>
           {% for s in stations %}
@@ -75,19 +77,19 @@
         </select>
       </div>
       <div class="col-md-6 col-12">
-        <label class="ps-field-label">Region</label>
+        <label class="ps-field-label required">Region</label>
         <select class="ps-select" id="region" required>
           <option value="">Select Region</option>
         </select>
       </div>
       <div class="col-md-6 col-12">
-        <label class="ps-field-label">City / Municipality</label>
+        <label class="ps-field-label required">City / Municipality</label>
         <select class="ps-select" id="city" required disabled>
           <option value="">Select Region first</option>
         </select>
       </div>
       <div class="col-md-6 col-12">
-        <label class="ps-field-label">Assigned Barangay</label>
+        <label class="ps-field-label required">Assigned Barangay</label>
         <select class="ps-select" id="barangay_select" required disabled>
           <option value="">Select City first</option>
         </select>
@@ -99,13 +101,11 @@
       <input type="hidden" id="city_name" name="city_name">
       <input type="hidden" id="barangay_code" name="barangay_code">
       <input type="hidden" id="barangay_name" name="barangay_name">
-      <div class="col-md-6 col-12">
-        <label class="ps-field-label">Temporary Password</label>
-        <input type="password" class="ps-input" name="password" minlength="12" required>
-      </div>
-      <div class="col-md-6 col-12">
-        <label class="ps-field-label">Confirm Password</label>
-        <input type="password" class="ps-input" name="confirm_password" minlength="12" required>
+      <div class="col-12">
+        <div class="alert alert-info mb-0" style="font-size:13px;">
+          A secure temporary password is generated automatically when you add the employee.
+          You&rsquo;ll see it once on the next page, where you can download it for the employee.
+        </div>
       </div>
       <div class="col-12 mt-4">
         <button type="submit" class="filter-btn" style="padding:8px 20px;">
@@ -118,6 +118,11 @@
 {% endblock %}
 
 {% block scripts %}
+<style>
+  .ps-field-label.required::after, .req-star { content:" *"; color:#d32f2f; font-weight:700; }
+  .ps-field-label.required::after { margin-left:2px; }
+  .req-note { font-size:12px; color:var(--text-muted); margin-bottom:12px; }
+</style>
 <script>
     window.__psgcUrl = "{{ url_for('nurse.nurse_static_data', filename='psgc_data.json') }}";
 </script>
