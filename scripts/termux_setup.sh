@@ -2,7 +2,8 @@
 # One-time setup inside Termux. Run from the project folder:  bash scripts/termux_setup.sh
 set -e
 pkg update -y && pkg upgrade -y
-pkg install -y python sqlite unzip net-tools
+pkg install -y python sqlite unzip net-tools python-numpy python-pillow
+rm -rf .venv
 python -m venv .venv
 . .venv/bin/activate
 pip install --upgrade pip
