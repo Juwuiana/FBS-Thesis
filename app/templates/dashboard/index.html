@@ -1,221 +1,206 @@
 {% extends "admin/admin_base.html" %}
 {% set active_page = "dashboard" %}
 
-{% block title %}Dashboard – FBS Diabetes Risk{% endblock %}
+{% block title %}Dashboard - FBS Diabetes Risk{% endblock %}
 {% block page_title %}Dashboard{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/admin_dashboard.css') }}" />{% endblock %}
+
+{# ---------- helpers (same rules as the nurse dashboard) ---------- #}
+{% macro fbs_cls(v) -%}
+{{ 'diabetic' if v >= 126 else ('pre' if v >= 100 else 'normal') }}
+{%- endmacro %}
+
+{% macro fbs_tip(v) -%}
+{{ 'Diabetic range (126 or higher)' if v >= 126 else ('Pre-diabetic range (100 to 125)' if v >= 100 else 'Normal range (below 100)') }}
+{%- endmacro %}
+
+{% macro chg(c, up_is_bad, meaning, label) -%}
+{% if c %}
+    {% set tone = 'flat' if c.dir == 'flat' else ('bad' if (c.dir == 'up') == up_is_bad else 'good') %}
+    {% if c.dir == 'flat' %}
+        {% set tip = 'No change ' ~ label ~ '. ' ~ meaning %}
+    {% else %}
+        {% set tip = ('Up ' if c.dir == 'up' else 'Down ') ~ c.diff ~ ' ' ~ label ~ '. ' ~ meaning %}
+    {% endif %}
+    <span class="ad-change {{ tone }} ad-tip" tabindex="0" data-tip="{{ tip }}">
+        {% if c.dir == 'up' %}
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+        {% elif c.dir == 'down' %}
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>
+        {% else %}
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg>
+        {% endif %}
+        {{ c.diff if c.dir != 'flat' else '' }}<span class="ad-sc-label">{{ label }}</span>
+    </span>
+{% else %}
+    <span class="ad-change flat ad-tip" tabindex="0" data-tip="Total for all recorded patients. A week-over-week arrow appears once there is a screening from about a week ago to compare with.">all time</span>
+{% endif %}
+{%- endmacro %}
 
 {% block content %}
 <main class="page-content">
+<div class="ad-dash">
 
-  <!-- ── ROW 1: STAT CARDS ── -->
-  <div class="row g-3 mb-3">
-    <div class="col-6 col-md col-lg">
-      <div class="stat-card">
-        <div class="stat-label">Total Screened</div>
-        <div class="stat-value">{{ metrics.total_screened | default('1,392') }}</div>
-        <div class="stat-change up">
-          <i class="bi bi-arrow-up-short"></i>{{ metrics.total_screened_change | default('+1.2% vs last week') }}
-        </div>
-      </div>
+<div class="ad-head">
+    <div>
+        <h1 class="ad-title">Dashboard</h1>
+        <p class="ad-sub">Santa Rosa City Health Office &mdash; Diabetes Risk Overview</p>
     </div>
-    <div class="col-6 col-md col-lg">
-      <div class="stat-card">
-        <div class="stat-label">At Risk (Predicted)</div>
-        <div class="stat-value">
-          {{ metrics.at_risk | default(276) }}
-          <span style="font-size:14px;font-weight:500;color:var(--text-muted)">({{ metrics.at_risk_pct | default(19.8) }}%)</span>
-        </div>
-        <div class="stat-change up">
-          <i class="bi bi-arrow-up-short"></i>{{ metrics.at_risk_change | default('+8% vs last week') }}
-        </div>
-      </div>
+    <div class="ad-legend" aria-label="Colour guide">
+        <span class="ad-legend-title">Fasting blood sugar</span>
+        <span class="ad-chip normal ad-tip" tabindex="0" data-tip="Normal: the body is handling sugar well. Routine re-screening only.">Normal &middot; below 100</span>
+        <span class="ad-chip pre ad-tip" tabindex="0" data-tip="Pre-diabetic: higher than normal but not yet diabetic. Lifestyle advice and a re-check are recommended.">Pre-diabetic &middot; 100&ndash;125</span>
+        <span class="ad-chip diabetic ad-tip" tabindex="0" data-tip="Diabetic range: 126 or higher. Needs confirmation and referral to a physician.">Diabetic &middot; 126+</span>
+        <span class="ad-info ad-tip" tabindex="0" data-tip="All values are fasting blood sugar in mg/dL (fasted at least 8 hours).">i</span>
     </div>
-    <div class="col-6 col-md col-lg">
-      <div class="stat-card">
-        <div class="stat-label">High Risk</div>
-        <div class="stat-value">
-          {{ metrics.high_risk | default(82) }}
-          <span style="font-size:14px;font-weight:500;color:var(--text-muted)">({{ metrics.high_risk_pct | default(5.9) }}%)</span>
-        </div>
-        <div class="stat-change up">
-          <i class="bi bi-arrow-up-short"></i>{{ metrics.high_risk_change | default('+3% vs last week') }}
-        </div>
-      </div>
-    </div>
-    <div class="col-6 col-md col-lg">
-      <div class="stat-card">
-        <div class="stat-label">Average FBS (mg/dL)</div>
-        <div class="stat-value">{{ metrics.avg_fbs | default(111.4) }}</div>
-        <div class="stat-change up">
-          <i class="bi bi-arrow-up-short"></i>{{ metrics.avg_fbs_change | default('+2.6 vs last week') }}
-        </div>
-      </div>
-    </div>
-    <div class="col-6 col-md col-lg">
-      <div class="stat-card">
-        <div class="stat-label">Model Accuracy</div>
-        <div class="stat-value">{{ ("%.1f"|format(metrics.model_accuracy) ~ "%") if metrics.model_accuracy is not none else "n/a" }}</div>
-        <div class="stat-change neutral">{{ model_performance.source or "Latest logged evaluation" }}</div>
-      </div>
-    </div>
-  </div>
+</div>
 
-  <!-- ── ROW 2: DONUT / LINE CHART / BARANGAY ── -->
-  <div class="row g-3 mb-3">
-
-    <!-- Donut -->
-    <div class="col-lg-3 col-md-6 col-12">
-      <div class="chart-card h-100">
-        <div class="chart-card-title">Risk Distribution</div>
-        <canvas id="donutChart" height="180"></canvas>
-                <div class="donut-legend mt-3">
-          {% set legend_rows = [
-            ("Low", "low", "--risk-low"),
-            ("Moderate", "moderate", "--risk-moderate"),
-            ("High", "high", "--risk-high"),
-          ] %}
-          {% for label, key, color_var in legend_rows %}
-          <div class="donut-legend-item">
-            <span class="legend-dot" style="background:var({{ color_var }})"></span>
-            <span>{{ label }} Risk – <strong>{{ risk_distribution[key].pct }}%</strong> ({{ risk_distribution[key].count }})</span>
-          </div>
-          {% endfor %}
+<div class="ad-stats">
+    <div class="ad-stat">
+        <div class="ad-stat-title">Total Screened
+            <span class="ad-info ad-tip" tabindex="0" data-tip="Patients with at least one completed fasting blood sugar test.">i</span>
         </div>
-      </div>
+        <div class="ad-stat-row">
+            <div class="ad-stat-value">{{ summary.total_screened }}</div>
+            {{ chg(summary_changes.get('total_screened'), false, 'More patients reached.', change_label) }}
+        </div>
+    </div>
+    <div class="ad-stat">
+        <div class="ad-stat-title">At Risk (Moderate + High)
+            <span class="ad-info ad-tip" tabindex="0" data-tip="Patients whose latest risk level is Moderate or High. A rise means more people need follow-up.">i</span>
+        </div>
+        <div class="ad-stat-row">
+            <div class="ad-stat-value">{{ summary.at_risk }}</div>
+            {{ chg(summary_changes.get('at_risk'), true, 'More at-risk patients is worse.', change_label) }}
+        </div>
+    </div>
+    <div class="ad-stat">
+        <div class="ad-stat-title">High Risk
+            <span class="ad-info ad-tip" tabindex="0" data-tip="Patients whose latest risk level is High.">i</span>
+        </div>
+        <div class="ad-stat-row">
+            <div class="ad-stat-value danger">{{ summary.high_risk }}</div>
+            {{ chg(summary_changes.get('high_risk'), true, 'More high-risk patients is worse.', change_label) }}
+        </div>
+    </div>
+    <div class="ad-stat">
+        <div class="ad-stat-title">Avg. FBS (mg/dL)
+            <span class="ad-info ad-tip" tabindex="0" data-tip="Average of each patient's latest fasting blood sugar. The colour shows which range the average falls in.">i</span>
+        </div>
+        <div class="ad-stat-row">
+            {% if summary.avg_fbs %}
+            <div class="ad-stat-value {{ fbs_cls(summary.avg_fbs) }} ad-tip" tabindex="0" data-tip="Average is in the {{ fbs_tip(summary.avg_fbs)|lower }}">{{ summary.avg_fbs }}</div>
+            {% else %}
+            <div class="ad-stat-value">&mdash;</div>
+            {% endif %}
+            {{ chg(summary_changes.get('avg_fbs'), true, 'A higher average means worse overall glucose control.', change_label) }}
+        </div>
+    </div>
+</div>
+
+<div class="ad-row">
+    <div class="ad-card ad-span-4">
+        <div class="ad-card-head">Risk Profile Distribution</div>
+        <div class="ad-card-body">
+            <div class="ad-chart"><canvas id="adRiskDonut"></canvas></div>
+            <p class="ad-note">
+                Based on {{ risk_total }} completed screening{{ 's' if risk_total != 1 else '' }}
+                (Low: {{ risk_counts.Low }}, Moderate: {{ risk_counts.Moderate }}, High: {{ risk_counts.High }})
+            </p>
+        </div>
     </div>
 
-    <!-- Line Chart -->
-    <div class="col-lg-6 col-md-12 col-12">
-      <div class="chart-card h-100">
-        <div class="chart-card-title">Screenings Over Time</div>
-        <canvas id="lineChart" height="200"></canvas>
-      </div>
+    <div class="ad-card ad-span-8">
+        <div class="ad-card-head">Screening Volume Timeline</div>
+        <div class="ad-card-body">
+            <div class="ad-crumbs" id="adVolumeCrumbs"></div>
+            <div class="ad-chart"><canvas id="adVolumeLine"></canvas></div>
+            <p class="ad-note" id="adVolumeHint">Click a point or a label below the chart to zoom in.</p>
+        </div>
+    </div>
+</div>
+
+<div class="ad-row">
+    <div class="ad-card ad-span-5">
+        <div class="ad-card-head">Regional Burden &mdash; Top Barangays</div>
+        <div class="ad-card-body">
+            <div class="ad-chart ad-chart-tall" style="height:{{ [280, top_barangays|length * 38 + 40]|max }}px"><canvas id="adBarangayBar"></canvas></div>
+            <p class="ad-note">Patients per barangay (latest visit), same count as the nurse dashboard.</p>
+        </div>
     </div>
 
-    <!-- Barangay -->
-    <div class="col-lg-3 col-md-6 col-12">
-      <div class="chart-card h-100">
-        <div class="chart-card-title">Barangay List by At-Risk Count</div>
-        {% set barangays = barangay_list if barangay_list is defined else [
-          {"name":"Kanluran","count":58},
-          {"name":"Market Area","count":47},
-          {"name":"Dila","count":41},
-          {"name":"Dita","count":33},
-          {"name":"Malitlit","count":29}
-        ] %}
-        {% for b in barangays %}
-        <div class="barangay-item">
-          <div class="d-flex justify-content-between">
-            <span class="barangay-name">{{ b.name }}</span>
-            <span class="barangay-count">{{ b.count }}</span>
-          </div>
-          <div class="barangay-bar-track">
-            <div class="barangay-bar-fill" style="width:{{ (b.count / 60 * 100)|int }}%"></div>
-          </div>
+    <div class="ad-card ad-span-7">
+        <div class="ad-card-head">Recent Patient Registries</div>
+        <div class="ad-table-wrap">
+            <table class="ad-table">
+                <thead>
+                    <tr>
+                        <th>Patient ID</th>
+                        <th>Name</th>
+                        <th>Age / Sex</th>
+                        <th>FBS (mg/dL)</th>
+                        <th>Risk Level</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in recent %}
+                    <tr>
+                        <td>{{ r.patient_code }}</td>
+                        <td>{{ r.last_name }}, {{ r.first_name }}</td>
+                        <td>{{ r.age }} / {{ r.sex }}</td>
+                        <td>
+                            {% if r.fbs_mg_dl is not none %}
+                            <span class="ad-fbs {{ fbs_cls(r.fbs_mg_dl) }} ad-tip" tabindex="0" data-tip="{{ fbs_tip(r.fbs_mg_dl) }}">{{ r.fbs_mg_dl }}</span>
+                            {% else %}&mdash;{% endif %}
+                        </td>
+                        <td>
+                            {% if r.risk == 'High' %}<span class="ad-badge high">High</span>
+                            {% elif r.risk == 'Moderate' %}<span class="ad-badge mod">Moderate</span>
+                            {% elif r.risk == 'Low' %}<span class="ad-badge low">Low</span>
+                            {% else %}<span class="ad-empty" style="padding:0">Pending</span>{% endif %}
+                        </td>
+                        <td>{{ r.assessment_date or "&mdash;"|safe }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="6" class="ad-empty">No screenings recorded yet.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
-        {% endfor %}
-      </div>
     </div>
-  </div>
+</div>
 
-  <!-- ── ROW 3: RECENT SCREENINGS / MODEL PERFORMANCE ── -->
-  <div class="row g-3">
-
-    <!-- Recent Screenings Table -->
-    <div class="col-lg-8 col-12">
-      <div class="chart-card">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-          <div class="chart-card-title mb-0">Recent Screenings</div>
-          
+<div class="ad-row">
+    <div class="ad-card ad-span-12">
+        <div class="ad-card-head">Model Performance
+            <a class="ad-link" href="{{ url_for('admin.reliability') }}">Full report</a>
         </div>
-        <div class="table-responsive">
-          <table class="table table-borderless screening-table mb-0">
-            <thead>
-              <tr>
-                <th>Patient ID</th>
-                <th>Name</th>
-                <th>FBS (mg/dL)</th>
-                <th>Category</th>
-                <th>Risk Level</th>
-                <th>Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% set rows = recent_screenings if recent_screenings is defined else [
-                {"id":"CAB-2025-0156","name":"Juan Dela Cruz","fbs":142,"category":"Diabetic","risk":"High","date":"May 27, 2025"},
-                {"id":"CAB-2025-0155","name":"Maria Santos","fbs":118,"category":"Prediabetic","risk":"Low","date":"May 27, 2025"},
-                {"id":"CAB-2025-0154","name":"Pedro Reyes","fbs":96,"category":"Normal","risk":"Moderate","date":"May 27, 2025"},
-                {"id":"CAB-2025-0153","name":"Ana Garcia","fbs":134,"category":"Prediabetic","risk":"High","date":"May 27, 2025"},
-                {"id":"CAB-2025-0152","name":"Lisa Perez","fbs":155,"category":"Diabetic","risk":"High","date":"May 26, 2025"}
-              ] %}
-              {% for r in rows %}
-              <tr>
-                <td style="font-size:12px;color:var(--text-muted)">{{ r.id }}</td>
-                <td>{{ r.name }}</td>
-                <td><strong>{{ r.fbs }}</strong></td>
-                <td><span class="badge-category">{{ r.category }}</span></td>
-                <td>
-                  <span class="risk-pill risk-{{ r.risk | lower }}">{{ r.risk }}</span>
-                </td>
-                <td style="font-size:12px;color:var(--text-muted)">{{ r.date }}</td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
+        <div class="ad-card-body">
+            {% if model_performance.source %}<p class="ad-note" style="text-align:left;margin:0 0 .6rem">{{ model_performance.source }}</p>{% endif %}
+            <div class="ad-perf-grid">
+                <div class="ad-perf-item"><span>Accuracy</span><strong>{{ model_performance.accuracy }}%</strong></div>
+                <div class="ad-perf-item"><span>Precision</span><strong>{{ model_performance.precision }}</strong></div>
+                <div class="ad-perf-item"><span>Recall</span><strong>{{ model_performance.recall }}</strong></div>
+                <div class="ad-perf-item"><span>F1-Score</span><strong>{{ model_performance.f1_score }}</strong></div>
+                <div class="ad-perf-item"><span>ROC-AUC</span><strong>{{ model_performance.roc_auc }}</strong></div>
+            </div>
         </div>
-      </div>
     </div>
+</div>
 
-    <!-- Model Performance -->
-    <div class="col-lg-4 col-12">
-      <div class="chart-card h-100">
-        <div class="chart-card-title">Model Performance (Current Model)</div>
-        <canvas id="radarChart" height="200"></canvas>
-        <div class="mt-3">
-          {% set perf = model_performance %}
-          {% if perf.source %}<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">{{ perf.source }}</div>{% endif %}
-          <div class="perf-row">
-            <span class="perf-label">Accuracy</span>
-            <span class="perf-value">{{ perf.accuracy }}%</span>
-          </div>
-          <div class="perf-row">
-            <span class="perf-label">Precision</span>
-            <span class="perf-value">{{ perf.precision }}</span>
-          </div>
-          <div class="perf-row">
-            <span class="perf-label">Recall</span>
-            <span class="perf-value">{{ perf.recall }}</span>
-          </div>
-          <div class="perf-row">
-            <span class="perf-label">F1-Score</span>
-            <span class="perf-value">{{ perf.f1_score }}</span>
-          </div>
-          <div class="perf-row">
-            <span class="perf-label">ROC-AUC</span>
-            <span class="perf-value">{{ perf.roc_auc }}</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
+</div>
 </main>
+{% endblock %}
 
+{% block scripts %}
 <script>
-  window.__dashboardData = {
-    riskData: [
-      {{ risk_distribution.low.pct }},
-      {{ risk_distribution.moderate.pct }},
-      {{ risk_distribution.high.pct }}
-    ],
+  window.__adminDash = {
+    riskData: {{ risk_data | tojson }},
     timeline: {{ timeline | tojson }},
-    modelPerformance: {
-      accuracy: {{ (model_performance.accuracy / 100) if model_performance.accuracy else 0 }},
-      precision: {{ model_performance.precision or 0 }},
-      recall: {{ model_performance.recall or 0 }},
-      f1: {{ model_performance.f1_score or 0 }},
-      rocAuc: {{ model_performance.roc_auc or 0 }}
-    }
+    topBarangays: {{ top_barangays | tojson }},
+    volumeUrl: {{ url_for('admin.dashboard_screening_volume') | tojson }}
   };
 </script>
+<script src="{{ url_for('static', filename='js/admin_dashboard.js') }}"></script>
 {% endblock %}

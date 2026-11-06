@@ -12,6 +12,7 @@ from app.controllers import auth_controller, metrics_controller
 from app.constants import CSV_IMPORT_COLUMNS, ROLE_MAP, STATION_MAP
 from app.db import get_db
 from app.models import audit_model
+from app.models import health_analytics_model
 from app.models.model_performance_model import list_models, get_best_model
 from app.views.auth_views import login_required, require_role_for_blueprint, role_required
 
@@ -194,165 +195,75 @@ def _download_retention_archive(patient_model):
 @admin_bp.route("/dashboard")
 @login_required
 def dashboard():
-    conn = get_db()
+    # Same data functions as the nurse dashboard, so every number matches it.
+    summary = health_analytics_model.get_dashboard_summary()
+    risk_status = health_analytics_model.get_risk_status_distribution()
+    timeline = health_analytics_model.get_screening_volume_timeline(level="year")
+    top_barangays = health_analytics_model.get_top_barangays()
+    recent = health_analytics_model.get_recent_registries()
+    summary_changes = health_analytics_model.get_dashboard_changes()
 
-    # "Current" stats (Total Screened, At Risk, High Risk, Avg FBS, Risk
-    # Distribution) reflect each PATIENT's most recent screening only, so a
-    # patient tested 5 times counts once, using their latest result. This
-    # matches the nurse dashboard's patient-based count. The Barangay list,
-    # Timeline, and Recent Screenings table intentionally stay as full
-    # event logs -- they're about screening activity, not current status.
-    latest_rows = conn.execute(
-        """
-        WITH latest_ids AS (
-            SELECT ls.id AS screening_id,
-                   ROW_NUMBER() OVER (
-                       PARTITION BY v.patient_id
-                       ORDER BY ls.test_datetime DESC, ls.id DESC
-                   ) AS rn
-            FROM lab_screenings ls
-            JOIN visits v ON v.id = ls.visit_id
-        )
-        SELECT ls.fbs_mg_dl, COALESCE(ls.final_risk_level, ls.preliminary_risk_level) AS final_risk_level
-        FROM lab_screenings ls
-        JOIN latest_ids li ON li.screening_id = ls.id
-        WHERE li.rn = 1
-        """
-    ).fetchall()
-
-    total_screened = len(latest_rows)
-    at_risk_count = sum(1 for r in latest_rows if r["final_risk_level"] in ("Moderate", "High"))
-    high_risk_count = sum(1 for r in latest_rows if r["final_risk_level"] == "High")
-    at_risk_pct = round(100 * at_risk_count / total_screened, 1) if total_screened else 0
-    high_risk_pct = round(100 * high_risk_count / total_screened, 1) if total_screened else 0
-
-    fbs_values = [r["fbs_mg_dl"] for r in latest_rows if r["fbs_mg_dl"] is not None]
-    avg_fbs = round(sum(fbs_values) / len(fbs_values), 1) if fbs_values else 0
-
-    metrics = {
-        "total_screened": total_screened,
-        "at_risk": at_risk_count, "at_risk_pct": at_risk_pct,
-        "high_risk": high_risk_count, "high_risk_pct": high_risk_pct,
-        "avg_fbs": avg_fbs,
-        "model_accuracy": 59.7,  # RandomForest test accuracy (WIP)
+    risk_counts = {
+        "Low": risk_status.get("Low", 0),
+        "Moderate": risk_status.get("Moderate", 0),
+        "High": risk_status.get("High", 0),
     }
+    risk_total = sum(risk_counts.values())
+    if risk_total:
+        risk_data = [round(risk_counts[k] / risk_total * 100, 1) for k in ("Low", "Moderate", "High")]
+    else:
+        risk_data = [0, 0, 0]
 
-    low_count = sum(1 for r in latest_rows if r["final_risk_level"] == "Low")
-    moderate_count = sum(1 for r in latest_rows if r["final_risk_level"] == "Moderate")
-    high_count = high_risk_count
-    risk_distribution = {
-        "low":      {"count": low_count,      "pct": round(100*low_count/total_screened,1) if total_screened else 0},
-        "moderate": {"count": moderate_count, "pct": round(100*moderate_count/total_screened,1) if total_screened else 0},
-        "high":     {"count": high_count,     "pct": round(100*high_count/total_screened,1) if total_screened else 0},
-    }
-
-    barangay_rows = conn.execute(
-        """
-        SELECT b.name, COUNT(ls.id) AS cnt
-        FROM lab_screenings ls
-        JOIN visits v ON v.id = ls.visit_id
-        JOIN patients p ON p.id = v.patient_id
-        LEFT JOIN barangays b ON b.id = p.barangay_id
-        GROUP BY b.name
-        ORDER BY cnt DESC
-        LIMIT 5
-        """
-        ).fetchall()
-    barangay_list = [{"name": row[0] or "Unknown", "count": row[1]} for row in barangay_rows]
-
-    period_rows = conn.execute(
-        "SELECT test_datetime, COALESCE(final_risk_level, preliminary_risk_level) AS final_risk_level "
-        "FROM lab_screenings WHERE test_datetime IS NOT NULL"
-    ).fetchall()
-
-    day_totals, day_at_risk = {}, {}
-    for row in period_rows:
-        try:
-            d = datetime.fromisoformat(row["test_datetime"]).date()
-        except (TypeError, ValueError):
-            continue
-        day_totals[d] = day_totals.get(d, 0) + 1
-        if row["final_risk_level"] in ("Moderate", "High"):
-            day_at_risk[d] = day_at_risk.get(d, 0) + 1
-
-    recent_days = sorted(day_totals.keys(), reverse=True)[:14]
-    recent_days.reverse()  # chronological order for the chart
-
-    timeline_labels, timeline_total, timeline_at_risk = [], [], []
-    for d in recent_days:
-        timeline_labels.append(d.strftime("%b %d"))
-        timeline_total.append(day_totals.get(d, 0))
-        timeline_at_risk.append(day_at_risk.get(d, 0))
-    timeline = {"labels": timeline_labels, "totalScreened": timeline_total, "atRisk": timeline_at_risk}
-
-    recent_rows = conn.execute(
-        """
-        SELECT ls.id, p.first_name, p.middle_name, p.last_name, p.birthdate, p.sex,
-               ls.fbs_mg_dl, ls.model_predicted_risk_level,
-               COALESCE(ls.final_risk_level, ls.preliminary_risk_level) AS final_risk_level,
-               ls.test_datetime
-        FROM lab_screenings ls
-        JOIN visits v ON v.id = ls.visit_id
-        JOIN patients p ON p.id = v.patient_id
-        ORDER BY ls.test_datetime DESC
-        LIMIT 10
-        """
-    ).fetchall()
-    recent_screenings = []
-    for row in recent_rows:
-        full_name = " ".join(
-            part for part in [row["first_name"], row["middle_name"], row["last_name"]] if part
-        )
-        age = _compute_age(row["birthdate"]) if row["birthdate"] else None
-        try:
-            date_display = datetime.fromisoformat(row["test_datetime"]).strftime("%b %d, %Y")
-        except (TypeError, ValueError):
-            date_display = row["test_datetime"]
-        recent_screenings.append({
-            "id": f"SCR-{row['id']:05d}",
-            "name": full_name,
-            "age_sex": f"{age if age is not None else '—'}/{row['sex'] or '—'}",
-            "fbs": row["fbs_mg_dl"],
-            "category": row["model_predicted_risk_level"],
-            "risk": row["final_risk_level"],
-            "date": date_display,
-        })
-
-    # WIP: RandomForest test-set metrics from phase4_summary.json (macro-averaged, n=216).
+    # WIP fallback, used only when model_performance_logs has no rows.
     model_performance = {
         "accuracy": 59.7, "precision": 0.553, "recall": 0.554,
         "f1_score": 0.548, "roc_auc": 0.737,
         "source": "RandomForest - held-out test set (n=216) - WIP",
     }
-
-    # From feature/model-reliability: once real evaluation results exist in
-    # model_performance_logs, use the actual best model's numbers instead of
-    # the placeholder figures above. Falls back to the placeholders (and thus
-    # never breaks the dashboard) when the table is empty or unmigrated.
     try:
         best = get_best_model()
     except sqlite3.Error:
         best = None
     if best:
-        if best.get("accuracy") is not None:
-            metrics["model_accuracy"] = round(best["accuracy"] * 100, 1)
+        def _val(key, fallback):
+            return best.get(key) if best.get(key) is not None else fallback
+
+        n = best.get("test_set_size")
         model_performance = {
             "accuracy": round(best["accuracy"] * 100, 1) if best.get("accuracy") is not None else model_performance["accuracy"],
-            "precision": best.get("precision_score") if best.get("precision_score") is not None else model_performance["precision"],
-            "recall": best.get("recall_score") if best.get("recall_score") is not None else model_performance["recall"],
-            "f1_score": best.get("f1_score") if best.get("f1_score") is not None else model_performance["f1_score"],
-            "roc_auc": best.get("roc_auc") if best.get("roc_auc") is not None else model_performance["roc_auc"],
+            "precision": _val("precision_score", model_performance["precision"]),
+            "recall": _val("recall_score", model_performance["recall"]),
+            "f1_score": _val("f1_score", model_performance["f1_score"]),
+            "roc_auc": _val("roc_auc", model_performance["roc_auc"]),
+            "source": f"{best['model_name']} - held-out test set" + (f" (n={n:,})" if n else ""),
         }
 
     return render_template(
         "dashboard/index.html",
-        metrics=metrics,
-        risk_distribution=risk_distribution,
-        barangay_list=barangay_list,
-        recent_screenings=recent_screenings,
-        model_performance=model_performance,
+        summary=summary,
+        summary_changes=summary_changes,
+        change_label="vs last week",
+        risk_data=risk_data,
+        risk_counts=risk_counts,
+        risk_total=risk_total,
         timeline=timeline,
+        top_barangays=top_barangays,
+        recent=recent,
+        model_performance=model_performance,
     )
+
+
+@admin_bp.route("/dashboard/screening-volume")
+@login_required
+def dashboard_screening_volume():
+    """Drill-down data for the Screening Volume Timeline (year -> month -> week)."""
+    level = request.args.get("level", "year")
+    try:
+        data = health_analytics_model.get_screening_volume_timeline(
+            level=level, year=request.args.get("year"), month=request.args.get("month"))
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify({"level": level, "labels": list(data.keys()), "values": list(data.values())})
 
 
 # ── Demo/placeholder fallback for the Model Reliability page ───────────────

@@ -6,6 +6,12 @@
 
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/reliability.css') }}" />
+<style>
+  /* compact reliability page */
+  .rel-chart-box { position: relative; height: 210px; }
+  .rel-chart-box.cv { height: 190px; }
+
+</style>
 {% endblock %}
 
 {% block content %}
@@ -20,7 +26,7 @@
 
     <!-- Algorithm Benchmarking Table -->
     <div class="col-lg-7 col-12">
-      <div class="rel-card h-100">
+      <div class="rel-card">
         <div class="rel-card-title">Algorithm benchmarking — all models</div>
         <div class="table-responsive">
           <table class="table table-borderless bench-table mb-0">
@@ -59,6 +65,26 @@
           computed for the selected model only.
         </p>
         {% endif %}
+      </div>
+      <div class="rel-card mt-3">
+        <div class="rel-card-title">Model Optimization Details</div>
+        {% set opt = optimization %}
+        <div class="detail-row">
+          <span class="detail-label">Optimization Technique</span>
+          <span class="detail-value">{{ opt.technique or "—" }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Serialized Model Size</span>
+          <span class="detail-value">{{ (opt.serialized_size_kb ~ " KB") if opt.serialized_size_kb is not none else "—" }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Avg. Inference Latency</span>
+          <span class="detail-value">{{ (opt.inference_time_ms ~ " ms") if opt.inference_time_ms is not none else "—" }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Target Deployment Device</span>
+          <span class="detail-value">{{ opt.target_device or "—" }}</span>
+        </div>
       </div>
     </div>
 
@@ -127,32 +153,9 @@
   <!-- ── ROW 2: OPTIMIZATION / TRAINING SET / THRESHOLDS ── -->
   <div class="row g-3 mb-3">
 
-    <!-- Model Optimization Details -->
-    <div class="col-lg-4 col-md-6 col-12">
-      <div class="rel-card h-100">
-        <div class="rel-card-title">Model Optimization Details</div>
-        {% set opt = optimization %}
-        <div class="detail-row">
-          <span class="detail-label">Optimization Technique</span>
-          <span class="detail-value">{{ opt.technique or "—" }}</span>
-        </div>
-        <div class="detail-row">
-          <span class="detail-label">Serialized Model Size</span>
-          <span class="detail-value">{{ (opt.serialized_size_kb ~ " KB") if opt.serialized_size_kb is not none else "—" }}</span>
-        </div>
-        <div class="detail-row">
-          <span class="detail-label">Avg. Inference Latency</span>
-          <span class="detail-value">{{ (opt.inference_time_ms ~ " ms") if opt.inference_time_ms is not none else "—" }}</span>
-        </div>
-        <div class="detail-row">
-          <span class="detail-label">Target Deployment Device</span>
-          <span class="detail-value">{{ opt.target_device or "—" }}</span>
-        </div>
-      </div>
-    </div>
 
     <!-- Training Set Details -->
-    <div class="col-lg-4 col-md-6 col-12">
+    <div class="col-lg-6 col-md-6 col-12">
       <div class="rel-card h-100">
         <div class="rel-card-title">Training Set Details</div>
         {% set ts = training_set %}
@@ -221,7 +224,7 @@
     </div>
 
     <!-- Risk Prediction Thresholds -->
-    <div class="col-lg-4 col-md-12 col-12">
+    <div class="col-lg-6 col-md-6 col-12">
       <div class="rel-card h-100">
         <div class="rel-card-title">Risk Prediction Thresholds</div>
 
@@ -258,11 +261,11 @@
   <div class="row g-3">
 
     <!-- Feature Importance -->
-    <div class="col-lg-6 col-12">
+    <div class="col-md-6 col-12">
       <div class="rel-card h-100">
         <div class="rel-card-title">Feature Importance</div>
         {% if feature_importance %}
-        <canvas id="featureChart" height="200"></canvas>
+        <div class="rel-chart-box"><canvas id="featureChart"></canvas></div>
         <div class="text-muted-sm" style="font-size:12px;margin-top:8px;">Share of the model's predictive power that each input accounts for. Measured on the held-out test set by shuffling one input at a time and seeing how much the model's AUC drops. Longer bar = the model relies on it more.</div>
         {% else %}
         <div class="text-muted-sm" style="font-size:12px;">Feature importance not available.</div>
@@ -271,11 +274,11 @@
     </div>
 
     <!-- Cross-Validation Results -->
-    <div class="col-lg-6 col-12">
+    <div class="col-md-6 col-12">
       <div class="rel-card h-100">
         <div class="rel-card-title">Cross-Validation Results</div>
         {% if cv.fold_scores %}
-        <canvas id="cvChart" height="200"></canvas>
+        <div class="rel-chart-box cv"><canvas id="cvChart"></canvas></div>
         {% else %}
         <div class="text-muted-sm" style="font-size:12px;">Per-fold CV scores not available (only mean/std/min/max recorded).</div>
         {% endif %}

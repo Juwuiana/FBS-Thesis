@@ -77,7 +77,7 @@ function initReliabilityCharts(data) {
       options: {
         indexAxis: 'y',
         responsive: true,
-        maintainAspectRatio: true,
+        maintainAspectRatio: false,
         scales: {
           x: {
             beginAtZero: true,
@@ -136,7 +136,7 @@ function initReliabilityCharts(data) {
       },
       options: {
         responsive: true,
-        maintainAspectRatio: true,
+        maintainAspectRatio: false,
         scales: {
           x: {
             grid: { display: false },
