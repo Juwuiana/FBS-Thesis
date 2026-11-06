@@ -402,13 +402,18 @@ def nurse_screening_submit(patient_id, visit_id):
     # The Predictor falls back to the clearly-labelled stub when no trained
     # model is installed, so the GREEN pipeline can still be exercised on
     # Android/Termux.
-    prediction = metrics_controller.run_measured_prediction(
-        get_db(),
-        current_app.extensions["predictor"],
-        current_app.extensions["battery"],
-        features,
-        lab_screening_id=lab_screening_id,
-    )
+    try:
+        prediction = metrics_controller.run_measured_prediction(
+            get_db(),
+            current_app.extensions["predictor"],
+            current_app.extensions["battery"],
+            features,
+            lab_screening_id=lab_screening_id,
+        )
+    except ValueError as exc:
+        flash(f"Screening saved, but no risk prediction was made: {exc}. "
+              "Please correct the patient or visit data.", "error")
+        return redirect(url_for('nurse.nurse_data_management', just_saved=1))
     lab_model.set_model_prediction(
         visit_id,
         prediction["model_predicted_risk_level"],
