@@ -1090,6 +1090,11 @@ def nurse_patient_export_visit(patient_id, visit_id):
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
 
+@nurse_bp.route('/api/analytics/followup_calendar')
+def api_followup_calendar():
+    """?month=YYYY-MM -- patients with a follow-up date in that month."""
+    return jsonify(health_analytics_model.get_followup_calendar(request.args.get('month')))
+
 @nurse_bp.route('/api/analytics/health_results')
 def api_health_results():
     return jsonify({

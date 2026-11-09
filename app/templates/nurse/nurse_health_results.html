@@ -143,6 +143,95 @@
 <!-- ============ FOLLOW-UP ============ -->
 <section class="hr-panel" id="panel-followup" role="tabpanel">
 
+    <div class="form-card">
+        <div class="card-header">Referral progress for moderate and high risk</div>
+        <div class="card-body">
+            {% for row in referral.steps %}
+            <div class="hr-meter-row">
+                <span class="hr-meter-label">{{ row.label }} <small class="hr-muted">({{ row.n }} of {{ referral.at_risk }})</small></span>
+                <div class="hr-meter {{ row.tone }}"><i style="width: {{ row.pct }}%"></i></div>
+                <span class="hr-meter-val">{{ row.pct }}%</span>
+            </div>
+            {% endfor %}
+            {% if referral.destinations %}
+            <p class="hr-note">Referred to: {% for d in referral.destinations %}{{ d.name }} ({{ d.n }}){{ ', ' if not loop.last }}{% endfor %}</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Follow-up calendar: who is scheduled on which day -->
+    <style>
+        .fu-cal-head { display:flex; align-items:center; justify-content:space-between; gap:.5rem; flex-wrap:wrap; }
+        .fu-cal-nav { display:flex; gap:.4rem; align-items:center; }
+        .fu-cal-nav .btn { padding:.3rem .7rem; font-size:.8rem; }
+        .fu-dow, .fu-grid { display:grid; grid-template-columns:repeat(7, minmax(0,1fr)); gap:4px; }
+        .fu-dow div { text-align:center; font-size:.72rem; color:var(--text-muted,#6b7280); padding:.3rem 0; }
+        .fu-cell { min-height:5.2rem; padding:.3rem .4rem; text-align:left; border:1px solid var(--border,#e5e7eb);
+                   border-radius:6px; background:#fff; font:inherit; display:flex; flex-direction:column; gap:2px; position:relative; }
+        .fu-cell.fu-empty { border:none; background:transparent; }
+        button.fu-cell { cursor:pointer; }
+        button.fu-cell:hover { border-color:#3a7d3a; }
+        .fu-daynum { font-size:.78rem; font-weight:600; }
+        .fu-count { position:absolute; top:.25rem; right:.35rem; font-size:.7rem; font-weight:700; padding:0 .4rem; border-radius:999px; background:#e5e7eb; color:#374151; }
+        .fu-past.has-pts { background:#fef2f2; border-color:#fecaca; }
+        .fu-past.has-pts .fu-count { background:#fecaca; color:#991b1b; }
+        .fu-today { border:2px solid #3a7d3a; }
+        .fu-future.has-pts { background:#f0f9ff; border-color:#bae6fd; }
+        .fu-future.has-pts .fu-count { background:#bae6fd; color:#075985; }
+        .fu-cell.is-selected { box-shadow:0 0 0 2px #3a7d3a inset; }
+        .fu-pt { font-size:.7rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:flex; align-items:center; gap:.25rem; }
+        .fu-dot { width:.5rem; height:.5rem; border-radius:50%; flex:none; }
+        .fu-dot.high { background:#dc2626; } .fu-dot.mod { background:#f59e0b; }
+        .fu-more { font-size:.68rem; color:var(--text-muted,#6b7280); }
+        .fu-legend { display:flex; gap:1rem; flex-wrap:wrap; font-size:.72rem; color:var(--text-muted,#6b7280); margin:.5rem 0; }
+        .fu-legend span::before { content:""; display:inline-block; width:.7rem; height:.7rem; border-radius:3px; margin-right:.3rem; vertical-align:-1px; border:1px solid #cbd5e1; }
+        .fu-legend .l-past::before { background:#fecaca; } .fu-legend .l-today::before { border:2px solid #3a7d3a; } .fu-legend .l-future::before { background:#bae6fd; }
+        .fu-detail { margin-top:.75rem; padding-top:.75rem; border-top:1px solid var(--border,#e5e7eb); }
+        .fu-detail-title { margin:0 0 .5rem; font-size:.9rem; }
+        .fu-detail-list { list-style:none; margin:0; padding:0; max-height:16rem; overflow-y:auto; }
+        .fu-detail-item { padding:.4rem 0; border-bottom:1px solid var(--border,#eef0f2); }
+        .fu-detail-item .risk-badge { margin-left:.5rem; }
+        .fu-filters { display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; margin-bottom:.75rem; }
+        .fu-filters .hr-select { min-width:0; }
+        .fu-filters .btn { padding:.3rem .7rem; font-size:.8rem; }
+        .fu-filter-summary { font-size:.75rem; color:var(--text-muted,#6b7280); margin-left:auto; }
+        @media (max-width:700px) { .fu-cell { min-height:3.4rem; } .fu-pt, .fu-more { display:none; } }
+    </style>
+    <div class="form-card hr-noprint" id="fuCalendar" data-patient-url="{{ url_for('nurse.nurse_patient_file_view', patient_id='__ID__') }}">
+        <div class="card-header fu-cal-head">
+            <span>Follow-up calendar &mdash; <span id="fuCalTitle"></span></span>
+            <div class="fu-cal-nav">
+                <button type="button" class="btn btn-secondary" id="fuCalPrev" aria-label="Previous month">&lsaquo;</button>
+                <button type="button" class="btn btn-secondary" id="fuCalToday">Today</button>
+                <button type="button" class="btn btn-secondary" id="fuCalNext" aria-label="Next month">&rsaquo;</button>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="fu-filters hr-noprint">
+                <select id="fuFltRisk" class="hr-select" aria-label="Filter by risk">
+                    <option value="">All risk levels</option><option value="High">High</option><option value="Moderate">Moderate</option><option value="Low">Low</option>
+                </select>
+                <select id="fuFltWhen" class="hr-select" aria-label="Filter by date status">
+                    <option value="">All dates</option><option value="past">Overdue</option><option value="today">Due today</option><option value="future">Upcoming</option>
+                </select>
+                <select id="fuFltBrgy" class="hr-select" aria-label="Filter by barangay">
+                    <option value="">All barangays</option>
+                </select>
+                <input type="search" id="fuFltSearch" class="hr-select" placeholder="Search name or ID" aria-label="Search patients">
+                <button type="button" class="btn btn-secondary" id="fuFltClear">Clear</button>
+                <span class="fu-filter-summary" id="fuFltSummary" aria-live="polite"></span>
+            </div>
+            <div class="fu-dow"><div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div></div>
+            <div class="fu-grid" id="fuCalGrid"></div>
+            <div class="fu-legend">
+                <span class="l-past">Past, no newer visit (overdue)</span>
+                <span class="l-today">Today</span>
+                <span class="l-future">Upcoming</span>
+            </div>
+            <div class="fu-detail" id="fuCalDetail"><p class="hr-sub">Select a day to see its patients.</p></div>
+        </div>
+    </div>
+
     {% if red_flags %}
     <div class="form-card hr-redflags">
         <div class="card-header">Needs clinician review today</div>
@@ -168,80 +257,6 @@
         </div>
     </div>
     {% endif %}
-
-    <div class="form-card">
-        <div class="card-header">Referral progress for moderate and high risk</div>
-        <div class="card-body">
-            {% for row in referral.steps %}
-            <div class="hr-meter-row">
-                <span class="hr-meter-label">{{ row.label }} <small class="hr-muted">({{ row.n }} of {{ referral.at_risk }})</small></span>
-                <div class="hr-meter {{ row.tone }}"><i style="width: {{ row.pct }}%"></i></div>
-                <span class="hr-meter-val">{{ row.pct }}%</span>
-            </div>
-            {% endfor %}
-            {% if referral.destinations %}
-            <p class="hr-note">Referred to: {% for d in referral.destinations %}{{ d.name }} ({{ d.n }}){{ ', ' if not loop.last }}{% endfor %}</p>
-            {% endif %}
-        </div>
-    </div>
-
-    <div class="form-card hr-worklist">
-        <div class="card-header">
-            <span>Patients needing follow-up (<span id="worklistCount">{{ worklist|length }}</span>)</span>
-            <div class="hr-filters hr-noprint">
-                <select id="worklistRisk" class="hr-select" aria-label="Filter by risk">
-                    <option value="">All risk levels</option><option value="High">High</option><option value="Moderate">Moderate</option>
-                </select>
-                <select id="worklistStatus" class="hr-select" aria-label="Filter by status">
-                    <option value="">All statuses</option><option value="overdue">Follow-up overdue</option><option value="lost">Lost to follow-up (over 1 yr)</option>
-                    <option value="none">No referral recorded</option><option value="ok">Referred / scheduled</option>
-                </select>
-                <select id="worklistBarangay" class="hr-select" aria-label="Filter by barangay">
-                    <option value="">All barangays</option>
-                    {% for b in worklist_barangays %}<option value="{{ b }}">{{ b }}</option>{% endfor %}
-                </select>
-                <input type="search" id="worklistSearch" class="hr-select" placeholder="Search name or ID" aria-label="Search patients">
-            </div>
-        </div>
-        <div class="card-body hr-scroll tall">
-            <table class="data-table hr-sticky">
-                <thead><tr>
-                    <th data-sort="name">Patient</th><th data-sort="age">Age / Sex</th><th data-sort="barangay">Barangay</th>
-                    <th data-sort="date">Last visit</th><th data-sort="fbs">FBS</th><th data-sort="risk">Risk</th>
-                    <th data-sort="status">Status</th><th data-sort="fu">Follow-up by</th>
-                </tr></thead>
-                <tbody id="worklistBody">
-                {% for w in worklist %}
-                    <tr data-risk="{{ w.risk }}" data-status="{{ w.status_key }}" data-barangay="{{ w.barangay or '' }}"
-                        data-search="{{ (w.last_name ~ ' ' ~ w.first_name ~ ' ' ~ w.patient_code)|lower }}"
-                        data-name="{{ (w.last_name ~ ' ' ~ w.first_name)|lower }}"
-                        data-age="{{ w.age if w.age is not none else '' }}"
-                        data-date="{{ w.assessment_date or '' }}"
-                        data-fbs="{{ w.fbs_mg_dl if w.fbs_mg_dl is not none else '' }}"
-                        data-riskrank="{{ 2 if w.risk == 'High' else 1 }}"
-                        data-statusrank="{{ {'overdue': 0, 'none': 1, 'lost': 2, 'ok': 3}.get(w.status_key, 4) }}"
-                        data-fu="{{ w.follow_up_date or '' }}">
-                        <td>
-                            <a class="patient-name-link" href="{{ url_for('nurse.nurse_patient_file_view', patient_id=w.patient_code) }}">{{ w.last_name }}, {{ w.first_name }}</a>
-                            <div class="hr-sub">{{ w.patient_code }}</div>
-                        </td>
-                        <td>{{ w.age if w.age is not none else '—' }} / {{ w.sex or '—' }}</td>
-                        <td>{{ w.barangay or '—' }}</td>
-                        <td>{{ w.assessment_date or '—' }}</td>
-                        <td>{{ w.fbs_mg_dl if w.fbs_mg_dl is not none else '—' }}</td>
-                        <td><span class="risk-badge {{ 'badge-danger' if w.risk == 'High' else 'badge-warning' }}">{{ w.risk }}</span></td>
-                        <td>
-                            <span class="hr-pill {{ w.status_key }}"{% if w.status_key == 'lost' %} style="background:#e5e7eb; color:#374151;"{% endif %}>{{ w.status }}</span>
-                            {% if w.referred_to %}<div class="hr-sub">{{ w.referred_to }}</div>{% endif %}
-                        </td>
-                        <td>{{ w.follow_up_date or '—' }}</td>
-                    </tr>
-                {% endfor %}
-                </tbody>
-            </table>
-            <p class="hr-empty" id="worklistEmpty" {% if worklist %}hidden{% endif %}>No patients match. Nothing is waiting on follow-up.</p>
-        </div>
-    </div>
 </section>
 
 <!-- ============ BARANGAYS ============ -->
@@ -368,4 +383,5 @@
 <script src="{{ url_for('static', filename='vendor/chartjs/chart.umd.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/nurse_dashboard_charts.js') }}"></script>
 <script src="{{ url_for('static', filename='js/nurse_screening_trend.js') }}"></script>
+<script src="{{ url_for('static', filename='js/nurse_followup_calendar.js') }}"></script>
 {% endblock %}

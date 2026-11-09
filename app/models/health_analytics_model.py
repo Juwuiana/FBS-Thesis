@@ -681,6 +681,44 @@ def get_followup_worklist(limit: int = 100) -> list[dict]:
     return result[:limit]
 
 
+def get_followup_calendar(month: str | None = None) -> dict:
+    """Follow-up dates for one month, for the calendar view on the Follow-up tab.
+    month is 'YYYY-MM' (defaults to the current month). Uses each patient's latest
+    visit, same as the worklist, so a newer visit clears an old follow-up date.
+    Returns {'month', 'today', 'days': {'YYYY-MM-DD': [patient, ...]}}."""
+    from datetime import date, timedelta
+    today = date.today()
+    try:
+        y, m = (int(x) for x in (month or "").split("-"))
+        first = date(y, m, 1)
+    except (ValueError, TypeError):
+        first = today.replace(day=1)
+    nxt = (first.replace(day=28) + timedelta(days=4)).replace(day=1)
+    last = nxt - timedelta(days=1)
+
+    conn = get_connection()
+    rows = conn.execute(f"""
+        SELECT p.patient_code, p.first_name, p.last_name, b.name AS barangay,
+               SUBSTR(ls.follow_up_date, 1, 10) AS follow_up_date,
+               ls.referral_action, ls.referred_to, ls.fbs_mg_dl,
+               {_RISK} AS risk
+        {_base_query()} AND p.anonymized_at IS NULL
+          AND ls.follow_up_date IS NOT NULL
+          AND SUBSTR(ls.follow_up_date, 1, 10) BETWEEN ? AND ?
+        ORDER BY CASE {_RISK} WHEN 'High' THEN 0 WHEN 'Moderate' THEN 1 ELSE 2 END,
+                 p.last_name, p.first_name
+        LIMIT 3000
+    """, (first.isoformat(), last.isoformat())).fetchall()
+    conn.close()
+
+    days = {}
+    for r in rows:
+        d = dict(r)
+        day = d.pop("follow_up_date")
+        days.setdefault(day, []).append(d)
+    return {"month": first.strftime("%Y-%m"), "today": today.isoformat(), "days": days}
+
+
 def get_monthly_risk_trend(months: int = 6) -> dict:
     """{'2026-09': {'Low': n, 'Moderate': n, 'High': n}} -- every screening, not just latest per patient."""
     conn = get_connection()
