@@ -277,7 +277,7 @@
                             {% if p.pending_account_help %}
                             <a class="edit-flag tip" tabindex="0"
                             href="{{ url_for('nurse.nurse_patient_file_view', patient_id=p.patient_code, return_qs=qs) }}"
-                            data-tip="{% if p.pending_account_help.reason in ['self_deactivated', 'Account deactivated by patient'] %}Patient deactivated their own portal account on {{ p.pending_account_help.at[:10] }}. Open the record to reactivate portal access if they ask.{% else %}Account help requested on {{ p.pending_account_help.at[:10] }}: {{ p.pending_account_help.reason }}. Open the record and reissue portal access.{% endif %}"
+                            data-tip="{% if p.pending_account_help.reason in ['self_deactivated', 'Account deactivated by patient'] %}Patient deactivated their own portal account on {{ p.pending_account_help.at[:10] }}. Open the record to reactivate portal access if they ask.{% else %}Account help requested on {{ p.pending_account_help.at[:10] }}: {{ p.pending_account_help.reason }}. Open the record and reissue portal access.{% endif %}">
                                 <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="M10.8 12.2 20 3M17 6l3 3M14 9l2 2"/></svg>
                             </a>
                             {% endif %}
@@ -305,7 +305,12 @@
                                 <button type="submit" class="btn btn-secondary" style="padding:0.35rem 0.75rem; font-size:0.75rem;" title="Mark the patient's own changes as reviewed">Mark reviewed</button>
                             </form>
                             {% endif %}
-                            {% if p.visit_status == "draft" %}
+                            {% if p.awaiting_lab %}
+                                <a href="{{ url_for('nurse.nurse_screening', patient_id=p.patient_code) }}"
+                                   class="risk-badge"
+                                   style="background:#fef3c7; color:#92400e; border:1px solid #fcd34d; margin-left:0.35rem; text-decoration:none; display:inline-block;"
+                                   title="Intake complete, waiting on the lab result. Click to enter FBS.">Awaiting lab</a>
+                            {% elif p.visit_status == "draft" %}
                                 <a href="{{ url_for('nurse.nurse_patient_file_view', patient_id=p.patient_code, return_qs=qs) }}?edit=1"
                                    class="risk-badge draft-continue-btn"
                                    style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1; margin-left:0.35rem; cursor:pointer; text-decoration:none; display:inline-block;"

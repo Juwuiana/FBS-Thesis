@@ -388,9 +388,20 @@ document.addEventListener("DOMContentLoaded", () => {
     const draftBtn = document.getElementById("saveDraftBtn");
 
     submitBtn.addEventListener("click", () => submitRecord("submitted"));
+
+    // Second submit path: record is complete, but the lab result isn't back
+    // yet. Same validation/status as a normal submit, no jump to screening --
+    // the patient shows under "Awaiting Lab Result" until FBS is entered.
+    const awaitBtn = document.createElement("button");
+    awaitBtn.type = "button";
+    awaitBtn.id = "submitAwaitLabBtn";
+    awaitBtn.className = "btn btn-secondary";
+    awaitBtn.textContent = "Submit — awaiting lab result";
+    awaitBtn.addEventListener("click", () => submitRecord("submitted", false));
+    submitBtn.insertAdjacentElement("afterend", awaitBtn);
     draftBtn.addEventListener("click", () => submitRecord("draft"));
 
-    async function submitRecord(status) {
+    async function submitRecord(status, goToLab = true) {
         const payload = buildPayload(status);
 
         if (!validateRecord(payload.visit, status === "submitted")) {
@@ -399,6 +410,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         submitBtn.disabled = true;
         draftBtn.disabled = true;
+        awaitBtn.disabled = true;
 
         try {
             const res = await fetch(`/api/patients/${encodeURIComponent(patientId)}/records`, {
@@ -413,14 +425,16 @@ document.addEventListener("DOMContentLoaded", () => {
                 alert(data.error || "Something went wrong saving this record.");
                 submitBtn.disabled = false;
                 draftBtn.disabled = false;
+                awaitBtn.disabled = false;
                 return;
             }
 
-            if (status === "draft") {
+            if (status === "draft" || !goToLab) {
                 submitBtn.disabled = false;
                 draftBtn.disabled = false;
+                awaitBtn.disabled = false;
                 showDraftSavedDialog({
-                    message: "Draft saved.",
+                    message: status === "draft" ? "Draft saved." : "Record submitted. Awaiting lab result.",
                     onGo: () => { window.location.href = window.__dataManagementUrl || "/nurse/data_management"; },
                     onStay: () => {},
                 });
@@ -432,6 +446,7 @@ document.addEventListener("DOMContentLoaded", () => {
             alert("Network error — please check your connection and try again.");
             submitBtn.disabled = false;
             draftBtn.disabled = false;
+            awaitBtn.disabled = false;
         }
     }
 

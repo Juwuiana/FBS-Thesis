@@ -608,9 +608,18 @@ def _age_from(birthdate):
     return today.year - b.year - ((today.month, today.day) < (b.month, b.day))
 
 
+_INTAKE_COMPLETE = "(" + " AND ".join(
+    f"COALESCE(CAST(v.{c} AS TEXT), '') != ''" for c in (
+        "smoking_status", "alcohol_intake", "illicit_drug_use",
+        "bp_systolic", "bp_diastolic", "heart_rate", "respiratory_rate",
+        "height_cm", "weight_kg", "waist_cm",
+    )
+) + ")"  # same definition as patient_model._INTAKE_COMPLETE_SQL
+
+
 def get_followup_summary() -> dict:
     """Action cards: Moderate/High with no referral logged, follow-up dates already
-    past (latest visit only, so a newer visit clears it), and visits (drafts included) with no FBS yet."""
+    past (latest visit only, so a newer visit clears it), and visits with a complete intake but no FBS yet."""
     conn = get_connection()
     row = conn.execute(f"""
         SELECT
@@ -619,16 +628,22 @@ def get_followup_summary() -> dict:
             SUM(CASE WHEN {_RISK} IN ('Moderate','High')
                       AND ls.follow_up_date IS NOT NULL
                       AND ls.follow_up_date < DATE('now') THEN 1 ELSE 0 END) AS overdue,
-            SUM(CASE WHEN v.id IS NOT NULL AND ls.fbs_mg_dl IS NULL THEN 1 ELSE 0 END) AS awaiting_lab
+            SUM(CASE WHEN v.id IS NOT NULL AND ls.fbs_mg_dl IS NULL
+                      AND {_INTAKE_COMPLETE} THEN 1 ELSE 0 END) AS awaiting_lab
         {_base_query()} AND p.anonymized_at IS NULL
     """).fetchone()
     conn.close()
     return {k: row[k] or 0 for k in ("no_action", "overdue", "awaiting_lab")}
 
 
+# A follow-up date this far in the past is no longer a "reminder" case: the
+# patient was most likely lost to follow-up and needs outreach, not a nudge.
+LOST_TO_FOLLOWUP_DAYS = 365
+
+
 def get_followup_worklist(limit: int = 100) -> list[dict]:
     """Moderate/High patients (latest visit), most urgent first:
-    High before Moderate, then overdue, then no referral, then highest FBS."""
+    High before Moderate, then overdue (recent), no referral, lost to follow-up (over a year), then highest FBS."""
     from datetime import date
     conn = get_connection()
     rows = conn.execute(f"""
@@ -646,14 +661,22 @@ def get_followup_worklist(limit: int = 100) -> list[dict]:
         d["age"] = _age_from(d["birthdate"])
         action = (d["referral_action"] or "").strip() or ("Referred" if (d["referred_to"] or "").strip() else "")
         if d["follow_up_date"] and d["follow_up_date"][:10] < today:
-            d["status_key"], d["status"] = "overdue", "Follow-up overdue"
+            try:
+                days_over = (date.today() - date.fromisoformat(d["follow_up_date"][:10])).days
+            except ValueError:
+                days_over = 0
+            d["days_overdue"] = days_over
+            if days_over > LOST_TO_FOLLOWUP_DAYS:
+                d["status_key"], d["status"] = "lost", "Lost to follow-up (over 1 year)"
+            else:
+                d["status_key"], d["status"] = "overdue", "Follow-up overdue"
         elif not action:
             d["status_key"], d["status"] = "none", "No referral recorded"
         else:
             d["status_key"], d["status"] = "ok", action
         result.append(d)
 
-    order = {"overdue": 0, "none": 1, "ok": 2}
+    order = {"overdue": 0, "none": 1, "lost": 2, "ok": 3}
     result.sort(key=lambda d: (d["risk"] != "High", order[d["status_key"]], -(d["fbs_mg_dl"] or 0)))
     return result[:limit]
 

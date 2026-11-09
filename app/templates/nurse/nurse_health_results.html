@@ -193,7 +193,7 @@
                     <option value="">All risk levels</option><option value="High">High</option><option value="Moderate">Moderate</option>
                 </select>
                 <select id="worklistStatus" class="hr-select" aria-label="Filter by status">
-                    <option value="">All statuses</option><option value="overdue">Follow-up overdue</option>
+                    <option value="">All statuses</option><option value="overdue">Follow-up overdue</option><option value="lost">Lost to follow-up (over 1 yr)</option>
                     <option value="none">No referral recorded</option><option value="ok">Referred / scheduled</option>
                 </select>
                 <select id="worklistBarangay" class="hr-select" aria-label="Filter by barangay">
@@ -219,7 +219,7 @@
                         data-date="{{ w.assessment_date or '' }}"
                         data-fbs="{{ w.fbs_mg_dl if w.fbs_mg_dl is not none else '' }}"
                         data-riskrank="{{ 2 if w.risk == 'High' else 1 }}"
-                        data-statusrank="{{ {'overdue': 0, 'none': 1, 'ok': 2}.get(w.status_key, 3) }}"
+                        data-statusrank="{{ {'overdue': 0, 'none': 1, 'lost': 2, 'ok': 3}.get(w.status_key, 4) }}"
                         data-fu="{{ w.follow_up_date or '' }}">
                         <td>
                             <a class="patient-name-link" href="{{ url_for('nurse.nurse_patient_file_view', patient_id=w.patient_code) }}">{{ w.last_name }}, {{ w.first_name }}</a>
@@ -231,7 +231,7 @@
                         <td>{{ w.fbs_mg_dl if w.fbs_mg_dl is not none else '—' }}</td>
                         <td><span class="risk-badge {{ 'badge-danger' if w.risk == 'High' else 'badge-warning' }}">{{ w.risk }}</span></td>
                         <td>
-                            <span class="hr-pill {{ w.status_key }}">{{ w.status }}</span>
+                            <span class="hr-pill {{ w.status_key }}"{% if w.status_key == 'lost' %} style="background:#e5e7eb; color:#374151;"{% endif %}>{{ w.status }}</span>
                             {% if w.referred_to %}<div class="hr-sub">{{ w.referred_to }}</div>{% endif %}
                         </td>
                         <td>{{ w.follow_up_date or '—' }}</td>

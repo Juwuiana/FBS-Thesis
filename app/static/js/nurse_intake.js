@@ -598,7 +598,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    async function submitIntake(redirectAfter) {
+    async function submitIntake(redirectAfter, goToLab = true) {
     const status = redirectAfter ? 'submitted' : 'draft';
     const { patient, visit, conditions, cvd_responses } = buildPayload(status);
 
@@ -607,8 +607,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const submitBtn = $('submitIntakeBtn');
     const draftBtn = $('saveDraftBtn');
+    const awaitBtn = $('submitAwaitLabBtn');
     submitBtn.disabled = true;
     draftBtn.disabled = true;
+    if (awaitBtn) awaitBtn.disabled = true;
 
     try {
         const res = await fetch('/api/patients', {
@@ -630,8 +632,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         patientIdInput.value = data.patient.patient_code;
-        if (redirectAfter) {
+        if (redirectAfter && goToLab) {
             window.location.href = `/nurse/screening/${data.patient.patient_code}`;
+        } else if (redirectAfter) {
+            // Intake is submitted (complete) but the lab result isn't back yet:
+            // no FBS is saved, so the patient shows under "Awaiting Lab Result".
+            showDraftSavedDialog({
+                message: `Intake submitted. Patient ID: ${data.patient.patient_code}. Awaiting lab result.`,
+                onGo: () => { window.location.href = window.__dataManagementUrl || '/nurse/data_management'; },
+                onStay: () => { resetIntakeForm(); },
+            });
         } else {
             showDraftSavedDialog({
                 message: `Draft saved. Patient ID: ${data.patient.patient_code}.`,
@@ -645,10 +655,26 @@ document.addEventListener('DOMContentLoaded', () => {
     } finally {
         submitBtn.disabled = false;
         draftBtn.disabled = false;
+        if (awaitBtn) awaitBtn.disabled = false;
     }
 }  
 
 $('submitIntakeBtn').addEventListener('click', () => submitIntake(true));
+
+// Second submit path: intake is complete, but the lab result isn't back yet.
+// Same validation and status ('submitted') as the normal submit, just no
+// jump to the screening page -- the patient waits under "Awaiting Lab Result".
+(() => {
+    const main = $('submitIntakeBtn');
+    if (!main || $('submitAwaitLabBtn')) return;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.id = 'submitAwaitLabBtn';
+    btn.className = 'btn btn-secondary';
+    btn.textContent = 'Submit — awaiting lab result';
+    btn.addEventListener('click', () => submitIntake(true, false));
+    main.insertAdjacentElement('afterend', btn);
+})();
 $('saveDraftBtn').addEventListener('click', () => submitIntake(false));
 
     // Draft saved as-is; the nurse is done with this patient for now -- clear

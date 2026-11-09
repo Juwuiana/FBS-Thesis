@@ -316,6 +316,20 @@ def update_patient(patient_id: int, data: dict, allow_name_edit: bool = False, a
     finally:
         conn.close()
 
+# "Awaiting lab" = intake is complete (every field the nurse form requires on
+# submit is filled) but no FBS has been recorded yet. A visit stays 'draft'
+# until the lab screening is saved, so status alone can't tell "intake still
+# being filled in" apart from "intake done, waiting on the lab".
+_INTAKE_REQUIRED_COLUMNS = (
+    "smoking_status", "alcohol_intake", "illicit_drug_use",
+    "bp_systolic", "bp_diastolic", "heart_rate", "respiratory_rate",
+    "height_cm", "weight_kg", "waist_cm",
+)
+_INTAKE_COMPLETE_SQL = "(" + " AND ".join(
+    f"COALESCE(CAST(v.{c} AS TEXT), '') != ''" for c in _INTAKE_REQUIRED_COLUMNS
+) + ")"
+
+
 def _patient_listing_filters(barangay=None, risk=None, date=None, q=None, status=None):
     """
     Shared WHERE-clause builder for list_patients_with_latest_screening and
@@ -338,13 +352,13 @@ def _patient_listing_filters(barangay=None, risk=None, date=None, q=None, status
         like = f"%{q.strip()}%"
         params.extend([like, like, like])
     if status == "draft":
-        conditions.append("COALESCE(v.status, '') = 'draft'")
+        conditions.append("COALESCE(v.status, '') = 'draft' AND NOT " + _INTAKE_COMPLETE_SQL)
     elif status == "account_help":
         conditions.append(
             "p.account_help_requested_at IS NOT NULL AND p.account_help_resolved_at IS NULL"
         )
     elif status == "awaiting_lab":
-        conditions.append("v.id IS NOT NULL AND COALESCE(v.status, '') != 'draft' AND ls.id IS NULL")
+        conditions.append("v.id IS NOT NULL AND ls.fbs_mg_dl IS NULL AND " + _INTAKE_COMPLETE_SQL)
     elif status == "needs_review":
 
         conditions.append("""
@@ -422,6 +436,8 @@ def list_patients_with_latest_screening(barangay=None, risk=None, date=None, ent
                v.assessment_date AS date,
                v.status AS visit_status,
                ls.fbs_mg_dl AS fbs,
+               CASE WHEN v.id IS NOT NULL AND ls.fbs_mg_dl IS NULL AND {_INTAKE_COMPLETE_SQL}
+                    THEN 1 ELSE 0 END AS awaiting_lab,
                COALESCE(ls.final_risk_level, ls.preliminary_risk_level, ls.model_predicted_risk_level) AS risk
         {_PATIENT_LISTING_JOINS}
     """
